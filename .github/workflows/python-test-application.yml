@@ -6,7 +6,7 @@ on:
       PYTHON_VERSION:
         required: true
         type: string
-        description: The python version to test and build against
+        description: The python version to test against
   workflow_dispatch:
 
 jobs:

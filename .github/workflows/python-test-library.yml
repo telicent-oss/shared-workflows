@@ -24,7 +24,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install pip-tools
 
-      - name: Generate Requirements without Code Artifact
+      - name: Generate requirements
         run: |
           python -m piptools compile --extra dev -o requirements.txt pyproject.toml
           pip install -r requirements.txt
