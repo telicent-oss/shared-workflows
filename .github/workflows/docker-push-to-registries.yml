@@ -58,11 +58,6 @@ on:
           Specifies the main branch for the repository, defaults to main.  If this build is on the configured main
           branch then the latest tag will be added to the image, if the build is on another branch then the development
           tag will be added to the image.
-    outputs:
-      aws_image: 
-        description: |
-          The versioned AWS ECR image tag that was created and published.
-        value: ${{ jobs.build.outputs.aws-image }}
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
