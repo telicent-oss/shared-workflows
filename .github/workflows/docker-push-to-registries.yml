@@ -75,7 +75,7 @@ jobs:
       packages: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/che ckout@v3
 
       - name: Set up Docker buildx
         id: buildx
@@ -108,7 +108,7 @@ jobs:
         with:
           # Defines the base image names in repository/name format
           images: |
-            ${{ env.DOCKER_USERNAME }}/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
+            telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
           # Manually handling latest below so disabling automatic latest handling
           flavor: |
             latest=false
@@ -139,5 +139,4 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           target: ${{ inputs.TARGET }}
           build-args: |
-            NPM_TOKEN=${{ secrets.NPM_REGISTRY_TOKEN }}
             ${{ inputs.BUILD_ARGS }}
