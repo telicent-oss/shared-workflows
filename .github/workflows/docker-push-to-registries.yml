@@ -1,0 +1,143 @@
+name: Publish Node Telicent image to configured container repositories
+
+on:
+  workflow_call:
+    inputs:
+      APP_NAME_PREFIX:
+        required: false
+        type: string
+        default: telicent-
+        description: |
+          The prefix for the image name, defaults to telicent- but can be set to an empty string if you prefer to just
+          use APP_NAME as the application name.
+      APP_NAME:
+        required: true
+        type: string
+        description: |
+          The name for the application used as the main portion of the image name.
+      DOCKERFILE:
+        required: true
+        type: string
+        description: |
+          The name of the Dockerfile to build the image from.
+      PATH:
+        type: string
+        description: |
+          The path in which the Dockerfile is located. For current path leave empty. Otherwise eg. ./frontend
+        default: .
+      TARGET:
+        type: string
+        required: false
+        description: |
+          The build target within the Dockerfile to build the image from.
+      BUILD_ARGS:
+        type: string
+        required: false
+        description: |
+          Additional build arguments to pass to the Docker --build-arg flag.
+      VERSION:
+        required: true
+        type: string
+        description: |
+          The version for the image, used in tagging the image.
+      VERSION_SUFFIX:
+        required: false
+        type: string
+        description: |
+          Optional suffix for the version of the image, used in tagging the image.
+      IMAGE_SUFFIX:
+        required: false
+        type: string
+        description: |
+          Optional suffix used as part of the image name.
+      MAIN_BRANCH:
+        required: false
+        type: string
+        default: main
+        description: |
+          Specifies the main branch for the repository, defaults to main.  If this build is on the configured main
+          branch then the latest tag will be added to the image, if the build is on another branch then the development
+          tag will be added to the image.
+    outputs:
+      aws_image: 
+        description: |
+          The versioned AWS ECR image tag that was created and published.
+        value: ${{ jobs.build.outputs.aws-image }}
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Set up Docker buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Enable buildkit cache
+        uses: actions/cache@v2
+        with:
+          path: /tmp/buildkit-cache/buildkit-state.tar
+          key: ${{ runner.os }}-buildkit-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildkit-
+
+      - name: Load buildkit state from cache
+        uses: dashevo/gh-action-cache-buildkit-state@v1
+        with:
+          builder: buildx_buildkit_${{ steps.buildx.outputs.name }}0
+          cache-path: /tmp/buildkit-cache
+          cache-max-size: 3g
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Prepare Docker Image Names and Tags
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          # Defines the base image names in repository/name format
+          images: |
+            ${{ env.DOCKER_USERNAME }}/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
+          # Manually handling latest below so disabling automatic latest handling
+          flavor: |
+            latest=false
+          # Creates tags based on various criteria
+          #
+          # For any tag, and more specifically semver tags i.e. v1.2.3, use the Git tag/semver as-is
+          # A long format SHA hash for all builds
+          # The developer provided version for all builds
+          # A latest tag, if and only if, this commit is on the main branch
+          # A development tag, if this commit is not on the main branch
+          tags: |
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=sha,format=long,prefix=
+            type=raw,value=${{ inputs.VERSION }}${{ inputs.VERSION_SUFFIX }}
+            type=raw,value=latest,enable=${{ github.ref_name == inputs.MAIN_BRANCH }}
+            type=raw,value=development,enable=${{ github.ref_name != inputs.MAIN_BRANCH}}
+
+      - name: Build, tag, and push image to authenticated docker registry
+        id: build-images
+        uses: docker/build-push-action@v4
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          context: ${{ inputs.PATH }}
+          file: ${{ inputs.PATH }}/${{ inputs.DOCKERFILE }}
+          tags: ${{ steps.meta.outputs.tags }}
+          target: ${{ inputs.TARGET }}
+          build-args: |
+            NPM_TOKEN=${{ secrets.NPM_REGISTRY_TOKEN }}
+            ${{ inputs.BUILD_ARGS }}
