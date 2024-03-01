@@ -16,9 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ !contains(github.event.head_commit.message, 'wip:') }}
     permissions:
-      id-token: write
       contents: read
-      packages: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -40,7 +38,6 @@ jobs:
           key: ${{ runner.os }}-node_modules-${{ hashFiles('**/yarn.lock') }}-${{ steps.node.outputs.version }}
       - name: create .yarnrc file
         run: |
-          npm config set "@telicent-oss:registry" "https://www.npmjs.com/"
           npm config set "//www.npmjs.com//:_authToken" ${{ secrets.NPM_REGISTRY_TOKEN }} 
       - name: Install dependencies
         run: yarn install
