@@ -65,12 +65,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write
       contents: read
-      packages: write
     steps:
       - name: Checkout
-        uses: actions/che ckout@v3
+        uses: actions/checkout@v3
 
       - name: Set up Docker buildx
         id: buildx
