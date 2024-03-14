@@ -45,7 +45,7 @@ on:
         type: string
         description: |
           Optional suffix for the version of the image, used in tagging the image.
-      IMAGE_SUFFIX:
+      IMAGE_SUFFIX: # Previously ECR_SUFFIX
         required: false
         type: string
         description: |
