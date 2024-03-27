@@ -52,6 +52,9 @@ jobs:
     permissions:
       contents: read
       issues: read
+    concurrency:
+      group: jira-sync
+      cancel-in-progress: false
     steps:
       - name: Git Checkout
         uses: actions/checkout@v4
@@ -74,10 +77,13 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ inputs.cross-links-file }}
-          key: jira-sync-cross-links
+          key: jira-sync-cross-links-${{ hashFiles(inputs.cross-links-file) }}
+          # If the cross links file is not checked in then we always want to restore
+          # the most recently stored one
+          restore-keys: |
+            jira-sync-cross-links-
 
-      - name: Generate Initial Cross Links
-        if: ${{ steps.cache-cross-links.outputs.cache-hit != 'true' }}
+      - name: Prepare Cross Links
         env:
           JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
         run: |
@@ -102,9 +108,11 @@ jobs:
             --cross-links-file ${{ inputs.cross-links-file }} \
             --jira-issue-mappings ${{ inputs.issue-mapping-file }}
 
-      - name: Save Updated Cross Links
-        if: ${{ hashFiles(inputs.issue-mapping-file) != '' }}
-        uses: actions/cache/save@v4
+      # This step is needed so that if the cross links file gets updated we
+      # generate a new cache from it
+      - name: Update Cached Cross Links
+        uses: actions/cache@v4
         with:
           path: ${{ inputs.cross-links-file }}
-          key: jira-sync-cross-links
+          key: jira-sync-cross-links-${{ hashFiles(inputs.cross-links-file) }}
+          lookup-only: true
