@@ -1,0 +1,118 @@
+name: Sync GitHub Issues to JIRA
+on:
+  workflow_call: 
+    inputs:
+      jira-url:
+        required: true
+        type: string
+        description: |
+          Specifies the Base URL of the JIRA instance to sync against.
+      jira-project:
+        required: true
+        type: string
+        description: |
+          Specifies the JIRA project key for the JIRA project into which issues should be sync'd.
+      cross-links-file:
+        required: false
+        type: string
+        default: cross-links.yaml
+        description: |
+          Specifies a file that will be used to store the cross-links between GitHub and JIRA to ensure that issues are 
+          not unnecessarily sync'd multiple times.
+      issue-mapping-file:
+        required: true
+        type: string
+        description: |
+          Specifies the file that contains the mapping rules controlling how GitHub Issues are mapped into JIRA Issue 
+          Types, this allows ensuring that the correct issue types are created on the JIRA side during sync.
+      extra-sync-options:
+        required: false
+        type: string
+        description: |
+          Specifies additional options to pass into the jira-sync command when sync'ing issues e.g. `--skip-existing` 
+          if you only want to sync new issues.
+
+          Note that these options are added to the start of the command options so they cannot override the options that
+          this action will automatically set from your other inputs and secrets.
+    secrets:
+      JIRA_USERNAME:
+        required: true
+        description: |
+          A JIRA Username (usually an email address) which can be used to authenticate against the 
+          configured JIRA instance in conjunction with the JIRA_TOKEN secret.
+      JIRA_TOKEN:
+        required: true
+        description: |
+          A JIRA Token (created by a specific user account) which can be used to authenticate against the
+          configured JIRA instance in conjunction with the JIRA_USERNAME secret.
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+    concurrency:
+      group: jira-sync
+      cancel-in-progress: false
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: temurin
+
+      - name: Install jira-sync
+        uses: jaxxstorm/action-install-gh-release@71d17cb091aa850acb2a1a4cf87258d183eb941b #v1.11.0
+        with: # Grab the latest version
+          repo: telicent-oss/jira-sync
+          platform: jvm
+          arch: noarch
+
+      - name: Restore Cached Cross Links
+        id: cache-cross-links
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ inputs.cross-links-file }}
+          key: jira-sync-cross-links-${{ hashFiles(inputs.cross-links-file) }}
+          # If the cross links file is not checked in then we always want to restore
+          # the most recently stored one
+          restore-keys: |
+            jira-sync-cross-links-
+
+      - name: Prepare Cross Links
+        env:
+          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+        run: |
+          jira-sync issues cross-links \
+            --jira-url ${{ inputs.jira-url }} \
+            --jira-token-env JIRA_TOKEN \
+            --jira-user ${{ secrets.JIRA_USERNAME }} \
+            --jira-project-key ${{ inputs.jira-project }} \
+            --cross-links-file ${{ inputs.cross-links-file }}
+
+      - name: Sync Issues to JIRA
+        env:
+          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+        run: |
+          jira-sync issues to-jira \
+            ${{ inputs.extra-sync-options }} \
+            --jira-url ${{ inputs.jira-url }} \
+            --jira-token-env JIRA_TOKEN \
+            --jira-user ${{ secrets.JIRA_USERNAME }} \
+            --jira-project-key ${{ inputs.jira-project }} \
+            --github-repository ${{ github.repository }} \
+            --cross-links-file ${{ inputs.cross-links-file }} \
+            --jira-issue-mappings ${{ inputs.issue-mapping-file }}
+
+      # This step is needed so that if the cross links file gets updated we
+      # generate a new cache from it
+      - name: Update Cached Cross Links
+        uses: actions/cache@v4
+        with:
+          path: ${{ inputs.cross-links-file }}
+          key: jira-sync-cross-links-${{ hashFiles(inputs.cross-links-file) }}
+          lookup-only: true
