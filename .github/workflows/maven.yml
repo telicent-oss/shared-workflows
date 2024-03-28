@@ -88,12 +88,12 @@ on:
         description: |
           Password/Token for authenticating to DockerHub, only needed if USERS_DOCKERHUB_IMAGES is set to true.
       GPG_PRIVATE_KEY:
-        required: true
+        required: false
         description: |
           A GPG Private Key that will be used to sign the built artifacts during the build process.  The pom.xml 
           MUST invoke the maven-gpg-plugin for this to have an effect.
       GPG_PASSPHRASE:
-        required: true
+        required: false
         description: |
           The passphrase protecting the provided GPG Private Key.
 
@@ -174,22 +174,41 @@ jobs:
           server-username: MAVEN_USERNAME
           server-password: MAVEN_PASSWORD
 
+      - name: Check whether GPG Signing is Enabled
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        id: gpg-check
+        run: |
+          if [ "${{ secrets.GPG_PRIVATE_KEY }}" != "" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Import GPG key
+        if: ${{ matrix.os == 'ubuntu-latest' && steps.gpg-check.outputs.enabled == 'true' }}
         uses: crazy-max/ghaction-import-gpg@v6
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
+      - name: Generate Extra Maven Arguments (if needed)
+        id: extra-maven-args
+        if: ${{ matrix.os == 'windows-latest' || steps.gpg-check.outputs.enabled == 'false' }}
+        shell: bash
+        run: |
+          echo "args=-Dgpg.skip=true" >> "$GITHUB_OUTPUT"
+
       - name: Build and Verify Maven Package
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
-          mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }}
+          mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
 
       - name: Build and Verify Maven Package (Windows - Docker Profile disabled)
         if: ${{ matrix.os == 'windows-latest' }}
+        shell: bash
         # Remember that Windows Action runners DO NOT support Docker so explicitly disable the Docker profile
         run: |
-          mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P-${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }}
+          mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P-${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
 
       - name: Detect Maven version
         id: project
@@ -200,6 +219,13 @@ jobs:
       # It's safe to skipTests for the Publish step because we just did a full mvn verify in the earlier steps
       # which will have run all the unit and integration tests
       - name: Publish Maven SNAPSHOTs
-        if: ${{ inputs.PUBLISH_SNAPSHOTS && matrix.os == 'ubuntu-latest' && github.ref_name == inputs.MAIN_BRANCH && steps.project.outputs.version != '' && contains(steps.project.outputs.version, 'SNAPSHOT') }}
+        # We only publish if all the following are true:
+        # - GPG Key was provided for signing
+        # - The build was not triggered by Dependabot
+        # - The PUBLISH_SNAPSHOTS input was set to true
+        # - We're building on the ubuntu runner
+        # - We're on the configured MAIN_BRANCH 
+        # - The declared version for the Maven project is a SNAPSHOT
+        if: ${{ steps.gpg-check.outputs.enabled == 'true' && github.actor != 'dependabot[bot]' && inputs.PUBLISH_SNAPSHOTS && matrix.os == 'ubuntu-latest' && github.ref_name == inputs.MAIN_BRANCH && steps.project.outputs.version != '' && contains(steps.project.outputs.version, 'SNAPSHOT') }}
         run: |
           mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -DskipTests ${{ inputs.MAVEN_ARGS }}
