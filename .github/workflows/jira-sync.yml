@@ -50,8 +50,11 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     permissions:
+      # Needed so we can read the repository contents to find the mappings file
       contents: read
-      issues: read
+      # Needed to read the issues for sync, and to close them if --close-after-sync is 
+      # supplied in inputs.extra-sync-options
+      issues: write
     concurrency:
       group: jira-sync
       cancel-in-progress: false
@@ -97,6 +100,7 @@ jobs:
       - name: Sync Issues to JIRA
         env:
           JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           jira-sync issues to-jira \
             ${{ inputs.extra-sync-options }} \
@@ -104,6 +108,7 @@ jobs:
             --jira-token-env JIRA_TOKEN \
             --jira-user ${{ secrets.JIRA_USERNAME }} \
             --jira-project-key ${{ inputs.jira-project }} \
+            --github-token-env GH_TOKEN \
             --github-repository ${{ github.repository }} \
             --cross-links-file ${{ inputs.cross-links-file }} \
             --jira-issue-mappings ${{ inputs.issue-mapping-file }}
