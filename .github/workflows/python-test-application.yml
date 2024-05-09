@@ -7,6 +7,11 @@ on:
         required: true
         type: string
         description: The python version to test against
+      PYTEST:
+        required: false
+        type: boolean
+        description: If set test will attempt to run pytest over unittest
+        default: false
   workflow_dispatch:
 
 jobs:
