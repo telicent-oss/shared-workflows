@@ -32,4 +32,12 @@ jobs:
         run:  python -m ruff check --output-format=github .
 
       - name: Unit Tests
-        run: python -m unittest discover --verbose
+        run: |
+          if ${{ inputs.PYTEST }}; then
+            pytest
+          else
+            python -m unittest discover --verbose
+          fi
+        shell: bash
+        env:
+          PYTEST: ${{ inputs.PYTEST }}
