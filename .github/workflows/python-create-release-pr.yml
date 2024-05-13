@@ -1,0 +1,24 @@
+name: Create Python release PR from pyproject.toml
+
+on:
+  workflow_call:
+
+jobs:
+  create-release-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v3
+        with:
+          release-type: python
+          package-name: release-please-action
+          prerelease: false
+          default-branch: main
+          extra-files: |
+            "pyproject.toml"
+          version-file: pyproject.toml
+          changelog-types: '[
+          {"type":"feat","section":"Features","hidden":false},
+          {"type":"fix","section":"Bug Fixes","hidden":false},
+          {"type":"chore","section":"Miscellaneous","hidden":false},
+          {"type":"perf","section":"Performance improvements","hidden":false}
+          ]'
