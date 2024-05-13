@@ -7,6 +7,11 @@ on:
         required: true
         type: string
         description: The python version to test against
+      TEST_COMMAND:
+        required: false
+        type: string
+        description: The command to run for tests
+        default: "python -m unittest discover --verbose"
   workflow_dispatch:
 
 jobs:
@@ -32,4 +37,4 @@ jobs:
         run:  python -m ruff check --output-format=github .
 
       - name: Unit Tests
-        run: python -m unittest discover --verbose
+        run: ${{ inputs.test_command }}
