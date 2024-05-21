@@ -131,6 +131,12 @@ jobs:
           file: ${{ inputs.PATH }}/${{ inputs.DOCKERFILE }}
           tags: ${{ steps.meta.outputs.tags }}
           target: ${{ inputs.TARGET }}
+          outputs: type=docker,dest=/tmp/myimage.tar
           build-args: |
             ${{ inputs.BUILD_ARGS }}
             
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dockerimage
+          path: /tmp/dockerimage.tar # TODO Allow naming
