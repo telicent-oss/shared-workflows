@@ -139,7 +139,7 @@ jobs:
           build-args: |
             ${{ inputs.BUILD_ARGS }}
       - name: Update Docker Hub Description
-        uses: peter-evans/dockerhub-description@dc67fad # SHA for safety; don't use mutable git releases when creds invovled
+        uses: peter-evans/dockerhub-description@dc67fad7001ef9e8e3c124cb7a64e16d0a63d864 # SHA for safety; don't use mutable git releases when creds invovled
         if: inputs.DOCKER_HUB_REPO_NAME != ''
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
