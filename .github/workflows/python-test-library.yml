@@ -12,6 +12,11 @@ on:
         type: string
         description: The command to run for tests
         default: "python -m unittest discover --verbose"
+      SKIP_BUILD:
+        required: false
+        type: boolean
+        description: Whether to skip the build test (i.e. for non-libraries)
+        default: false
   workflow_dispatch:
 
 jobs:
@@ -31,7 +36,7 @@ jobs:
 
       - name: Generate requirements
         run: |
-          python -m piptools compile --extra dev -o requirements.txt pyproject.toml
+          python -m piptools compile --all-extras -o requirements.txt pyproject.toml
           pip install -r requirements.txt
 
       - name: mypy Static Type Checking
@@ -44,4 +49,5 @@ jobs:
         run: ${{ inputs.test_command }}
 
       - name: Build
+        if: ${{ inputs.SKIP_BUILD == false }}
         run: python -m build
