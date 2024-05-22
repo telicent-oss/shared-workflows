@@ -19,7 +19,7 @@ on:
         required: true
         type: string
         description: |
-          The name of the Dockerfile to build the image from.
+          The name of the Dockerfile to build the image from.  This is relative to the PATH input
       PATH:
         type: string
         description: |
@@ -68,7 +68,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Docker buildx
         id: buildx
@@ -128,9 +128,16 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           context: ${{ inputs.PATH }}
-          file: ${{ inputs.PATH }}/${{ inputs.DOCKERFILE }}
+          file: ${{ inputs.DOCKERFILE }}
           tags: ${{ steps.meta.outputs.tags }}
           target: ${{ inputs.TARGET }}
           build-args: |
             ${{ inputs.BUILD_ARGS }}
+
+  scan-image:
+    needs: build
+    uses: Telicent-oss/shared-workflows/.github/workflows/trivy-image-scan.yml@main
+    with:
+      IMAGE_REF: telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
+      SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
             
