@@ -10,11 +10,11 @@ on:
         description: |
           The prefix for the image name, defaults to telicent- but can be set to an empty string if you prefer to just
           use APP_NAME as the application name.
-      REPO_NAME:
+      DOCKER_HUB_REPO_NAME:
         required: false
         type: string
         description: |
-          The gihub repo shorthand e.g telicent-oss/telicent-app
+          Populates image's Dockerhub page with text from Github repo README.md. Format is github shorthand for repos e.g telicent-oss/telicent-app
       APP_NAME:
         required: true
         type: string
@@ -140,9 +140,9 @@ jobs:
             ${{ inputs.BUILD_ARGS }}
       - name: Update Docker Hub Description
         uses: peter-evans/dockerhub-description@v3
-        if: inputs.REPO_NAME != ''
+        if: inputs.DOCKER_HUB_REPO_NAME != ''
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
-          repository: ${{ inputs.REPO_NAME }}
+          repository: ${{ inputs.DOCKER_HUB_REPO_NAME }}
             
