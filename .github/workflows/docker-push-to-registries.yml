@@ -140,7 +140,7 @@ jobs:
             ${{ inputs.BUILD_ARGS }}
       - name: Update Docker Hub Description
         uses: peter-evans/dockerhub-description@v3
-        if: github.event.inputs.REPO_NAME != ''
+        if: inputs.REPO_NAME != ''
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
