@@ -68,6 +68,19 @@ on:
           Specifies whether Maven SNAPSHOTs are published from this build.  Note that even when enabled (as is
           the default) SNAPSHOTs are only published when a build occurs on the main branch.  The main branch 
           can be separately configured via the MAIN_BRANCH parameter.
+      CHANGELOG_FILE:
+        required: false
+        type: string
+        default: CHANGELOG.md
+        description: |
+          Specifies the CHANGELOG file in the repository from which release notes can be extracted.
+      RELEASE_FILES:
+        required: false
+        type: string
+        description: |
+          Specifies the release files that should be attached to the GitHub release.  For example a 
+          downloadable package that is generated from the repository.  Regardless of this value we 
+          will always attach the SBOMs to the release.
     secrets:
       MAVEN_USERNAME:
         required: false
@@ -210,6 +223,35 @@ jobs:
         run: |
           mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P-${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
 
+      - name: Trivy Vulnerability Scan
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          output: trivy-report.json
+          format: json
+          scan-ref: .
+          exit-code: 0
+
+      - name: Upload Vulnerability Scan Results
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report
+          path: trivy-report.json
+          retention-days: 30
+
+      - name: Fail build on High/Criticial Vulnerabilities
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          format: table
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 1
+
       - name: Detect Maven version
         id: project
         if: ${{ matrix.os == 'ubuntu-latest' }}
@@ -229,3 +271,95 @@ jobs:
         if: ${{ steps.gpg-check.outputs.enabled == 'true' && github.actor != 'dependabot[bot]' && inputs.PUBLISH_SNAPSHOTS && matrix.os == 'ubuntu-latest' && github.ref_name == inputs.MAIN_BRANCH && steps.project.outputs.version != '' && contains(steps.project.outputs.version, 'SNAPSHOT') }}
         run: |
           mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -DskipTests ${{ inputs.MAVEN_ARGS }}
+
+  github-release:
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    if: ${{ github.ref_type == 'tag' && needs.build.outputs.version != '' && !contains(needs.build.outputs.version, 'SNAPSHOT') }}
+    permissions:
+      id-token: write
+      contents: write
+      issues: write
+      pull-requests: write
+    env:
+      # These have to be exported into the environment due to how the setup-java action configures the Maven
+      # settings.xml file to avoid directly embedding credentials into it.
+      MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+      MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Install Java and Maven
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ inputs.JAVA_VERSION }}
+          distribution: ${{ inputs.JDK }}
+          cache: maven
+          # Forced to use indirection here, the setup-java action configures the Maven settings.xml to reference
+          # the credentials via environment variables
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+
+      - name: Import GPG key
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
+      # Note this job only runs after a successful build job so safe to skip tests at this point
+      - name: Deploy Maven Release
+        run: |
+          mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} -DskipTests
+
+      # If a CHANGELOG file has been provided find the developer curated release notes for 
+      # the release from that file
+      - name: Extract Release Notes
+        if: ${{ inputs.CHANGELOG_FILE != '' }}
+        run: |
+          RELEASE="${{ needs.build.outputs.version }}"
+          STARTED=0
+          while IFS= read -r LINE; do
+            if [ ${STARTED} -eq 1 ]; then
+              if [[ "${LINE}" == \#* ]]; then
+                break
+              fi
+              echo "${LINE}" >> ${{ github.workspace }}-release-notes.txt
+            elif [[ "${LINE}" == \#*${RELEASE} ]]; then
+              STARTED=1
+              echo "# Version ${RELEASE}" >> ${{ github.workspace }}-release-notes.txt
+            fi
+          done < "${{ inputs.CHANGELOG_FILE }}"
+          
+          if [ ${STARTED} -eq 0 ]; then
+            echo "Release ${RELEASE} not found in ${{ inputs.CHANGELOG_FILE }}, no CHANGELOG release notes available" 1>&2
+          else
+            echo "Detected Release Notes for ${RELEASE} are:"
+            cat ${{ github.workspace }}-release-notes.txt
+          fi
+          exit 0
+
+      - name: Detect whether GitHub Automatic Release Notes are enabled
+        id: auto
+        run: |
+          if [ -f ".github/release.yml" ]; then
+            echo "Using GitHub Automated Release Notes in addition to CHANGELOG release notes"
+            echo "enabled=true" >> ${GITHUB_OUTPUT}
+          else
+            echo "Using CHANGELOG release notes only"
+            echo "enabled=false" >> ${GITHUB_OUTPUT}
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@69320dbe05506a9a39fc8ae11030b214ec2d1f87 # v2.0.5
+        with:
+          body_path: ${{ github.workspace }}-release-notes.txt
+          generate_release_notes: ${{ steps.auto.outputs.enabled }}
+          name: ${{ needs.build.outputs.version }}
+          prerelease: false
+          # We grab the CycloneDX BOMs we're generating plus any release files the workflow inputs specify
+          files: |
+            **/*-bom.json
+            ${{ inputs.RELEASE_FILES }}
+        
+        
