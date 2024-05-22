@@ -139,10 +139,10 @@ jobs:
           build-args: |
             ${{ inputs.BUILD_ARGS }}
       - name: Update Docker Hub Description
-        uses: peter-evans/dockerhub-description@v3
+        uses: peter-evans/dockerhub-description@dc67fad # SHA for safety; don't use mutable git releases when creds invovled
         if: inputs.DOCKER_HUB_REPO_NAME != ''
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
           repository: ${{ inputs.DOCKER_HUB_REPO_NAME }}
             
