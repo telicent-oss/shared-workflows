@@ -3,6 +3,12 @@ name: Publish Node Telicent image to configured container repositories
 on:
   workflow_call:
     inputs:
+      GITHUB_REF:
+        required: false
+        type: string
+        description: |
+          pass in \$\{\{ github.ref \}\} to allow this workflow's "if" conditions to resemble
+          triggering workflows
       APP_NAME_PREFIX:
         required: false
         type: string
@@ -145,4 +151,5 @@ jobs:
     with:
       IMAGE_REF: docker.io/telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}:${{ github.sha }}
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
+      GITHUB_REF: ${{ inputs.GITHUB_REF }}
             
