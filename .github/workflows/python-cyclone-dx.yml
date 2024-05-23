@@ -2,6 +2,11 @@ name: Python Cyclone DX Scan
 
 on:
   workflow_call:
+    inputs:
+      EXTRAS_ARG:
+        required: false
+        type: string
+        description: Any extra dependencies to be included in SBOM scan
 
 jobs:
   generate-sbom:
@@ -24,7 +29,7 @@ jobs:
 
     - name: Generate requirements
       run: |
-        python -m piptools compile -o requirements.txt pyproject.toml
+        python -m piptools compile ${{ inputs.EXTRAS_ARG }} -o requirements.txt pyproject.toml
         pip install cyclonedx-bom==4.4.3
 
     - name: Generate SBOM
