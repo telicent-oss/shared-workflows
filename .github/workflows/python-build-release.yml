@@ -2,6 +2,11 @@ name: Build Python Release
 
 on:
   workflow_call:
+    inputs:
+      PACKAGE:
+        required: true
+        type: string
+        description: The package to store the generate SBOM in
 
 jobs:
   cyclone-dx-test:
@@ -36,7 +41,7 @@ jobs:
 
     - name: Place SBOM in pkg
       run: |
-        mv ${{ github.run_number }}-cyclone-dx.json telicent_lib/sbom.json
+        mv ${{ github.run_number }}-cyclone-dx.json ${{ inputs.PACKAGE }}/sbom.json
 
     - name: Build a binary wheel and a source tarball
       run: python3 -m build
