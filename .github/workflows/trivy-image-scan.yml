@@ -48,6 +48,13 @@ jobs:
           name: trivy-docker-report-${{ inputs.SCAN_NAME }}
           path: trivy-docker-report.json
           retention-days: 30
+
+      - name: Release sbom
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            trivy-docker-report.json
   
       - name: Fail Build on High/Critical Vulnerabilities
         uses: aquasecurity/trivy-action@master
