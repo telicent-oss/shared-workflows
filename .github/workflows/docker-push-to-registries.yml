@@ -142,6 +142,6 @@ jobs:
     needs: build
     uses: Telicent-oss/shared-workflows/.github/workflows/trivy-image-scan.yml@main
     with:
-      IMAGE_REF: telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
+      IMAGE_REF: docker.io/telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
             
