@@ -28,7 +28,7 @@ jobs:
         STARTED=0
         while IFS= read -r LINE; do
           if [ ${STARTED} -eq 1 ]; then
-            if [[ "${LINE}" == \##\ \[* ]]; then
+            if [[ "${LINE}" == \##\ *]]; then
               break
             fi
             echo "${LINE}" >> ${{ github.workspace }}-release-notes.txt
