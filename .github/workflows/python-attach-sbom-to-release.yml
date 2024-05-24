@@ -1,0 +1,30 @@
+name: Downloads SBOM artifact to attach to given releease
+
+on:
+  workflow_call:
+    inputs:
+      SBOM:
+        required: true
+        type: string
+        description: The reference to the SBOM to downloads
+      RELEASE_ID:
+        required: true
+        type: string
+        description: The ID of the release to attach the SBOM to
+
+jobs:
+  attach-sbom-to-release:
+    name: Attach SBOM to release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download SBOM
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ inputs.SBOM }}.sbom.json
+
+      - name: Attach to release
+        uses: irongut/EditRelease@v1.2.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          id: ${{ inputs.RELEASE_ID }}
+          files: ${{ inputs.SBOM }}.sbom.json
