@@ -140,7 +140,7 @@ jobs:
 
   scan-image:
     needs: build
-    uses: Telicent-oss/shared-workflows/.github/workflows/trivy-image-scan.yml@TELFE-186/scan-docker
+    uses: Telicent-oss/shared-workflows/.github/workflows/trivy-image-scan.yml@main
     secrets: inherit
     with:
       IMAGE_REF: telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}:${{ github.sha }}
