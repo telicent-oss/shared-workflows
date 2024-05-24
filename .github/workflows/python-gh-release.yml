@@ -55,3 +55,7 @@ jobs:
         name: v${{ inputs.VERSION }}
         prerelease: false
         tag_name: v${{ inputs.VERSION }}
+
+    - name: Confirm ID
+      run: |
+        echo "release-id: ${{steps.create-github-release.output.id}}"

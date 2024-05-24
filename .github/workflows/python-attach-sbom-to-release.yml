@@ -22,6 +22,10 @@ jobs:
         with:
           name: ${{ inputs.SBOM }}
 
+      - name: Confirm ID
+        run: |
+          echo "release-id: ${{ inputs.RELEASE_ID }}"
+
       - name: Attach to release
         uses: irongut/EditRelease@v1.2.0
         with:
