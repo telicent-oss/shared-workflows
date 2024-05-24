@@ -1,0 +1,21 @@
+name: Gets the Python Version Number
+
+on:
+  workflow_call:
+    outputs:
+      version:
+        description: |
+          The Python version number
+        value: ${{ jobs.get-version.outputs.version }}
+  workflow_dispatch:
+
+jobs:
+  get-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: get-version-from-toml
+        id: get-library-version
+        run: echo "CURRENT_VERSION=`awk -F'= ' '/\[project\]/ {flag=1; next} /version/ && flag {gsub(/"/, "", $2); print $2; flag=0}' pyproject.toml`" >> "$GITHUB_OUTPUT"
+    outputs:
+      version: ${{ steps.get-version-from-toml.outputs.CURRENT_VERSION }}
