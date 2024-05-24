@@ -7,18 +7,11 @@ on:
         required: true
         type: string
         description: The version being released
-    outputs:
-      release-id:
-        description: |
-          The ID of the release
-        value: ${{ jobs.do-release.outputs.id }}
 
 jobs:
   do-release:
     name: Do Release
     runs-on: ubuntu-latest
-    outputs:
-      id: ${{steps.create-github-release.outputs.id}}
 
     steps:
     - uses: actions/checkout@v2
@@ -55,7 +48,3 @@ jobs:
         name: v${{ inputs.VERSION }}
         prerelease: false
         tag_name: v${{ inputs.VERSION }}
-
-    - name: Confirm ID
-      run: |
-        echo "release-id: ${{steps.create-github-release.outputs.id}}"
