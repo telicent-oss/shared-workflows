@@ -27,4 +27,4 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           id: ${{ inputs.RELEASE_ID }}
-          files: ${{ inputs.SBOM }}
+          files: ${{ inputs.SBOM }}.sbom.json
