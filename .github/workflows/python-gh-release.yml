@@ -19,9 +19,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       id: ${{steps.create-github-release.output.id}}
+
     steps:
     - name: Extract Release Notes
-      if: ${{ inputs.CHANGELOG_FILE != '' }}
       run: |
         RELEASE="${{ inputs.VERSION }}"
         STARTED=0
