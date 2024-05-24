@@ -7,11 +7,18 @@ on:
         required: true
         type: string
         description: The version being released
+    outputs:
+      release-id:
+        description: |
+          The ID of the release
+        value: ${{ jobs.do-release.outputs.id }}
 
 jobs:
   do-release:
     name: Do Release
     runs-on: ubuntu-latest
+    outputs:
+      id: ${{steps.create-github-release.output.id}}
     steps:
     - name: Extract Release Notes
       if: ${{ inputs.CHANGELOG_FILE != '' }}
@@ -39,9 +46,11 @@ jobs:
         exit 0
 
     - name: Create GitHub Release
+      id: create-github-release
       uses: softprops/action-gh-release@69320dbe05506a9a39fc8ae11030b214ec2d1f87 # v2.0.5
       with:
         body_path: ${{ github.workspace }}-release-notes.txt
         generate_release_notes: false
-        name: v${{ needs.build.outputs.version }}
+        name: v${{ inputs.VERSION }}
         prerelease: false
+        tag_name: v${{ inputs.VERSION }}
