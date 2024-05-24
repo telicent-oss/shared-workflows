@@ -7,10 +7,10 @@ on:
         required: true
         type: string
         description: The reference to the SBOM to downloads
-      RELEASE_ID:
+      VERSION:
         required: true
         type: string
-        description: The ID of the release to attach the SBOM to
+        description: The version to attach the SBOM to
 
 jobs:
   attach-sbom-to-release:
@@ -22,22 +22,11 @@ jobs:
         with:
           name: ${{ inputs.SBOM }}
 
-      - name: Confirm ID
-        run: |
-          echo "release-id: ${{ inputs.RELEASE_ID }}"
-
       - name: Upload SBOM to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ${{ inputs.SBOM }}.sbom.json
-          tag: v0.0.7-rc1
+          tag: ${{ inputs.VERSION }}
           overwrite: true
           file_glob: true
-
-#      - name: Attach to release
-#        uses: irongut/EditRelease@v1.2.0
-#        with:
-#          token: ${{ secrets.GITHUB_TOKEN }}
-#          id: ${{ inputs.RELEASE_ID }}
-#          files: "${{ inputs.SBOM }}.sbom.json"
