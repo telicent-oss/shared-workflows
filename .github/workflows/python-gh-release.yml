@@ -18,7 +18,7 @@ jobs:
     name: Do Release
     runs-on: ubuntu-latest
     outputs:
-      id: ${{steps.create-github-release.output.id}}
+      id: ${{steps.create-github-release.outputs.id}}
 
     steps:
     - uses: actions/checkout@v2
@@ -58,4 +58,4 @@ jobs:
 
     - name: Confirm ID
       run: |
-        echo "release-id: ${{steps.create-github-release.output.id}}"
+        echo "release-id: ${{steps.create-github-release.outputs.id}}"
