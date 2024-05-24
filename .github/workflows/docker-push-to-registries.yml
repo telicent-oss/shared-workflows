@@ -121,6 +121,8 @@ jobs:
             type=semver,pattern={{version}}
             type=sha,format=long,prefix=
             type=raw,value=${{ inputs.VERSION }}${{ inputs.VERSION_SUFFIX }}
+            type=raw,value=latest,enable=${{ github.ref_name == inputs.MAIN_BRANCH }}
+            type=raw,value=development,enable=${{ github.ref_name != inputs.MAIN_BRANCH}}
 
       - name: Build, tag, and push image to authenticated docker registry
         id: build-images
