@@ -1,0 +1,47 @@
+name: Does GitHub release for given version and attaches SBOMs
+
+on:
+  workflow_call:
+    inputs:
+      VERSION:
+        required: true
+        type: string
+        description: The version being released
+
+jobs:
+  do-release:
+    name: Do Release
+    runs-on: ubuntu-latest
+    steps:
+    - name: Extract Release Notes
+      if: ${{ inputs.CHANGELOG_FILE != '' }}
+      run: |
+        RELEASE="${{ inputs.VERSION }}"
+        STARTED=0
+        while IFS= read -r LINE; do
+          if [ ${STARTED} -eq 1 ]; then
+            if [[ "${LINE}" == \##\ \[* ]]; then
+              break
+            fi
+            echo "${LINE}" >> ${{ github.workspace }}-release-notes.txt
+          elif [[ "${LINE}" == \#\#\ [\[?]*${RELEASE}[\]?]* ]]; then
+            STARTED=1
+            echo "${LINE}" >> ${{ github.workspace }}-release-notes.txt
+          fi
+        done < "CHANGELOG.md"
+        
+        if [ ${STARTED} -eq 0 ]; then
+          echo "Release ${RELEASE} not found in CHANGELOG.md, no CHANGELOG release notes available" 1>&2
+        else
+          echo "Detected Release Notes for ${RELEASE} are:"
+          cat 1-release-notes.txt
+        fi
+        exit 0
+
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@69320dbe05506a9a39fc8ae11030b214ec2d1f87 # v2.0.5
+      with:
+        body_path: ${{ github.workspace }}-release-notes.txt
+        generate_release_notes: false
+        name: v${{ needs.build.outputs.version }}
+        prerelease: false
