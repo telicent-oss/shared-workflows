@@ -3,12 +3,6 @@ name: Scan Container Image with Trivy
 on:
   workflow_call:
     inputs:
-      GITHUB_REF:
-        required: false
-        type: string
-        description: |
-          pass in \$\{\{ github.ref \}\} to allow this workflow's "if" conditions to resemble
-          triggering workflows
       SCAN_NAME:
         type: string
         description: |
@@ -53,11 +47,9 @@ jobs:
           name: trivy-docker-report-${{ inputs.SCAN_NAME }}
           path: trivy-docker-report.json
           retention-days: 30
-      - name: Check github.ref
-        run: echo "The github.ref is ${{ github.ref }}"
       - name: Release sbom
         uses: softprops/action-gh-release@v2
-        if: startsWith(inputs.GITHUB_REF, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
             trivy-docker-report.json
