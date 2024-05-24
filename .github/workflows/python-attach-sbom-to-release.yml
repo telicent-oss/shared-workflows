@@ -20,11 +20,11 @@ jobs:
       - name: Download SBOM
         uses: actions/download-artifact@v3
         with:
-          name: ${{ inputs.SBOM }}.sbom.json
+          name: ${{ inputs.SBOM }}
 
       - name: Attach to release
         uses: irongut/EditRelease@v1.2.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           id: ${{ inputs.RELEASE_ID }}
-          files: ${{ inputs.SBOM }}.sbom.json
+          files: ${{ inputs.SBOM }}
