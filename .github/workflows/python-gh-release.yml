@@ -21,6 +21,7 @@ jobs:
       id: ${{steps.create-github-release.output.id}}
 
     steps:
+    - uses: actions/checkout@v2
     - name: Extract Release Notes
       run: |
         RELEASE="${{ inputs.VERSION }}"
