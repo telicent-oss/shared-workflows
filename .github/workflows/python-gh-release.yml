@@ -42,7 +42,7 @@ jobs:
           echo "Release ${RELEASE} not found in CHANGELOG.md, no CHANGELOG release notes available" 1>&2
         else
           echo "Detected Release Notes for ${RELEASE} are:"
-          cat 1-release-notes.txt
+          cat ${{ github.workspace }}-release-notes.txt
         fi
         exit 0
 
