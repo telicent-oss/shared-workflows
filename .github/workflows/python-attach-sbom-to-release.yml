@@ -26,9 +26,18 @@ jobs:
         run: |
           echo "release-id: ${{ inputs.RELEASE_ID }}"
 
-      - name: Attach to release
-        uses: irongut/EditRelease@v1.2.0
+      - name: Upload SBOM to release
+        uses: svenstaro/upload-release-action@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          id: ${{ inputs.RELEASE_ID }}
-          files: ${{ inputs.SBOM }}.sbom.json
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ inputs.SBOM }}.sbom.json
+          tag: v0.0.7-rc1
+          overwrite: true
+          file_glob: true
+
+#      - name: Attach to release
+#        uses: irongut/EditRelease@v1.2.0
+#        with:
+#          token: ${{ secrets.GITHUB_TOKEN }}
+#          id: ${{ inputs.RELEASE_ID }}
+#          files: "${{ inputs.SBOM }}.sbom.json"
