@@ -40,7 +40,7 @@ jobs:
 
     - name: Generate SBOM
       run: |
-        python -m cyclonedx_py requirements > ${{ inputs.SCAN_NAME }}.bom.json
+        python -m cyclonedx_py requirements > ${{ inputs.SCAN_NAME }}-bom.json
 
     - name: Store the SBOM
       uses: actions/upload-artifact@v4
