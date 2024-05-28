@@ -13,6 +13,9 @@ on:
         required: false
         type: string
         description: Any extra dependencies to be included in SBOM scan
+    outputs:
+      artifact-name:
+        value: ${{ inputs.SCAN_NAME }}
 
 jobs:
   generate-sbom:
