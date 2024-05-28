@@ -1,4 +1,4 @@
-name: Python Cyclone DX Scan
+name: Python Trivy Scan
 
 on:
   workflow_call:
@@ -7,6 +7,12 @@ on:
         required: false
         type: string
         description: Any extra dependencies to be included in SBOM scan
+      SCAN_NAME:
+        type: string
+        required: true
+        description: |
+          A developer friendly name for the image to differentiate scan reports where a repository is
+          building multiple images.
 
 jobs:
   generate-sbom:
@@ -34,13 +40,13 @@ jobs:
 
     - name: Generate SBOM
       run: |
-        python -m cyclonedx_py requirements > ${{ github.run_number }}-cyclone-dx.json
+        python -m cyclonedx_py requirements > ${{ SCAN_NAME }}.bom.json
 
     - name: Store the SBOM
       uses: actions/upload-artifact@v3
       with:
-        name: cyclone-dx-sbom
-        path: ${{ github.run_number }}-cyclone-dx.json
+        name: "${{ inputs.SCAN_NAME}}-application"
+        path: "${{ SCAN_NAME }}.bom.json"
 
   scan-sbom-for-high-crit:
     name: Scan SBOM for HIGH and CRITICAL
@@ -51,14 +57,14 @@ jobs:
       - name: Download SBOM
         uses: actions/download-artifact@v3
         with:
-          name: cyclone-dx-sbom
+          name: "${{ inputs.SCAN_NAME}}-application"
       - name: Scan SBOM
         uses: aquasecurity/trivy-action@master
         with:
           exit-code: '1'
           format: 'table'
           severity: 'HIGH,CRITICAL'
-          scan-ref: ${{ github.run_number }}-cyclone-dx.json
+          scan-ref: "${{ SCAN_NAME }}.bom.json"
           scan-type: 'sbom'
           scanners: 'vuln'
 
@@ -71,13 +77,13 @@ jobs:
       - name: Download SBOM
         uses: actions/download-artifact@v3
         with:
-          name: cyclone-dx-sbom
+          name: "${{ inputs.SCAN_NAME}}-application"
       - name: Scan SBOM
         uses: aquasecurity/trivy-action@master
         with:
           exit-code: '0'
           format: 'table'
           severity: 'UNKNOWN,LOW,MEDIUM'
-          scan-ref: ${{ github.run_number }}-cyclone-dx.json
+          scan-ref: "${{ SCAN_NAME }}.bom.json"
           scan-type: 'sbom'
           scanners: 'vuln'
