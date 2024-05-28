@@ -3,16 +3,16 @@ name: Python Trivy Scan
 on:
   workflow_call:
     inputs:
-      EXTRAS_ARG:
-        required: false
-        type: string
-        description: Any extra dependencies to be included in SBOM scan
       SCAN_NAME:
         type: string
         required: true
         description: |
           A developer friendly name for the image to differentiate scan reports where a repository is
           building multiple images.
+      EXTRAS_ARG:
+        required: false
+        type: string
+        description: Any extra dependencies to be included in SBOM scan
 
 jobs:
   generate-sbom:
@@ -40,13 +40,13 @@ jobs:
 
     - name: Generate SBOM
       run: |
-        python -m cyclonedx_py requirements > ${{ SCAN_NAME }}.bom.json
+        python -m cyclonedx_py requirements > ${{ inputs.SCAN_NAME }}.bom.json
 
     - name: Store the SBOM
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.SCAN_NAME}}-application
-        path: ${{ SCAN_NAME }}.bom.json
+        path: ${{ inputs.SCAN_NAME }}.bom.json
 
   scan-sbom-for-high-crit:
     name: Scan SBOM for HIGH and CRITICAL
@@ -64,7 +64,7 @@ jobs:
           exit-code: '1'
           format: 'table'
           severity: 'HIGH,CRITICAL'
-          scan-ref: ${{ SCAN_NAME }}.bom.json
+          scan-ref: ${{ inputs.SCAN_NAME }}.bom.json
           scan-type: 'sbom'
           scanners: 'vuln'
 
@@ -84,6 +84,6 @@ jobs:
           exit-code: '0'
           format: 'table'
           severity: 'UNKNOWN,LOW,MEDIUM'
-          scan-ref: ${{ SCAN_NAME }}.bom.json
+          scan-ref: ${{ inputs.SCAN_NAME }}.bom.json
           scan-type: 'sbom'
           scanners: 'vuln'
