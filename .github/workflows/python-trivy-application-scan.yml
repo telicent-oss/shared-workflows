@@ -7,8 +7,8 @@ on:
         type: string
         required: true
         description: |
-          A developer friendly name for the image to differentiate scan reports where a repository is
-          building multiple images.
+          A developer friendly name for the application to differentiate scan reports where a repository is
+          building multiple applications.
       EXTRAS_ARG:
         required: false
         type: string
@@ -40,13 +40,13 @@ jobs:
 
     - name: Generate SBOM
       run: |
-        python -m cyclonedx_py requirements > ${{ inputs.SCAN_NAME }}-bom.json
+        python -m cyclonedx_py requirements > ${{ inputs.SCAN_NAME }}-application-bom.json
 
     - name: Store the SBOM
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.SCAN_NAME}}-application
-        path: ${{ inputs.SCAN_NAME }}-bom.json
+        path: ${{ inputs.SCAN_NAME }}-application-bom.json
 
   scan-sbom-for-high-crit:
     name: Scan SBOM for HIGH and CRITICAL
@@ -64,7 +64,7 @@ jobs:
           exit-code: '1'
           format: 'table'
           severity: 'HIGH,CRITICAL'
-          scan-ref: ${{ inputs.SCAN_NAME }}-bom.json
+          scan-ref: ${{ inputs.SCAN_NAME }}-application-bom.json
           scan-type: 'sbom'
           scanners: 'vuln'
 
@@ -84,7 +84,7 @@ jobs:
           exit-code: '0'
           format: 'table'
           severity: 'UNKNOWN,LOW,MEDIUM'
-          scan-ref: ${{ inputs.SCAN_NAME }}-bom.json
+          scan-ref: ${{ inputs.SCAN_NAME }}-application-bom.json
           scan-type: 'sbom'
           scanners: 'vuln'
 
@@ -103,7 +103,7 @@ jobs:
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'sbom'
-          scan-ref: ${{ inputs.SCAN_NAME }}-bom.json
+          scan-ref: ${{ inputs.SCAN_NAME }}-application-bom.json
           output: ${{ inputs.SCAN_NAME }}-scan-report.json
           format: 'json'
           exit-code: '0'

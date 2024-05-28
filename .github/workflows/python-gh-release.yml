@@ -1,4 +1,4 @@
-name: Does GitHub release for given version and attaches SBOMs
+name: Does GitHub release for given version and extracts release notes from CHANGELOG.md
 
 on:
   workflow_call:

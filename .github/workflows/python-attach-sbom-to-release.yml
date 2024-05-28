@@ -1,12 +1,12 @@
-name: Downloads SBOM artifact to attach to given releease
+name: Downloads SBOM artifact to attach to given release
 
 on:
   workflow_call:
     inputs:
-      SBOM:
+      SBOM_ARTIFACT:
         required: true
         type: string
-        description: The reference to the SBOM to downloads
+        description: The reference to the SBOM artifact to download
       VERSION:
         required: true
         type: string
@@ -20,13 +20,13 @@ jobs:
       - name: Download SBOM
         uses: actions/download-artifact@v4
         with:
-          name: ${{ inputs.SBOM }}
+          name: ${{ inputs.SBOM_ARTIFACT }}
 
       - name: Upload SBOM to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ${{ inputs.SBOM }}-bom.json
+          file: ${{ inputs.SBOM_ARTIFACT }}-bom.json
           tag: v${{ inputs.VERSION }}
           overwrite: true
           file_glob: true
