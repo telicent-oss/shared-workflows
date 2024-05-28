@@ -87,3 +87,30 @@ jobs:
           scan-ref: ${{ inputs.SCAN_NAME }}.bom.json
           scan-type: 'sbom'
           scanners: 'vuln'
+
+  scan-and-store-full-report:
+    name: Scan for all vulnerabilities and store the report
+    needs:
+    - generate-sbom
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.SCAN_NAME}}-application
+
+      - name: Trivy Vulnerability Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'sbom'
+          scan-ref: ${{ inputs.SCAN_NAME }}.bom.json
+          output: ${{ inputs.SCAN_NAME }}.scan-report.json
+          format: 'json'
+          exit-code: '0'
+
+      - name: Upload Vulnerability Scan Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-report-${{ inputs.SCAN_NAME }}-application
+          path: ${{ inputs.SCAN_NAME }}.scan-report.json
+          retention-days: 30
