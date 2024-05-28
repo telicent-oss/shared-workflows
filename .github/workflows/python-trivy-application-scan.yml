@@ -40,13 +40,13 @@ jobs:
 
     - name: Generate SBOM
       run: |
-        python -m cyclonedx_py requirements > ${{ inputs.SCAN_NAME }}-application-bom.json
+        python -m cyclonedx_py requirements > ${{ inputs.SCAN_NAME }}-bom.json
 
     - name: Store the SBOM
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ inputs.SCAN_NAME}}-application
-        path: ${{ inputs.SCAN_NAME }}-application-bom.json
+        name: ${{ inputs.SCAN_NAME}}
+        path: ${{ inputs.SCAN_NAME }}-bom.json
 
   scan-sbom-for-high-crit:
     name: Scan SBOM for HIGH and CRITICAL
@@ -57,14 +57,14 @@ jobs:
       - name: Download SBOM
         uses: actions/download-artifact@v4
         with:
-          name: ${{ inputs.SCAN_NAME}}-application
+          name: ${{ inputs.SCAN_NAME}}
       - name: Scan SBOM
         uses: aquasecurity/trivy-action@master
         with:
           exit-code: '1'
           format: 'table'
           severity: 'HIGH,CRITICAL'
-          scan-ref: ${{ inputs.SCAN_NAME }}-application-bom.json
+          scan-ref: ${{ inputs.SCAN_NAME }}-bom.json
           scan-type: 'sbom'
           scanners: 'vuln'
 
@@ -77,14 +77,14 @@ jobs:
       - name: Download SBOM
         uses: actions/download-artifact@v4
         with:
-          name: ${{ inputs.SCAN_NAME}}-application
+          name: ${{ inputs.SCAN_NAME}}
       - name: Scan SBOM
         uses: aquasecurity/trivy-action@master
         with:
           exit-code: '0'
           format: 'table'
           severity: 'UNKNOWN,LOW,MEDIUM'
-          scan-ref: ${{ inputs.SCAN_NAME }}-application-bom.json
+          scan-ref: ${{ inputs.SCAN_NAME }}-bom.json
           scan-type: 'sbom'
           scanners: 'vuln'
 
@@ -97,13 +97,13 @@ jobs:
       - name: Download SBOM
         uses: actions/download-artifact@v4
         with:
-          name: ${{ inputs.SCAN_NAME}}-application
+          name: ${{ inputs.SCAN_NAME}}
 
       - name: Trivy Vulnerability Scan
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'sbom'
-          scan-ref: ${{ inputs.SCAN_NAME }}-application-bom.json
+          scan-ref: ${{ inputs.SCAN_NAME }}-bom.json
           output: ${{ inputs.SCAN_NAME }}-scan-report.json
           format: 'json'
           exit-code: '0'
@@ -111,6 +111,6 @@ jobs:
       - name: Upload Vulnerability Scan Results
         uses: actions/upload-artifact@v4
         with:
-          name: trivy-report-${{ inputs.SCAN_NAME }}-application
+          name: trivy-report-${{ inputs.SCAN_NAME }}
           path: ${{ inputs.SCAN_NAME }}-scan-report.json
           retention-days: 30
