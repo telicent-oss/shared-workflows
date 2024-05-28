@@ -26,7 +26,7 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ${{ inputs.SBOM }}.bom.json
+          file: ${{ inputs.SBOM }}-bom.json
           tag: ${{ inputs.VERSION }}
           overwrite: true
           file_glob: true
