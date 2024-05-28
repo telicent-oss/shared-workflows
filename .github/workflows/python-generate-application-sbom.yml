@@ -1,0 +1,52 @@
+name: Generate an SBOM for Python Application
+
+on:
+  workflow_call:
+    inputs:
+      SCAN_NAME:
+        type: string
+        required: true
+        description: |
+          A developer friendly name for the application to differentiate scan reports where a repository is
+          building multiple applications.
+      EXTRAS_ARG:
+        required: false
+        type: string
+        description: Any extra dependencies to be included in SBOM scan
+    outputs:
+      artifact-name:
+        value: ${{ inputs.SCAN_NAME }}
+
+jobs:
+  generate-sbom:
+    name: Generate Python Application SBOM
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.x"
+
+    - name: Prepare pip and and pip-tools
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install pip-tools
+
+    - name: Generate requirements
+      run: |
+        python -m piptools compile ${{ inputs.EXTRAS_ARG }} -o requirements.txt pyproject.toml
+        pip install cyclonedx-bom==4.4.3
+
+    - name: Generate SBOM
+      run: |
+        python -m cyclonedx_py requirements > ${{ inputs.SCAN_NAME }}-bom.json
+
+    - name: Store the SBOM
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ inputs.SCAN_NAME}}
+        path: ${{ inputs.SCAN_NAME }}-bom.json
