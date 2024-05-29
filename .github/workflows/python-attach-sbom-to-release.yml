@@ -28,12 +28,3 @@ jobs:
           tag_name: v${{ inputs.VERSION }}
           files: |
             ${{ inputs.SBOM_ARTIFACT }}-bom.json
-
-#      - name: Upload SBOM to release
-#        uses: svenstaro/upload-release-action@v2
-#        with:
-#          repo_token: ${{ secrets.GITHUB_TOKEN }}
-#          file: ${{ inputs.SBOM_ARTIFACT }}-bom.json
-#          tag: v${{ inputs.VERSION }}
-#          overwrite: true
-#          file_glob: true
