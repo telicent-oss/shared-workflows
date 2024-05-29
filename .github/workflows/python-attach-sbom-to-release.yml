@@ -25,6 +25,7 @@ jobs:
       - name: Attach files to release
         uses: softprops/action-gh-release@69320dbe05506a9a39fc8ae11030b214ec2d1f87 # v2.0.5
         with:
+          tag_name: v${{ inputs.VERSION }}
           files: |
             ${{ inputs.SBOM_ARTIFACT }}-bom.json
 
