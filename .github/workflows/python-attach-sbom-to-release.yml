@@ -1,0 +1,30 @@
+name: Downloads SBOM artifact to attach to given release
+
+on:
+  workflow_call:
+    inputs:
+      SBOM_ARTIFACT:
+        required: true
+        type: string
+        description: The reference to the SBOM artifact to download
+      VERSION:
+        required: true
+        type: string
+        description: The version to attach the SBOM to
+
+jobs:
+  attach-sbom-to-release:
+    name: Attach SBOM to release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.SBOM_ARTIFACT }}
+
+      - name: Attach files to release
+        uses: softprops/action-gh-release@69320dbe05506a9a39fc8ae11030b214ec2d1f87 # v2.0.5
+        with:
+          tag_name: v${{ inputs.VERSION }}
+          files: |
+            ${{ inputs.SBOM_ARTIFACT }}-bom.json
