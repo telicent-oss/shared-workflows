@@ -145,3 +145,4 @@ jobs:
     with:
       IMAGE_REF: telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}:${{ github.sha }}
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
+      RELEASE_SBOM_FILE: trivy-image-scan-sbom-${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}.json
