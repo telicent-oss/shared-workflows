@@ -20,7 +20,7 @@ jobs:
     name: Generate Application SBOM
     uses: telicent-oss/shared-workflows/.github/workflows/python-generate-application-sbom.yml@main
     with:
-      SCAN_NAME: ${{ inputs.PACKAGE }}-${{ needs.get-version.outputs.version }}
+      SCAN_NAME: ${{ inputs.PACKAGE }}-${{ inputs.VERSION }}
 
   scan-application-sbom:
     name: Scan Application SBOM
@@ -67,5 +67,5 @@ jobs:
     - name: Store the distribution packages
       uses: actions/upload-artifact@v4
       with:
-        name: python-package-distributions
+        name: ${{ needs.generate-application-sbom.outputs.artifact-name }}-dist
         path: dist/
