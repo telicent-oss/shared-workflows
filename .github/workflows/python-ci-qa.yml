@@ -1,4 +1,4 @@
-name: Python Tests for Libraries
+name: Python Tests for Python Applications and Libraries
 
 on:
   workflow_call:

@@ -1,0 +1,54 @@
+name: Downloads an artifact of a given name and scan the SBOM
+
+on:
+  workflow_call:
+    inputs:
+      SCAN_NAME:
+        type: string
+        description: |
+          The name of the scan to download the artifact of to scan
+        required: true
+
+jobs:
+  scan-sbom-for-high-crit:
+    name: Scan SBOM for HIGH and CRITICAL
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.SCAN_NAME}}
+      - name: Scan SBOM
+        uses: aquasecurity/trivy-action@master
+        with:
+          exit-code: '1'
+          format: 'table'
+          severity: 'HIGH,CRITICAL'
+          scan-ref: ${{ inputs.SCAN_NAME }}-bom.json
+          scan-type: 'sbom'
+          scanners: 'vuln'
+
+  scan-and-store-full-report:
+    name: Scan for all vulnerabilities and store the report
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.SCAN_NAME}}
+
+      - name: Trivy Vulnerability Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'sbom'
+          scan-ref: ${{ inputs.SCAN_NAME }}-bom.json
+          output: ${{ inputs.SCAN_NAME }}-scan-report.json
+          format: 'json'
+          exit-code: '0'
+
+      - name: Upload Vulnerability Scan Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.SCAN_NAME }}-trivy-report
+          path: ${{ inputs.SCAN_NAME }}-scan-report.json
+          retention-days: 30

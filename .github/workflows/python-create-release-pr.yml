@@ -22,3 +22,4 @@ jobs:
           {"type":"chore","section":"Miscellaneous","hidden":false},
           {"type":"perf","section":"Performance improvements","hidden":false}
           ]'
+          skip-github-release: true
