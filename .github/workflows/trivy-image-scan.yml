@@ -47,9 +47,9 @@ jobs:
           name: trivy-docker-report-${{ inputs.SCAN_NAME }}
           path: trivy-docker-report.json
           retention-days: 30
-      - name: Release report on docker sbom
-        uses: softprops/action-gh-release@v2
+      - name: Release report on docker sbom (IF has tags for release)
         if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             trivy-docker-report.json
