@@ -2,6 +2,19 @@ name: Create Python release PR from pyproject.toml
 
 on:
   workflow_call:
+    inputs:
+      PRE_RELEASE:
+        default: false
+        required: false
+        type: boolean
+      DEFAULT_BRANCH:
+        default: main
+        required: false
+        type: string
+      SKIP_GITHUB_RELEASE:
+        default: true
+        required: false
+        type: boolean
 
 jobs:
   create-release-pr:
@@ -11,8 +24,8 @@ jobs:
         with:
           release-type: python
           package-name: release-please-action
-          prerelease: false
-          default-branch: main
+          prerelease: ${{ inputs.PRE_RELEASE }}
+          default-branch: ${{ inputs.DEFAULT_BRANCH }}
           extra-files: |
             "pyproject.toml"
           version-file: pyproject.toml
@@ -22,4 +35,4 @@ jobs:
           {"type":"chore","section":"Miscellaneous","hidden":false},
           {"type":"perf","section":"Performance improvements","hidden":false}
           ]'
-          skip-github-release: true
+          skip-github-release: ${{ inputs.SKIP_GITHUB_RELEASE }}
