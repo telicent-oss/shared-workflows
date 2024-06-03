@@ -296,6 +296,7 @@ jobs:
           java-version: ${{ inputs.JAVA_VERSION }}
           distribution: ${{ inputs.JDK }}
           cache: maven
+          server-id: ${{ inputs.MAVEN_REPOSITORY_ID }}
           # Forced to use indirection here, the setup-java action configures the Maven settings.xml to reference
           # the credentials via environment variables
           server-username: MAVEN_USERNAME
