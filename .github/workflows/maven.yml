@@ -82,12 +82,12 @@ on:
           downloadable package that is generated from the repository.  Regardless of this value we 
           will always attach the SBOMs to the release.
     secrets:
-      MAVEN_USERNAME:
+      MVN_USER_NAME:
         required: false
         description: |
           Username for authenticating to a Maven repository to publish SNAPSHOTs, only needed if SNAPSHOT 
           publishing is enabled.
-      MAVEN_PASSWORD:
+      MVN_USER_PWD:
         required: false
         description: |
           Password/Token for authenticating to a Maven repository to publish SNAPSHOTs, only needed if SNAPSHOT
@@ -158,8 +158,8 @@ jobs:
     env:
       # These have to be exported into the environment due to how the setup-java action configures the Maven
       # settings.xml file to avoid directly embedding credentials into it.
-      MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
-      MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+      MAVEN_USERNAME: ${{ secrets.MVN_USER_NAME }}
+      MAVEN_PASSWORD: ${{ secrets.MVN_USER_PWD }}
     permissions:
       contents: read
     outputs:
@@ -284,8 +284,8 @@ jobs:
     env:
       # These have to be exported into the environment due to how the setup-java action configures the Maven
       # settings.xml file to avoid directly embedding credentials into it.
-      MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
-      MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+      MAVEN_USERNAME: ${{ secrets.MVN_USER_NAME }}
+      MAVEN_PASSWORD: ${{ secrets.MVN_USER_PWD }}
     steps:
       - name: Check out Git repository
         uses: actions/checkout@v4
@@ -296,6 +296,7 @@ jobs:
           java-version: ${{ inputs.JAVA_VERSION }}
           distribution: ${{ inputs.JDK }}
           cache: maven
+          server-id: ${{ inputs.MAVEN_REPOSITORY_ID }}
           # Forced to use indirection here, the setup-java action configures the Maven settings.xml to reference
           # the credentials via environment variables
           server-username: MAVEN_USERNAME
