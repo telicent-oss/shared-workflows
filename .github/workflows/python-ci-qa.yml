@@ -48,14 +48,18 @@ jobs:
       - name: Unit Tests
         run: coverage run -m ${{ inputs.test_command }}
 
+      - name: Show coverage report
+        run: coverage report -m
+
       - name: HTML Coverage Report
         run: coverage html
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ vars.GITHUB_RUN_NUMBER }}-${{ inputs.PYTHON_VERSION }}-coverage
+          name: ${{ github.run_number }}-${{ inputs.PYTHON_VERSION }}-coverage
           path: htmlcov/
+          retention-days: 30
 
       - name: Build
         if: ${{ inputs.SKIP_BUILD == false }}
