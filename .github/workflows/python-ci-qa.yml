@@ -11,7 +11,7 @@ on:
         required: false
         type: string
         description: The command to run for tests
-        default: "python -m unittest discover --verbose"
+        default: "unittest discover --verbose"
       SKIP_BUILD:
         required: false
         type: boolean
@@ -46,7 +46,16 @@ jobs:
         run:  python -m ruff check --output-format=github .
 
       - name: Unit Tests
-        run: ${{ inputs.test_command }}
+        run: coverage run -m ${{ inputs.test_command }}
+
+      - name: HTML Coverage Report
+        run: coverage html
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ vars.GITHUB_RUN_NUMBER }}-coverage
+          path: htmlcov/
 
       - name: Build
         if: ${{ inputs.SKIP_BUILD == false }}
