@@ -54,7 +54,7 @@ jobs:
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ vars.GITHUB_RUN_NUMBER }}-coverage
+          name: ${{ vars.GITHUB_RUN_NUMBER }}-${{ inputs.PYTHON_VERSION }}-coverage
           path: htmlcov/
 
       - name: Build
