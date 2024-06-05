@@ -1,0 +1,33 @@
+name: Generate SBOM for Python application and scan it
+
+on:
+  workflow_call:
+    inputs:
+      SCAN_NAME:
+        type: string
+        description: |
+          The name of the scan to download the artifact of to scan
+        required: true
+      EXTRAS_ARG:
+        required: false
+        type: string
+        description: Any extra dependencies to be included in SBOM scan
+    outputs:
+      artifact-name:
+        value: ${{ jobs.generate-application-sbom.outputs.artifact-name }}
+
+jobs:
+  generate-application-sbom:
+    name: Generate Application SBOM
+    uses: telicent-oss/shared-workflows/.github/workflows/python-generate-application-sbom.yml@main
+    with:
+      EXTRAS_ARG: ${{ inputs.EXTRAS_ARG }}
+      SCAN_NAME: ${{ inputs.SCAN_NAME }}-application
+
+  scan-application-sbom:
+    name: Scan Application SBOM
+    needs:
+      - generate-application-sbom
+    uses: telicent-oss/shared-workflows/.github/workflows/python-scan-sbom.yml@main
+    with:
+      SCAN_NAME: ${{ needs.generate-application-sbom.outputs.artifact-name }}
