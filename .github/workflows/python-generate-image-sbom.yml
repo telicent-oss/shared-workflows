@@ -1,0 +1,43 @@
+name: Generate an SBOM for the Container Image and Scan with Trivy
+
+on:
+  workflow_call:
+    inputs:
+      SCAN_NAME:
+        type: string
+        description: |
+          A developer friendly name for the image to differentiate scan reports where a repository is
+          building multiple images.
+        required: true
+      IMAGE_REF:
+        type: string
+        description: |
+          Specifies the full image reference (repository, name and tag) for an image you wish to scan.
+        required: true
+    outputs:
+      artifact-name:
+        value: ${{ inputs.SCAN_NAME }}
+
+jobs:
+  generate-sbom:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate SBOM for image
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: 'image'
+          format: 'cyclonedx'
+          output: ${{ inputs.SCAN_NAME }}-bom.json
+          image-ref: ${{ inputs.IMAGE_REF }}
+
+      - name: Store the SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.SCAN_NAME }}
+          path: ${{ inputs.SCAN_NAME }}-bom.json
