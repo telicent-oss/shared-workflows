@@ -12,34 +12,22 @@ on:
         type: string
     outputs:
       application-sbom-artifact-name:
-        value: ${{ jobs.generate-application-sbom.outputs.artifact-name }}
+        value: ${{ jobs.generate-and-scan-application-sbom.outputs.artifact-name }}
 
 jobs:
-
-  generate-application-sbom:
-    name: Generate Application SBOM
-    uses: telicent-oss/shared-workflows/.github/workflows/python-generate-application-sbom.yml@main
+  generate-and-scan-application-sbom:
+    name: Generate and Scan Application SBOM
+    uses: telicent-oss/shared-workflows/.github/workflows/python-generate-and-scan-application.yml@main
     with:
       SCAN_NAME: ${{ inputs.PACKAGE }}-${{ inputs.VERSION }}
-
-  scan-application-sbom:
-    name: Scan Application SBOM
-    needs:
-      - generate-application-sbom
-    uses: telicent-oss/shared-workflows/.github/workflows/python-scan-sbom.yml@main
-    with:
-      SCAN_NAME: ${{ needs.generate-application-sbom.outputs.artifact-name }}
 
   build:
     name: Build Release Distribution
     runs-on: ubuntu-latest
     needs:
-    - generate-application-sbom
-    - scan-application-sbom
-
+    - generate-and-scan-application-sbom
     steps:
     - uses: actions/checkout@v4
-
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
@@ -55,11 +43,11 @@ jobs:
     - name: Download SBOM
       uses: actions/download-artifact@v4
       with:
-        name: ${{ needs.generate-application-sbom.outputs.artifact-name }}
+        name: ${{ needs.generate-and-scan-application-sbom.outputs.artifact-name }}
 
     - name: Place SBOM in pkg
       run: |
-        mv ${{ needs.generate-application-sbom.outputs.artifact-name }}-bom.json ${{ inputs.PACKAGE }}/sbom.json
+        mv ${{ needs.generate-and-scan-application-sbom.outputs.artifact-name }}-bom.json ${{ inputs.PACKAGE }}/sbom.json
 
     - name: Build a binary wheel and a source tarball
       run: python3 -m build
@@ -67,5 +55,5 @@ jobs:
     - name: Store the distribution packages
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ needs.generate-application-sbom.outputs.artifact-name }}-dist
+        name: ${{ needs.generate-and-scan-application-sbom.outputs.artifact-name }}-dist
         path: dist/
