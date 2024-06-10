@@ -20,22 +20,29 @@ jobs:
         RELEASE="${{ inputs.VERSION }}"
         STARTED=0
         while IFS= read -r LINE; do
-          if [ ${STARTED} -eq 1 ]; then
-            if [[ "${LINE}" == \##\ * ]]; then
-              break
-            fi
-            echo "${LINE}" >> ${{ github.workspace }}-release-notes.txt
-          elif [[ "${LINE}" == \#\#\ [\[?]*${RELEASE}[\]?]* ]]; then
-            STARTED=1
-            echo "${LINE}" >> ${{ github.workspace }}-release-notes.txt
-          fi
+        if [[ "${LINE}" =~ ^##\ (\[${RELEASE}\]|${RELEASE}) ]]; then
+         STARTED=1
+         echo "${LINE}"
+         continue
+        fi
+        if [ ${STARTED} -eq 1 ]; then
+         if [[ "${LINE}" =~ ^[\*-] ]] || [[ "${LINE}" =~ ^\#\#\# ]]; then
+           echo "${LINE}" >>  ${{ github.workspace }}-release-notes.txt
+         else
+           if [[ "${LINE}" =~ ^##\  ]]; then
+             break
+           fi
+         fi
+        fi
         done < "CHANGELOG.md"
-        
         if [ ${STARTED} -eq 0 ]; then
-          echo "Release ${RELEASE} not found in CHANGELOG.md, no CHANGELOG release notes available" 1>&2
+        echo "Release ${RELEASE} not found in the changelog."
+        fi
+        if [ "${STARTED}" -eq 0 ]; then
+               echo "Release ${RELEASE} not found in CHANGELOG.md, no CHANGELOG release notes available" 1>&2
         else
-          echo "Detected Release Notes for ${RELEASE} are:"
-          cat ${{ github.workspace }}-release-notes.txt
+         echo "Detected Release Notes for ${RELEASE} are:"
+         cat "${{ github.workspace }}-release-notes.txt"
         fi
         exit 0
 
