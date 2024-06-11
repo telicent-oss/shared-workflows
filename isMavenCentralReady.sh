@@ -10,19 +10,32 @@ function abort() {
     fi
 }
 
+function hardAbort() {
+  abort "$*"
+  exit 1
+}
+
+function requireCommand() {
+  local COMMAND=$1
+  if ! command -v ${COMMAND} >/dev/null 2>&1; then
+    echo "Required command ${COMMAND} not found"
+    exit 1
+  fi
+}
+
+# Check necessary commands are present
+requireCommand mvn
+requireCommand xidel
+
 function verified() {
     echo "  PASS: $*"
 }
 
 DIRECTORY=$1
-pushd "${DIRECTORY}" || abort "Invalid directory (${DIRECTORY}) supplied"
-if [ ${ERRORS} -gt 0 ]; then
-  exit 1
-fi
+pushd "${DIRECTORY}" || hardAbort "Invalid directory (${DIRECTORY}) supplied"
 
 if [ ! -f pom.xml ]; then
-  abort "Not a Maven project, no top level pom.xml in ${DIRECTORY}"
-  exit 1
+  hardAbort "Not a Maven project, no top level pom.xml in ${DIRECTORY}"
 fi
 
 function getMavenProperty() {
@@ -94,7 +107,11 @@ function hasMavenArtifact() {
 }
 
 echo "Quick Building the Maven Project..."
-mvn clean install -DskipTests >/dev/null 2>&1 || abort "Maven Build Failed"
+mvn clean install -DskipTests >/tmp/maven.log 2>&1
+if [ $? -ne 0 ]; then
+  cat /tmp/maven.log
+  hardAbort "Maven Build Failed"
+fi
 echo "Maven Build completed"
 echo "---"
 echo
