@@ -86,7 +86,6 @@ jobs:
       contents: read
     needs:
       - generate-and-scan-application-sbom
-      - scan-application-sbom
     outputs:
       image-ref: ${{ steps.capture-tags.outputs.image-ref }}
     steps:
