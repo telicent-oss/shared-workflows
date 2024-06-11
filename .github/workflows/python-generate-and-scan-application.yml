@@ -22,7 +22,7 @@ jobs:
     uses: telicent-oss/shared-workflows/.github/workflows/python-generate-application-sbom.yml@main
     with:
       EXTRAS_ARG: ${{ inputs.EXTRAS_ARG }}
-      SCAN_NAME: ${{ inputs.SCAN_NAME }}-application
+      SCAN_NAME: ${{ inputs.SCAN_NAME }}
 
   scan-application-sbom:
     name: Scan Application SBOM
