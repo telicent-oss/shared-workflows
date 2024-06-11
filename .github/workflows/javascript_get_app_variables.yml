@@ -1,7 +1,11 @@
 # javascript: Get app variables
 on:
   workflow_call:
-
+    inputs:
+      app_config_json_str:
+        required: true
+        type: string
+        description: "JSON string of app.config.json"
 jobs:
   get_app_variables:
     runs-on: ubuntu-latest
@@ -13,6 +17,7 @@ jobs:
       - run: sudo apt-get install jq
       - id: set_vars
         run: |
+          echo '${{ inputs.config_json }}' > ./app.config.json
           APP_NAME=$(jq -r '.app_name' ./app.config.json)
           echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
           IMAGE_NAME=$(jq -r '.image_name' ./app.config.json)
