@@ -58,6 +58,24 @@ on:
           Specifies the main branch for the repository, defaults to main.  If this build is on the configured main
           branch then the latest tag will be added to the image, if the build is on another branch then the development
           tag will be added to the image.
+      USES_MAVEN:
+        required: false
+        type: boolean
+        default: false
+        description: |
+          Whether your build requires the JDK and Maven to be present.
+      JAVA_VERSION:
+        required: false
+        type: number
+        default: 21
+        description: |
+          Specifies the JDK version to install and build with.  Defaults to 21.
+      JDK:
+        required: false
+        type: string
+        default: temurin
+        description: |
+          Specifies the JDK to use, defaults to temurin.
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -69,6 +87,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Install Java and Maven
+        if: ${{ inputs.USES_MAVEN }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ inputs.JAVA_VERSION }}
+          distribution: ${{ inputs.JDK }}
+          cache: maven
+
+      # NB - Assumption here is that this workflow has been called after the Maven workflow has been called so the 
+      #      Maven Cache already has all our dependencies present in it and tests have already passed
+      - name: Quick Maven Build
+        if: ${{ inputs.USES_MAVEN }}
+        run: |
+          mvn verify --batch-mode -DskipTests
 
       - name: Get SBOM from artifact
         uses: actions/download-artifact@v4

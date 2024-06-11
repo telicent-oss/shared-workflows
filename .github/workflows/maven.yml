@@ -33,54 +33,55 @@ on:
         type: string
         default: install
         description: |
-          Specifies the Maven goal(s) to use when building the project.  Defaults to install.
+          Specifies the Maven goal(s) to use when building the project.  Defaults to `install`.
       MAVEN_DEPLOY_GOALS:
         required: false
         type: string
         default: deploy
         description: |
-          Specifies the Maven goal(s) to use when deploying the project, assuming PUBLISH_SNAPSHOTS was set to true and
-          we're on the configured MAIN_BRANCH.  Defaults to deploy.
+          Specifies the Maven goal(s) to use when deploying the project, assuming `PUBLISH_SNAPSHOTS` was set to `true`
+          and we're on the configured `MAIN_BRANCH`.  Defaults to `deploy`.
       MAVEN_REPOSITORY_ID:
         required: false
         type: string
         default: sonatype-oss
         description: |
-          Specifies the ID of the repository to which SNAPSHOTs and Releases are published, this MUST match the ID of
-          a repository defined in the pom.xml for the project in order for credentials to be correctly configured.
+          Specifies the ID of the repository to which `SNAPSHOT`s and Releases are published, this **MUST** match 
+          the ID of a repository defined in the `pom.xml` for the project in order for credentials to be correctly 
+          configured.
       JAVA_VERSION:
         required: false
         type: number
-        default: 17
+        default: 21
         description: |
-          Specifies the JDK version to install and build with.  Defaults to 17.
+          Specifies the JDK version to install and build with.  Defaults to 21.
       JDK:
         required: false
         type: string
         default: temurin
         description: |
-          Specifies the JDK to use, defaults to temurin.
+          Specifies the JDK to use, defaults to `temurin`.
       MAIN_BRANCH:
         required: false
         type: string
         default: main
         description: |
-          Specifies the main branch for the repository.  Used in determining whether to publish SNAPSHOTs in 
-          conjunction with the PUBLISH_SNAPSHOTS parameter.
+          Specifies the main branch for the repository.  Used in determining whether to publish `SNAPSHOT`s in 
+          conjunction with the `PUBLISH_SNAPSHOTS` parameter.
       PUBLISH_SNAPSHOTS:
         required: false
         type: boolean
         default: true
         description: |
-          Specifies whether Maven SNAPSHOTs are published from this build.  Note that even when enabled (as is
-          the default) SNAPSHOTs are only published when a build occurs on the main branch.  The main branch 
-          can be separately configured via the MAIN_BRANCH parameter.
+          Specifies whether Maven `SNAPSHOT`s are published from this build.  Note that even when enabled (as is
+          the default) `SNAPSHOT`s are only published when a build occurs on the main branch.  The main branch 
+          can be separately configured via the `MAIN_BRANCH` parameter.
       CHANGELOG_FILE:
         required: false
         type: string
         default: CHANGELOG.md
         description: |
-          Specifies the CHANGELOG file in the repository from which release notes can be extracted.
+          Specifies the Change Log file in the repository from which release notes can be extracted.
       RELEASE_FILES:
         required: false
         type: string
@@ -92,26 +93,26 @@ on:
       MVN_USER_NAME:
         required: false
         description: |
-          Username for authenticating to a Maven repository to publish SNAPSHOTs, only needed if SNAPSHOT 
+          Username for authenticating to a Maven repository to publish `SNAPSHOT`s, only needed if `SNAPSHOT`
           publishing is enabled.
       MVN_USER_PWD:
         required: false
         description: |
-          Password/Token for authenticating to a Maven repository to publish SNAPSHOTs, only needed if SNAPSHOT
+          Password/Token for authenticating to a Maven repository to publish `SNAPSHOT`s, only needed if `SNAPSHOT`
           publishing is enabled.
       DOCKER_READ_USER:
         required: false
         description: |
-          Username for authenticating to DockerHub, only needed if USES_DOCKERHUB_IMAGES is set to true.
+          Username for authenticating to DockerHub, only needed if `USES_DOCKERHUB_IMAGES` is set to true.
       DOCKER_READ_PWD:
         required: false
         description: |
-          Password/Token for authenticating to DockerHub, only needed if USERS_DOCKERHUB_IMAGES is set to true.
+          Password/Token for authenticating to DockerHub, only needed if `USES_DOCKERHUB_IMAGES` is set to true.
       GPG_PRIVATE_KEY:
         required: false
         description: |
-          A GPG Private Key that will be used to sign the built artifacts during the build process.  The pom.xml 
-          MUST invoke the maven-gpg-plugin for this to have an effect.
+          A GPG Private Key that will be used to sign the built artifacts during the build process.  The `pom.xml`
+          **MUST** invoke the `maven-gpg-plugin` for this to have an effect.
       GPG_PASSPHRASE:
         required: false
         description: |
@@ -122,7 +123,7 @@ on:
         description: The detected Maven Version of the project as configured in the top level pom.xml
         value: ${{ jobs.build.outputs.version }}
       is-snapshot:
-        description: Whether the Maven build was for a SNAPSHOT version.
+        description: Whether the Maven build was for a `SNAPSHOT` version.
         value: ${{ jobs.build.outputs.version != '' && contains(jobs.build.outputs.version, 'SNAPSHOT') }}
       
   # Allows you to run this workflow manually from the Actions tab
@@ -285,7 +286,11 @@ jobs:
         # - The declared version for the Maven project is a SNAPSHOT
         if: ${{ steps.gpg-check.outputs.enabled == 'true' && github.actor != 'dependabot[bot]' && inputs.PUBLISH_SNAPSHOTS && matrix.os == 'ubuntu-latest' && github.ref_name == inputs.MAIN_BRANCH && steps.project.outputs.version != '' && contains(steps.project.outputs.version, 'SNAPSHOT') }}
         run: |
-          mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -DskipTests ${{ inputs.MAVEN_ARGS }}
+          if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
+            mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -DskipTests ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }}
+          else
+            mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -DskipTests ${{ inputs.MAVEN_ARGS }}
+          fi
 
   github-release:
     runs-on: ubuntu-latest
