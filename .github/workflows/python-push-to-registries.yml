@@ -70,30 +70,22 @@ on:
       image-sbom-artifact-name:
         value: ${{ jobs.generate-image-sbom.outputs.artifact-name }}
       application-sbom-artifact-name:
-        value: ${{ jobs.generate-application-sbom.outputs.artifact-name }}
+        value: ${{ jobs.generate-and-scan-application-sbom.outputs.artifact-name }}
 
 jobs:
-  generate-application-sbom:
-    name: Generate Application SBOM
-    uses: telicent-oss/shared-workflows/.github/workflows/python-generate-application-sbom.yml@main
+  generate-and-scan-application-sbom:
+    name: Generate and Scan Application SBOM
+    uses: telicent-oss/shared-workflows/.github/workflows/python-generate-and-scan-application.yml@main
     with:
       EXTRAS_ARG: ${{ inputs.EXTRAS_ARG }}
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}-${{ inputs.VERSION }}${{ inputs.VERSION_SUFFIX }}-application
-
-  scan-application-sbom:
-    name: Scan Application SBOM
-    needs:
-      - generate-application-sbom
-    uses: telicent-oss/shared-workflows/.github/workflows/python-scan-sbom.yml@main
-    with:
-      SCAN_NAME: ${{ needs.generate-application-sbom.outputs.artifact-name }}
 
   build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
     needs:
-      - generate-application-sbom
+      - generate-and-scan-application-sbom
       - scan-application-sbom
     outputs:
       image-ref: ${{ steps.capture-tags.outputs.image-ref }}
@@ -104,11 +96,11 @@ jobs:
       - name: Download Application SBOM
         uses: actions/download-artifact@v4
         with:
-          name: ${{ needs.generate-application-sbom.outputs.artifact-name }}
+          name: ${{ needs.generate-and-scan-application-sbom.outputs.artifact-name }}
 
       - name: Rename SBOM for inclusion in image build
         run: |
-          mv ${{ needs.generate-application-sbom.outputs.artifact-name }}-bom.json sbom.json
+          mv ${{ needs.generate-and-scan-application-sbom.outputs.artifact-name }}-bom.json sbom.json
 
       - name: Set up Docker buildx
         id: buildx
