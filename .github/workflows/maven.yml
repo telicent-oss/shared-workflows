@@ -21,6 +21,13 @@ on:
         default: ""
         description: |
           Specifies any additional arguments to pass to the Maven invocations.
+      MAVEN_DEBUG_ARGS:
+        required: false
+        type: string
+        default: ""
+        description: |
+          Specifies any additional arguments to pass to the Maven invocations when the workflow is run in 
+          debug mode.
       MAVEN_BUILD_GOALS:
         required: false
         type: string
@@ -214,14 +221,22 @@ jobs:
       - name: Build and Verify Maven Package
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
-          mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
+          if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
+          else
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
+          fi
 
       - name: Build and Verify Maven Package (Windows - Docker Profile disabled)
         if: ${{ matrix.os == 'windows-latest' }}
         shell: bash
         # Remember that Windows Action runners DO NOT support Docker so explicitly disable the Docker profile
         run: |
-          mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P-${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
+          if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P-${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
+          else
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P-${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
+          fi
 
       - name: Trivy Vulnerability Scan
         if: ${{ matrix.os == 'ubuntu-latest' }}
@@ -311,7 +326,11 @@ jobs:
       # Note this job only runs after a successful build job so safe to skip tests at this point
       - name: Deploy Maven Release
         run: |
-          mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} -DskipTests
+          if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
+            mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} -DskipTests
+          else
+            mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }} -DskipTests
+          fi
 
       # If a CHANGELOG file has been provided find the developer curated release notes for 
       # the release from that file
