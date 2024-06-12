@@ -101,7 +101,7 @@ jobs:
       - name: Quick Maven Build
         if: ${{ inputs.USES_MAVEN }}
         run: |
-          mvn verify --batch-mode -DskipTests
+          mvn verify --batch-mode -DskipTests -Dgpg.skip=true
 
       - name: Get SBOM from artifact
         uses: actions/download-artifact@v4
