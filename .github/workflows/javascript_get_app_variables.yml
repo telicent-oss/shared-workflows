@@ -12,7 +12,6 @@ jobs:
     outputs:
       app_name: ${{ steps.set_vars.outputs.app_name }}
       image_name: ${{ steps.set_vars.outputs.image_name }}
-      version: ${{ steps.set_vars.outputs.version }}
     steps:
       - run: sudo apt-get install jq
       - id: set_vars
@@ -22,5 +21,3 @@ jobs:
           echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
           IMAGE_NAME=$(jq -r '.image_name' ./app.config.json)
           echo "image_name=$IMAGE_NAME" >> $GITHUB_OUTPUT
-          VERSION=$(jq -r '.version' ./package.json)
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
