@@ -103,10 +103,14 @@ jobs:
         run: |
           mvn verify --batch-mode -DskipTests -Dgpg.skip=true
 
+      # The existence of this SBOM is context dependent, some teams build workflows may not generate a
+      # SBOM in this fashion hence continue-on-error: true
       - name: Get SBOM from artifact
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: ${{ github.run_number }}-sbom.json
+
       - name: Set up Docker buildx
         id: buildx
         uses: docker/setup-buildx-action@v2
