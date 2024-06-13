@@ -147,17 +147,34 @@ for POM in $(find . -name pom.xml); do
   # Check for Distribution Management
   hasMavenConfiguration "${POM}" "//project[last()]/distributionManagement/repository/url" "<distributionManagement> section" "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
 
+  # Check nothing is pointing at AWS CodeArtifact
+  grep -F "telicent-098669589541.d.codeartifact" "${POM}" >/dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    abort "POM file ${POM} still contains a reference to Telicent AWS CodeArtifact"
+  else
+    verified "POM file ${POM} does not reference Telicent AWS CodeArtifact"
+  fi
+  
+  # Check nothing is pointing at private GitHub organisation
+  grep -Fi "/telicent-io/" "${POM}" >/dev/null 2>&1
+  if [ $? -eq 0 ]; then
+    abort "POM file ${POM} still contains a reference to the private telicent-io GitHub organisation"
+  else
+    verified "POM file ${POM} does not reference private telicent-io GitHub organisation"
+  fi
+
   # Check aritifacts
   echo "Artifact Checks..."
   PACKAGING=$(getMavenProperty "${POM}" "project.packaging")
   ARTIFACT_ID=$(getMavenProperty "${POM}" "project.artifactId")
   VERSION=$(getMavenProperty "${POM}" "project.version")
+  FINAL_NAME=$(getMavenProperty "${POM}" "project.build.finalName")
   echo "POM file ${POM} has packaging type ${PACKAGING}"
 
   if [ "${PACKAGING}" != "pom" ]; then
-    hasMavenArtifact "${POM}" "${ARTIFACT_ID}-${VERSION}.jar" "JAR File"
-    hasMavenArtifact "${POM}" "${ARTIFACT_ID}-${VERSION}-sources.jar" "Sources JAR"
-    hasMavenArtifact "${POM}" "${ARTIFACT_ID}-${VERSION}-javadoc.jar" "Javadoc JAR"
+    hasMavenArtifact "${POM}" "${FINAL_NAME}.jar" "JAR File"
+    hasMavenArtifact "${POM}" "${FINAL_NAME}-sources.jar" "Sources JAR"
+    hasMavenArtifact "${POM}" "${FINAL_NAME}-javadoc.jar" "Javadoc JAR"
   fi
   hasMavenArtifact "${POM}" "${ARTIFACT_ID}-${VERSION}-bom.json" "JSON SBOM"
   hasMavenArtifact "${POM}" "${ARTIFACT_ID}-${VERSION}-bom.xml" "XML SBOM"
@@ -171,7 +188,10 @@ for POM in $(find . -name pom.xml); do
         continue
         ;;
       *)
-        if [ ! -f "${ARTIFACT}.asc" ]; then
+        if [[ "${ARTIFACT}" =~ original* ]]; then
+          # We ignore original- artifacts as those won't be slated for release
+          continue
+        elif [ ! -f "${ARTIFACT}.asc" ]; then
           abort "POM file ${POM} produces artifact ${ARTIFACT} that does not have a corresponding digital signature file"
         else
           verified "Verified POM file ${POM} generates digital signature for artifact ${ARTIFACT}"
