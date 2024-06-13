@@ -179,7 +179,7 @@ jobs:
     name: Generate and Store the SBOM
     needs:
       - build
-    uses: Telicent-oss/shared-workflows/.github/workflows/python-generate-image-sbom.yml@CORE-248-smart-cache-paralog-api-opensource
+    uses: Telicent-oss/shared-workflows/.github/workflows/python-generate-image-sbom.yml@main
     with:
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}-${{ inputs.VERSION }}${{ inputs.VERSION_SUFFIX }}-image
       IMAGE_REF: ${{ needs.build.outputs.image-ref }}
