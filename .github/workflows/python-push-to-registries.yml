@@ -75,7 +75,7 @@ on:
 jobs:
   generate-and-scan-application-sbom:
     name: Generate and Scan Application SBOM
-    uses: telicent-oss/shared-workflows/.github/workflows/python-generate-and-scan-application.yml@CORE-248-smart-cache-paralog-api-opensource
+    uses: telicent-oss/shared-workflows/.github/workflows/python-generate-and-scan-application.yml@main
     with:
       EXTRAS_ARG: ${{ inputs.EXTRAS_ARG }}
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}-${{ inputs.VERSION }}${{ inputs.VERSION_SUFFIX }}-application
