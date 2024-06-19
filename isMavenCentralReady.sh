@@ -65,6 +65,12 @@ function hasMavenProperty() {
         return
       fi
     fi
+    # NB - If the Maven property isn't defined Maven doesn't interpolate the property expression and we just get the
+    #      expression echo'd back to us so double check for that case!!
+    if [ "${VALUE}" == "\${${PROPERTY}}" ]; then
+      abort "POM file ${POM} does not set required Maven Property ${PROPERTY}"
+      return
+    fi
 
     verified "Verified POM file ${POM} has required Maven Property ${PROPERTY} set as:"
     verified "${VALUE}"
