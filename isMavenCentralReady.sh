@@ -162,7 +162,7 @@ for POM in $(find . -name pom.xml); do
   fi
   
   # Check nothing is pointing at private GitHub organisation
-  grep -Fi "/telicent-io/" "${POM}" >/dev/null 2>&1
+  grep -Fi "telicent-io" "${POM}" >/dev/null 2>&1
   if [ $? -eq 0 ]; then
     abort "POM file ${POM} still contains a reference to the private telicent-io GitHub organisation"
   else
@@ -209,6 +209,14 @@ for POM in $(find . -name pom.xml); do
   echo "---"
   echo
 done
+
+# Check nothing is pointing at private GitHub organisation
+grep -Fi "telicent-io" .github/workflows/*
+if [ $? -eq 0 ]; then
+  abort "Some GitHub Actions workflow files still contains a reference to workflows in the private telicent-io GitHub organisation"
+else
+  verified "GitHub Actions workflow file does not reference workflows in private telicent-io GitHub organisation"
+fi
 
 if [ ${ERRORS} -gt 0 ]; then
   echo "Maven Project in ${DIRECTORY} had various errors, please see above output for details"
