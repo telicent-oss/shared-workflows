@@ -76,6 +76,17 @@ on:
         default: temurin
         description: |
           Specifies the JDK to use, defaults to temurin.
+      ALLOW_MUTABLE_TAGS:
+        required: false
+        type: boolean
+        default: true
+        description: |
+          Set `false` to avoid adding mutable tags like `latest` and `development` e.g. if AWS ECR has mutable tags disabled, and 400s
+      package-directory:
+        required: false
+        type: string
+        default: .
+        description: Name of package which SBOM, if it exists
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -83,7 +94,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
+      id-token: write
       contents: read
+      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -103,13 +116,13 @@ jobs:
         run: |
           mvn verify --batch-mode -DskipTests -Dgpg.skip=true
 
-      # The existence of this SBOM is context dependent, some teams build workflows may not generate a
-      # SBOM in this fashion hence continue-on-error: true
       - name: Get SBOM from artifact
         uses: actions/download-artifact@v4
+        # Unsure if SBOM exists (for now)
         continue-on-error: true
         with:
-          name: ${{ github.run_number }}-sbom.json
+          name: ${{ github.run_number }}${{ inputs.package-directory }}.sbom.json
+          path: ${{ inputs.PATH }} 
 
       - name: Set up Docker buildx
         id: buildx
@@ -158,9 +171,8 @@ jobs:
             type=semver,pattern={{version}}
             type=sha,format=long,prefix=
             type=raw,value=${{ inputs.VERSION }}${{ inputs.VERSION_SUFFIX }}
-            type=raw,value=latest,enable=${{ github.ref_name == inputs.MAIN_BRANCH }}
-            type=raw,value=development,enable=${{ github.ref_name != inputs.MAIN_BRANCH}}
-
+            type=raw,value=latest,enable=${{ inputs.ALLOW_MUTABLE_TAGS && github.ref_name == inputs.MAIN_BRANCH }}
+            type=raw,value=development,enable=${{ inputs.ALLOW_MUTABLE_TAGS && github.ref_name != inputs.MAIN_BRANCH}}
       - name: Build, tag, and push image to authenticated docker registry
         id: build-images
         uses: docker/build-push-action@v4
@@ -170,7 +182,7 @@ jobs:
           # Dependabot triggered PRs don't have credentials to push images
           push: ${{ github.actor != 'dependabot[bot]' }}
           context: ${{ inputs.PATH }}
-          file: ${{ inputs.DOCKERFILE }}
+          file: ${{ inputs.PATH }}/${{ inputs.DOCKERFILE }}
           tags: ${{ steps.meta.outputs.tags }}
           target: ${{ inputs.TARGET }}
           build-args: |
@@ -178,7 +190,7 @@ jobs:
 
   scan-image:
     needs: build
-    uses: Telicent-oss/shared-workflows/.github/workflows/trivy-image-scan.yml@main
+    uses: telicent-oss/shared-workflows/.github/workflows/trivy-image-scan.yml@update/for-frontend-trivy
     secrets: inherit
     # Since Dependabot builds can't push an image we skip the scan workflow because there won't be
     # an image for it to pull down and scan
@@ -186,4 +198,3 @@ jobs:
     with:
       IMAGE_REF: telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}:${{ github.sha }}
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
-      RELEASE_SBOM_FILE: trivy-image-scan-sbom-${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}.json
