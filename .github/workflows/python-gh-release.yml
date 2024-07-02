@@ -14,43 +14,27 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
+
+    # If a CHANGELOG file has been provided find the developer curated release notes for 
+    # the release from that file
     - name: Extract Release Notes
-      run: |
-        RELEASE="${{ inputs.VERSION }}"
-        STARTED=0
-        while IFS= read -r LINE; do
-        if [[ "${LINE}" =~ ^##\ (\[${RELEASE}\]|${RELEASE}) ]]; then
-         STARTED=1
-         echo "${LINE}"
-         continue
-        fi
-        if [ ${STARTED} -eq 1 ]; then
-         if [[ "${LINE}" =~ ^[\*-] ]] || [[ "${LINE}" =~ ^\#\#\# ]]; then
-           echo "${LINE}" >>  ${{ github.workspace }}-release-notes.txt
-         else
-           if [[ "${LINE}" =~ ^##\  ]]; then
-             break
-           fi
-         fi
-        fi
-        done < "CHANGELOG.md"
-        if [ ${STARTED} -eq 0 ]; then
-        echo "Release ${RELEASE} not found in the changelog."
-        fi
-        if [ "${STARTED}" -eq 0 ]; then
-               echo "Release ${RELEASE} not found in CHANGELOG.md, no CHANGELOG release notes available" 1>&2
-        else
-         echo "Detected Release Notes for ${RELEASE} are:"
-         cat "${{ github.workspace }}-release-notes.txt"
-        fi
-        exit 0
+      id: release-notes
+      uses: telicent-oss/extract-release-notes-action@v1
+      with:
+        changelog-file: CHANGELOG.md
+        version: ${{ inputs.VERSION }}
+        attach-release-notes: true
+        job-summary: true
+        # Allow for the Change Log file to not exist, in which case we get blank release
+        # notes generated
+        fail-if-missing: false
 
     - name: Create GitHub Release
       id: create-github-release
-      uses: softprops/action-gh-release@69320dbe05506a9a39fc8ae11030b214ec2d1f87 # v2.0.5
+      uses: softprops/action-gh-release@a74c6b72af54cfa997e81df42d94703d6313a2d0 # v2.0.6
       with:
-        body_path: ${{ github.workspace }}-release-notes.txt
+        body_path: ${{ steps.release-notes.outputs.release-notes-file }}
         generate_release_notes: false
         name: v${{ inputs.VERSION }}
         prerelease: false

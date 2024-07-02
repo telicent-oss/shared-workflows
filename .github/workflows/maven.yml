@@ -340,46 +340,22 @@ jobs:
       # If a CHANGELOG file has been provided find the developer curated release notes for 
       # the release from that file
       - name: Extract Release Notes
-        if: ${{ inputs.CHANGELOG_FILE != '' }}
-        run: |
-          RELEASE="${{ needs.build.outputs.version }}"
-          STARTED=0
-          while IFS= read -r LINE; do
-            if [ ${STARTED} -eq 1 ]; then
-              if [[ "${LINE}" == \#* ]]; then
-                break
-              fi
-              echo "${LINE}" >> ${{ github.workspace }}-release-notes.txt
-            elif [[ "${LINE}" == \#*${RELEASE} ]]; then
-              STARTED=1
-              echo "# Version ${RELEASE}" >> ${{ github.workspace }}-release-notes.txt
-            fi
-          done < "${{ inputs.CHANGELOG_FILE }}"
-          
-          if [ ${STARTED} -eq 0 ]; then
-            echo "Release ${RELEASE} not found in ${{ inputs.CHANGELOG_FILE }}, no CHANGELOG release notes available" 1>&2
-          else
-            echo "Detected Release Notes for ${RELEASE} are:"
-            cat ${{ github.workspace }}-release-notes.txt
-          fi
-          exit 0
-
-      - name: Detect whether GitHub Automatic Release Notes are enabled
-        id: auto
-        run: |
-          if [ -f ".github/release.yml" ]; then
-            echo "Using GitHub Automated Release Notes in addition to CHANGELOG release notes"
-            echo "enabled=true" >> ${GITHUB_OUTPUT}
-          else
-            echo "Using CHANGELOG release notes only"
-            echo "enabled=false" >> ${GITHUB_OUTPUT}
-          fi
+        id: release-notes
+        uses: telicent-oss/extract-release-notes-action@v1
+        with:
+          changelog-file: ${{ inputs.CHANGELOG_FILE }}
+          version: ${{ needs.build.outputs.version }}
+          attach-release-notes: true
+          job-summary: true
+          # Allow for the Change Log file to not exist, in which case we get blank release
+          # notes generated
+          fail-if-missing: false
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@69320dbe05506a9a39fc8ae11030b214ec2d1f87 # v2.0.5
+        uses: softprops/action-gh-release@a74c6b72af54cfa997e81df42d94703d6313a2d0 # v2.0.6
         with:
-          body_path: ${{ github.workspace }}-release-notes.txt
-          generate_release_notes: ${{ steps.auto.outputs.enabled }}
+          body_path: ${{ steps.release-notes.outputs.release-notes-file }}
+          generate_release_notes: ${{ steps.release-notes.outputs.auto-release-notes }}
           name: ${{ needs.build.outputs.version }}
           prerelease: false
           # We grab the CycloneDX BOMs we're generating plus any release files the workflow inputs specify
