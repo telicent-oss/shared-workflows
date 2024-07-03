@@ -1,0 +1,52 @@
+name: Scan Container Image with Trivy
+
+on:
+  workflow_call:
+    inputs:
+      SCAN_NAME:
+        type: string
+        description: |
+          A developer friendly name for the image to diffentiate scan reports where a repository is
+          building multiple images.
+      DOCKERFILE:
+        type: string
+        description: |
+          Specifies the full path to the Dockerfile within the repository.
+        required: true
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  misconfiguration-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Trivy Docker Misconfiguration Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "config"
+          scan-ref: ${{ inputs.DOCKERFILE }}
+          output: trivy-docker-misconfiguration-report.json
+          format: json
+          exit-code: 0
+
+      - name: Upload Misconfiguration Scan Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-docker-misconfiguration-report-${{ inputs.SCAN_NAME }}
+          path: trivy-docker-misconfiguration-report.json
+          retention-days: 30
+  
+      - name: Fail Build on High/Critical Misconfigurations
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "config"
+          scan-ref: ${{ inputs.DOCKERFILE }}
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: 1
