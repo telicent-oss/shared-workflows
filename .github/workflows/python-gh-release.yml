@@ -9,7 +9,7 @@ on:
         description: The version being released
 
 jobs:
-  create-release-pr:
+  do-release::
     uses: telicent-oss/shared-workflows/.github/workflows/python-create-release-pr.yml@main
     with:
       SKIP_GITHUB_RELEASE: false
