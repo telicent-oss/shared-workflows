@@ -176,6 +176,12 @@ jobs:
           build-args: |
             ${{ inputs.BUILD_ARGS }}
 
+  scan-dockerfile-configuration:
+    uses: Telicent-oss/shared-workflows/.github/workflows/trivy-dockerfile-scan.yml@main
+    with:
+      DOCKERFILE: ${{ inputs.PATH }}/${{ inputs.DOCKERFILE }}
+      SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
+
   scan-image:
     needs: build
     uses: Telicent-oss/shared-workflows/.github/workflows/trivy-image-scan.yml@main
