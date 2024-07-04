@@ -86,7 +86,7 @@ on:
         required: false
         type: string
         default: .
-        description: Name of package which SBOM, if it exists
+        description: If release has multiple package that are SBOM targets, then set this to disambiguate SBOMs
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -187,6 +187,12 @@ jobs:
           target: ${{ inputs.TARGET }}
           build-args: |
             ${{ inputs.BUILD_ARGS }}
+
+  scan-dockerfile-configuration:
+    uses: Telicent-oss/shared-workflows/.github/workflows/trivy-dockerfile-scan.yml@main
+    with:
+      DOCKERFILE: ${{ inputs.PATH }}/${{ inputs.DOCKERFILE }}
+      SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
 
   scan-image:
     needs: build

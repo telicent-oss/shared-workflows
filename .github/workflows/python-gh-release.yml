@@ -1,57 +1,15 @@
-name: Does GitHub release for given version and extracts release notes from CHANGELOG.md
+name: Does release please
 
 on:
   workflow_call:
     inputs:
       VERSION:
-        required: true
+        required: false
         type: string
         description: The version being released
 
 jobs:
   do-release:
-    name: Do Release
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v2
-    - name: Extract Release Notes
-      run: |
-        RELEASE="${{ inputs.VERSION }}"
-        STARTED=0
-        while IFS= read -r LINE; do
-        if [[ "${LINE}" =~ ^##\ (\[${RELEASE}\]|${RELEASE}) ]]; then
-         STARTED=1
-         echo "${LINE}"
-         continue
-        fi
-        if [ ${STARTED} -eq 1 ]; then
-         if [[ "${LINE}" =~ ^[\*-] ]] || [[ "${LINE}" =~ ^\#\#\# ]]; then
-           echo "${LINE}" >>  ${{ github.workspace }}-release-notes.txt
-         else
-           if [[ "${LINE}" =~ ^##\  ]]; then
-             break
-           fi
-         fi
-        fi
-        done < "CHANGELOG.md"
-        if [ ${STARTED} -eq 0 ]; then
-        echo "Release ${RELEASE} not found in the changelog."
-        fi
-        if [ "${STARTED}" -eq 0 ]; then
-               echo "Release ${RELEASE} not found in CHANGELOG.md, no CHANGELOG release notes available" 1>&2
-        else
-         echo "Detected Release Notes for ${RELEASE} are:"
-         cat "${{ github.workspace }}-release-notes.txt"
-        fi
-        exit 0
-
-    - name: Create GitHub Release
-      id: create-github-release
-      uses: softprops/action-gh-release@69320dbe05506a9a39fc8ae11030b214ec2d1f87 # v2.0.5
-      with:
-        body_path: ${{ github.workspace }}-release-notes.txt
-        generate_release_notes: false
-        name: v${{ inputs.VERSION }}
-        prerelease: false
-        tag_name: v${{ inputs.VERSION }}
+    uses: telicent-oss/shared-workflows/.github/workflows/python-create-release-pr.yml@main
+    with:
+      SKIP_GITHUB_RELEASE: false
