@@ -86,7 +86,7 @@ on:
         required: false
         type: string
         default: .
-        description: Name of package which SBOM, if it exists
+        description: If release has multiple package that are SBOM targets, then set this to disambiguate SBOMs
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -196,7 +196,7 @@ jobs:
 
   scan-image:
     needs: build
-    uses: telicent-oss/shared-workflows/.github/workflows/trivy-image-scan.yml@update/for-frontend-trivy
+    uses: telicent-oss/shared-workflows/.github/workflows/trivy-image-scan.yml@main
     secrets: inherit
     # Since Dependabot builds can't push an image we skip the scan workflow because there won't be
     # an image for it to pull down and scan
