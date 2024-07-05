@@ -7,6 +7,11 @@ on:
         default: "."
         type: string
         description: directory to run all run commands from
+      yarn-test-command:
+        required: false
+        default: "test"
+        type: string
+        description: Yarn test command e.g. "test" or "test:ci"
 
 jobs:
   quality:
@@ -45,6 +50,6 @@ jobs:
       - name: Install dependencies
         run: yarn install
       - name: run integrated tests
-        run: yarn test
+        run: yarn ${{ inputs.yarn-test-command }}
     env:
       NODE_AUTH_TOKEN: ${{ secrets.NPM_REGISTRY_TOKEN }}
