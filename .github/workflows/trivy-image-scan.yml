@@ -40,8 +40,6 @@ jobs:
           output: trivy-docker-report.json
           format: json
           exit-code: 0
-          # See TELFE-211
-          scanners: "vuln"
 
       - name: Upload Vulnerability Scan Results
         uses: actions/upload-artifact@v4
@@ -58,8 +56,6 @@ jobs:
           format: 'cyclonedx'
           output: trivy-image-scan-sbom-${{ inputs.SCAN_NAME }}.json
           image-ref: ${{ inputs.IMAGE_REF }}
-          # See TELFE-211
-          scanners: "vuln"
 
       - name: Release SBOM for image (IF has tags for release)
         if: startsWith(github.ref, 'refs/tags/')
@@ -84,5 +80,3 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: 1
-          # See TELFE-211
-          scanners: "vuln"
