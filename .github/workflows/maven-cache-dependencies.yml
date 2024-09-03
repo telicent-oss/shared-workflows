@@ -1,0 +1,47 @@
+name: Maven Cache Dependencies
+
+on:
+  workflow_call:
+    inputs:
+      JAVA_VERSION:
+        required: false
+        type: number
+        default: 21
+        description: |
+          Specifies the JDK version to install and build with.  Defaults to 21.
+      JDK:
+        required: false
+        type: string
+        default: temurin
+        description: |
+          Specifies the JDK to use, defaults to `temurin`.
+      
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  cache-dependencies:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Install Java and Maven
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ inputs.JAVA_VERSION }}
+          distribution: ${{ inputs.JDK }}
+          cache: maven
+          # We intentionally don't configure credentials for the cache dependencies step.  Any dependencies MUST
+          # be in the public artifact repository so fail fast if a project is still relying on private dependencies
+          # that have not been published.
+
+      - name: Cache Maven Dependencies
+        run: |
+          mvn dependency:go-offline --batch-mode
