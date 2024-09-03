@@ -121,10 +121,10 @@ on:
     outputs:
       version: 
         description: The detected Maven Version of the project as configured in the top level pom.xml
-        value: ${{ jobs.build.outputs.version }}
+        value: ${{ jobs.scan-and-publish.outputs.version }}
       is-snapshot:
         description: Whether the Maven build was for a `SNAPSHOT` version.
-        value: ${{ jobs.build.outputs.version != '' && contains(jobs.build.outputs.version, 'SNAPSHOT') }}
+        value: ${{ jobs.scan-and-publish.outputs.version != '' && contains(jobs.scan-and-publish.outputs.version, 'SNAPSHOT') }}
       
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -136,32 +136,90 @@ jobs:
       JAVA_VERSION: ${{ inputs.JAVA_VERSION }}
       JDK: ${{ inputs.JDK }}
 
-  build:
+  detect-modules:
     needs: cache-dependencies
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      modules: ${{ steps.modules.outputs.modules }}
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Install Java and Maven
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ inputs.JAVA_VERSION }}
+          distribution: ${{ inputs.JDK }}
+          cache: maven
+
+      # NB - This is needed because sometimes Maven won't resolve internal project dependencies
+      #      if this is the very first build for that version e.g. just after a version bump
+      - name: Quick Maven Build
+        run: |
+          mvn install -DskipTests -Dgpg.skip -q
+
+      - name: Detect Maven Modules
+        id: modules
+        run: |
+          echo -n "modules=" >> "$GITHUB_OUTPUT"
+          mvn exec:exec -Dexec.executable=echo -Dexec.args='${project.artifactId}' -q | jq --raw-input --slurp -c 'split("\n") | map(select(. != ""))' >> "${GITHUB_OUTPUT}"
+  
+  build:
+    needs: detect-modules
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        module: ${{ fromJSON(needs.detect-modules.outputs.modules) }} 
       fail-fast: false
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+      
+      - name: Install Java and Maven
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ inputs.JAVA_VERSION }}
+          distribution: ${{ inputs.JDK }}
+          cache: maven
+
+      - name: Build Required Modules without Tests
+        run: |
+          if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} -am -DskipTests -Dgpg.skip ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }}
+          else
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} -am -DskipTests -Dgpg.skip ${{ inputs.MAVEN_ARGS }}
+          fi
+
+      - name: Build and Verify Maven Module
+        run: |
+          if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} -Dgpg.skip ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }}
+          else
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} -Dgpg.skip ${{ inputs.MAVEN_ARGS }}
+          fi
+    
+  scan-and-publish:
+    needs: build
+    runs-on: ubuntu-latest
     env:
       # These have to be exported into the environment due to how the setup-java action configures the Maven
       # settings.xml file to avoid directly embedding credentials into it.
       MAVEN_USERNAME: ${{ secrets.MVN_USER_NAME }}
       MAVEN_PASSWORD: ${{ secrets.MVN_USER_PWD }}
     permissions:
+      id-token: write
       contents: read
     outputs:
       version: ${{ steps.project.outputs.version }}
     steps:
       - name: Check out Git repository
         uses: actions/checkout@v4
-      
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        if: ${{ inputs.USES_DOCKERHUB_IMAGES && matrix.os == 'ubuntu-latest' }}
-        with:
-          username: ${{ secrets.DOCKER_READ_USER }}
-          password: ${{ secrets.DOCKER_READ_PWD }}
 
       - name: Install Java and Maven
         uses: actions/setup-java@v4
@@ -176,7 +234,6 @@ jobs:
           server-password: MAVEN_PASSWORD
 
       - name: Check whether GPG Signing is Enabled
-        if: ${{ matrix.os == 'ubuntu-latest' }}
         id: gpg-check
         run: |
           if [ "${{ secrets.GPG_PRIVATE_KEY }}" != "" ]; then
@@ -186,7 +243,7 @@ jobs:
           fi
 
       - name: Import GPG key
-        if: ${{ matrix.os == 'ubuntu-latest' && steps.gpg-check.outputs.enabled == 'true' }}
+        if: ${{ steps.gpg-check.outputs.enabled == 'true' }}
         uses: crazy-max/ghaction-import-gpg@v6
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
@@ -194,33 +251,12 @@ jobs:
 
       - name: Generate Extra Maven Arguments (if needed)
         id: extra-maven-args
-        if: ${{ matrix.os == 'windows-latest' || steps.gpg-check.outputs.enabled == 'false' }}
+        if: ${{ steps.gpg-check.outputs.enabled == 'false' }}
         shell: bash
         run: |
           echo "args=-Dgpg.skip=true" >> "$GITHUB_OUTPUT"
 
-      - name: Build and Verify Maven Package
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: |
-          if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
-          else
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
-          fi
-
-      - name: Build and Verify Maven Package (Windows - Docker Profile disabled)
-        if: ${{ matrix.os == 'windows-latest' }}
-        shell: bash
-        # Remember that Windows Action runners DO NOT support Docker so explicitly disable the Docker profile
-        run: |
-          if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P-${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
-          else
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P-${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
-          fi
-
       - name: Trivy Vulnerability Scan
-        if: ${{ matrix.os == 'ubuntu-latest' }}
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: "fs"
@@ -230,7 +266,6 @@ jobs:
           exit-code: 0
 
       - name: Upload Vulnerability Scan Results
-        if: ${{ matrix.os == 'ubuntu-latest' }}
         uses: actions/upload-artifact@v4
         with:
           name: trivy-report
@@ -238,7 +273,6 @@ jobs:
           retention-days: 30
 
       - name: Fail build on High/Criticial Vulnerabilities
-        if: ${{ matrix.os == 'ubuntu-latest' }}
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: "fs"
@@ -250,31 +284,19 @@ jobs:
 
       - name: Detect Maven version
         id: project
-        if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
           echo version=$(mvn -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_OUTPUT
 
-      # It's safe to skipTests for the Publish step because we just did a full mvn verify in the earlier steps
-      # which will have run all the unit and integration tests
+      # NB - It's safe to skipTests for the Publish step because we just did a full mvn verify in the previous step
+      #      which will have run all the unit and integration tests
       - name: Publish Maven SNAPSHOTs
-        # We only publish if all the following are true:
-        # - GPG Key was provided for signing
-        # - The build was not triggered by Dependabot
-        # - The PUBLISH_SNAPSHOTS input was set to true
-        # - We're building on the ubuntu runner
-        # - We're on the configured MAIN_BRANCH 
-        # - The declared version for the Maven project is a SNAPSHOT
-        if: ${{ steps.gpg-check.outputs.enabled == 'true' && github.actor != 'dependabot[bot]' && inputs.PUBLISH_SNAPSHOTS && matrix.os == 'ubuntu-latest' && github.ref_name == inputs.MAIN_BRANCH && steps.project.outputs.version != '' && contains(steps.project.outputs.version, 'SNAPSHOT') }}
+        if: ${{ inputs.PUBLISH_SNAPSHOTS && github.ref_name == inputs.MAIN_BRANCH && steps.project.outputs.version != '' && contains(steps.project.outputs.version, 'SNAPSHOT') }}
         run: |
-          if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
-            mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -DskipTests ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }}
-          else
-            mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -DskipTests ${{ inputs.MAVEN_ARGS }}
-          fi
+          mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -DskipTests -Daether.connector.basic.parallelPut=false ${{ inputs.MAVEN_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
 
   github-release:
-    needs: build
-    if: ${{ github.ref_type == 'tag' && needs.build.outputs.version != '' && !contains(needs.build.outputs.version, 'SNAPSHOT') }}
+    needs: scan-and-publish
+    if: ${{ github.ref_type == 'tag' && needs.scan-and-publish.outputs.version != '' && !contains(needs.scan-and-publish.outputs.version, 'SNAPSHOT') }}
     uses: telicent-oss/shared-workflows/.github/workflows/maven-github-release.yml@parallel-maven
     with:
       CHANGELOG_FILE: ${{ inputs.CHANGELOG_FILE }}
