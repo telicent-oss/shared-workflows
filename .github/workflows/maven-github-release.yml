@@ -1,0 +1,165 @@
+name: Maven GitHub Release
+
+on:
+  workflow_call:
+    inputs:
+      DOCKER_PROFILE:
+        required: false
+        type: string
+        default: docker
+        description: |
+          Specifies the name of the profile that enables/disables Docker based tests.
+      MAVEN_ARGS:
+        required: false
+        type: string
+        default: ""
+        description: |
+          Specifies any additional arguments to pass to the Maven invocations.
+      MAVEN_DEBUG_ARGS:
+        required: false
+        type: string
+        default: ""
+        description: |
+          Specifies any additional arguments to pass to the Maven invocations when the workflow is run in 
+          debug mode.
+      MAVEN_DEPLOY_GOALS:
+        required: false
+        type: string
+        default: deploy
+        description: |
+          Specifies the Maven goal(s) to use when deploying the project, assuming `PUBLISH_SNAPSHOTS` was set to `true`
+          and we're on the configured `MAIN_BRANCH`.  Defaults to `deploy`.
+      MAVEN_REPOSITORY_ID:
+        required: false
+        type: string
+        default: sonatype-oss
+        description: |
+          Specifies the ID of the repository to which `SNAPSHOT`s and Releases are published, this **MUST** match 
+          the ID of a repository defined in the `pom.xml` for the project in order for credentials to be correctly 
+          configured.
+      JAVA_VERSION:
+        required: false
+        type: number
+        default: 21
+        description: |
+          Specifies the JDK version to install and build with.  Defaults to 21.
+      JDK:
+        required: false
+        type: string
+        default: temurin
+        description: |
+          Specifies the JDK to use, defaults to `temurin`.
+      CHANGELOG_FILE:
+        required: false
+        type: string
+        default: CHANGELOG.md
+        description: |
+          Specifies the Change Log file in the repository from which release notes can be extracted.
+      RELEASE_FILES:
+        required: false
+        type: string
+        description: |
+          Specifies the release files that should be attached to the GitHub release.  For example a 
+          downloadable package that is generated from the repository.  Regardless of this value we 
+          will always attach the SBOMs to the release.
+    secrets:
+      MVN_USER_NAME:
+        required: false
+        description: |
+          Username for authenticating to a Maven repository to publish `SNAPSHOT`s, only needed if `SNAPSHOT`
+          publishing is enabled.
+      MVN_USER_PWD:
+        required: false
+        description: |
+          Password/Token for authenticating to a Maven repository to publish `SNAPSHOT`s, only needed if `SNAPSHOT`
+          publishing is enabled.
+      GPG_PRIVATE_KEY:
+        required: false
+        description: |
+          A GPG Private Key that will be used to sign the built artifacts during the build process.  The `pom.xml`
+          **MUST** invoke the `maven-gpg-plugin` for this to have an effect.
+      GPG_PASSPHRASE:
+        required: false
+        description: |
+          The passphrase protecting the provided GPG Private Key.
+      
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  github-release:
+    runs-on: ubuntu-latest
+    if: ${{ github.ref_type == 'tag' }}
+    permissions:
+      id-token: write
+      contents: write
+      issues: write
+      pull-requests: write
+    env:
+      # These have to be exported into the environment due to how the setup-java action configures the Maven
+      # settings.xml file to avoid directly embedding credentials into it.
+      MAVEN_USERNAME: ${{ secrets.MVN_USER_NAME }}
+      MAVEN_PASSWORD: ${{ secrets.MVN_USER_PWD }}
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Install Java and Maven
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ inputs.JAVA_VERSION }}
+          distribution: ${{ inputs.JDK }}
+          cache: maven
+          server-id: ${{ inputs.MAVEN_REPOSITORY_ID }}
+          # Forced to use indirection here, the setup-java action configures the Maven settings.xml to reference
+          # the credentials via environment variables
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+
+      - name: Import GPG key
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
+      # Note this job only runs after a successful build job so safe to skip tests at this point
+      - name: Deploy Maven Release
+        run: |
+          if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
+            mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} -DskipTests
+          else
+            mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }} -DskipTests
+          fi
+
+      - name: Detect Maven version
+        id: project
+        run: |
+          echo version=$(mvn -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_OUTPUT
+
+      # If a CHANGELOG file has been provided find the developer curated release notes for 
+      # the release from that file
+      - name: Extract Release Notes
+        id: release-notes
+        uses: telicent-oss/extract-release-notes-action@v1
+        with:
+          changelog-file: ${{ inputs.CHANGELOG_FILE }}
+          version: ${{ steps.project.outputs.version }}
+          attach-release-notes: true
+          job-summary: true
+          # Allow for the Change Log file to not exist, in which case we get blank release
+          # notes generated
+          fail-if-missing: false
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@a74c6b72af54cfa997e81df42d94703d6313a2d0 # v2.0.6
+        with:
+          body_path: ${{ steps.release-notes.outputs.release-notes-file }}
+          generate_release_notes: ${{ steps.release-notes.outputs.auto-release-notes }}
+          name: ${{ steps.project.outputs.version }}
+          prerelease: false
+          # We grab the CycloneDX BOMs we're generating plus any release files the workflow inputs specify
+          files: |
+            **/*-bom.json
+            ${{ inputs.RELEASE_FILES }}
+        
+        
