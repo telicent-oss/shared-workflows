@@ -306,3 +306,4 @@ jobs:
       MAVEN_ARGS: ${{ inputs.MAVEN_ARGS }}
       MAVEN_DEBUG_ARGS: ${{ inputs.MAVEN_DEBUG_ARGS }}
       MAVEN_DEPLOY_GOALS: ${{ inputs.MAVEN_DEPLOY_GOALS }}
+    secrets: inherit
