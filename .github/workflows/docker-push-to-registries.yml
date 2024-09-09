@@ -182,7 +182,7 @@ jobs:
       DOCKERFILE: ${{ inputs.PATH }}/${{ inputs.DOCKERFILE }}
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
 
-  scan-image:
+  trivy-scan-image:
     needs: build
     uses: Telicent-oss/shared-workflows/.github/workflows/trivy-image-scan.yml@main
     secrets: inherit
@@ -193,3 +193,14 @@ jobs:
       IMAGE_REF: telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}:${{ github.sha }}
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
       RELEASE_SBOM_FILE: trivy-image-scan-sbom-${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}.json
+
+  grype-scan-image:
+    needs: build
+    uses: Telicent-oss/shared-workflows/.github/workflows/grype-image-scan.yml@CORE-440
+    secrets: inherit
+    # Since Dependabot builds can't push an image we skip the scan workflow because there won't be
+    # an image for it to pull down and scan
+    if: ${{ github.actor != 'dependabot[bot]' }}
+    with:
+      IMAGE_REF: telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}:${{ github.sha }}
+      SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
