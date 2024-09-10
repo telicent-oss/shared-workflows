@@ -1,12 +1,13 @@
 name: Python Vuln Scan App and Image
 
-workflow_call:
-  inputs:
-    SCAN_IMAGE:
-      description: 'Flag to determine whether to scan the image with Anchore'
-      required: false
-      default: 'false'
-      type: boolean
+on:
+  workflow_call:
+    inputs:
+      SCAN_IMAGE:
+        description: 'Flag to determine whether to scan the image with Anchore'
+        required: false
+        default: 'false'
+        type: boolean
 
 jobs:
   generate_sbom:
