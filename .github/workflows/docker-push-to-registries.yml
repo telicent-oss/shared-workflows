@@ -196,7 +196,7 @@ jobs:
 
   grype-scan-image:
     needs: build
-    uses: Telicent-oss/shared-workflows/.github/workflows/grype-image-scan.yml@CORE-440
+    uses: Telicent-oss/shared-workflows/.github/workflows/grype-image-scan.yml@main
     secrets: inherit
     # Since Dependabot builds can't push an image we skip the scan workflow because there won't be
     # an image for it to pull down and scan
