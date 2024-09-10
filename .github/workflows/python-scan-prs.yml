@@ -1,0 +1,59 @@
+name: Python Vuln Scan App and Image
+
+workflow_call:
+  inputs:
+    SCAN_IMAGE:
+      description: 'Flag to determine whether to scan the image with Anchore'
+      required: false
+      default: 'false'
+      type: boolean
+
+jobs:
+  generate_sbom:
+    name: Generate Application SBOM
+    uses: telicent-oss/shared-workflows/.github/workflows/python-generate-and-scan-application.yml@TPT-185/TPT-184
+    with:
+      SCAN_NAME: ${{ github.run_number }}
+
+  build_and_scan_image:
+    name: Build Docker Image and Scan with Anchore
+    needs: generate_sbom
+    runs-on: ubuntu-latest
+    if: ${{ inputs.SCAN_IMAGE == 'true' }}
+    permissions:
+      contents: read
+      id-token: write
+      packages: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Download Application SBOM
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.generate_sbom.outputs.artifact-name }}
+
+      - name: Rename SBOM for reference
+        run: |
+          mv ${{ needs.generate_sbom.outputs.artifact-name }}-bom.json sbom.json
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build Docker Image Locally
+        id: build-image
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          tags: ${{ github.repository }}:latest
+          load: true  # load image in runner so it can be scanned
+
+      - name: Scan Docker Image with Anchore
+        uses: anchore/scan-action@v3
+        with:
+          image: ${{ github.repository }}:latest
+          fail-severity: 'high'
+          format: 'table'

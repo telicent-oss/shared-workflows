@@ -18,7 +18,8 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: ${{ inputs.SCAN_NAME}}
-      - name: Scan SBOM
+
+      - name: Trivy Scan for HIGH and CRITICAL vulnerabilities
         uses: aquasecurity/trivy-action@master
         with:
           exit-code: '1'
@@ -27,6 +28,13 @@ jobs:
           scan-ref: ${{ inputs.SCAN_NAME }}-bom.json
           scan-type: 'sbom'
           scanners: 'vuln'
+
+      - name: Anchore Scan for HIGH and CRITICAL vulnerabilities
+        uses: anchore/scan-action@v3
+        with:
+          sbom: ${{ inputs.SCAN_NAME }}-bom.json
+          fail-severity: 'high'
+          format: 'table'
 
   scan-and-store-full-report:
     name: Scan for all vulnerabilities and store the report
@@ -37,18 +45,33 @@ jobs:
         with:
           name: ${{ inputs.SCAN_NAME}}
 
-      - name: Trivy Vulnerability Scan
+      - name: Trivy Full Vulnerability Scan
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'sbom'
           scan-ref: ${{ inputs.SCAN_NAME }}-bom.json
-          output: ${{ inputs.SCAN_NAME }}-scan-report.json
+          output: ${{ inputs.SCAN_NAME }}-trivy-scan-report.json
           format: 'json'
           exit-code: '0'
 
-      - name: Upload Vulnerability Scan Results
+      - name: Anchore Full Vulnerability Scan
+        uses: anchore/scan-action@v3
+        with:
+          sbom: ${{ inputs.SCAN_NAME }}-bom.json
+          output: ${{ inputs.SCAN_NAME }}-anchore-scan-report.json
+          fail-severity: 'high'
+          format: 'json'
+
+      - name: Upload Trivy Vulnerability Scan Results
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.SCAN_NAME }}-trivy-report
-          path: ${{ inputs.SCAN_NAME }}-scan-report.json
+          path: ${{ inputs.SCAN_NAME }}-trivy-scan-report.json
+          retention-days: 30
+
+      - name: Upload Anchore Vulnerability Scan Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.SCAN_NAME }}-anchore-report
+          path: ${{ inputs.SCAN_NAME }}-anchore-scan-report.json
           retention-days: 30
