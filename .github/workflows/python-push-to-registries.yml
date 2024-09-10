@@ -80,12 +80,20 @@ jobs:
       EXTRAS_ARG: ${{ inputs.EXTRAS_ARG }}
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}-${{ inputs.VERSION }}${{ inputs.VERSION_SUFFIX }}-application
 
+  scan-dockerfile:
+    name: Scan Dockerfile
+    uses: telicent-oss/shared-workflows/.github/workflows/trivy-dockerfile-scan.yml@main
+    with:
+      SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.ECR_SUFFIX }}-${{ inputs.VERSION }}${{ inputs.VERSION_SUFFIX }}-application
+      DOCKERFILE: ${{ inputs.DOCKERFILE }}
+
   build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
     needs:
       - generate-and-scan-application-sbom
+      - scan-dockerfile
     outputs:
       image-ref: ${{ steps.capture-tags.outputs.image-ref }}
     steps:
