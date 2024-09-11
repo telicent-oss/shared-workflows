@@ -11,7 +11,7 @@ on:
       DOCKERFILE:
         description: |
           The name of the Dockerfile to build the image from. This is relative to the PATH input.
-        required: true
+        required: false
         default: 'Dockerfile'
         type: string
       PATH:
