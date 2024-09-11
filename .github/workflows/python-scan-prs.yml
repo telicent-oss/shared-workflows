@@ -6,7 +6,7 @@ on:
       SCAN_IMAGE:
         description: 'Flag to determine whether to scan the image with Anchore'
         required: false
-        default: 'false'
+        default: false
         type: boolean
 
 jobs:
@@ -20,7 +20,7 @@ jobs:
     name: Build Docker Image and Scan with Anchore
     needs: generate_sbom
     runs-on: ubuntu-latest
-    if: ${{ inputs.SCAN_IMAGE == 'true' }}
+    if: ${{ inputs.SCAN_IMAGE }}
     permissions:
       contents: read
       id-token: write
