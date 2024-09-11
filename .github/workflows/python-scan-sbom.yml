@@ -33,7 +33,8 @@ jobs:
         uses: anchore/scan-action@v3
         with:
           sbom: ${{ inputs.SCAN_NAME }}-bom.json
-          fail-severity: 'high'
+          fail-build: true
+          severity-cutoff: high
           format: 'table'
 
   scan-and-store-full-report:
@@ -59,7 +60,8 @@ jobs:
         with:
           sbom: ${{ inputs.SCAN_NAME }}-bom.json
           output: ${{ inputs.SCAN_NAME }}-anchore-scan-report.json
-          fail-severity: 'high'
+          fail-build: true
+          severity-cutoff: high
           format: 'json'
 
       - name: Upload Trivy Vulnerability Scan Results

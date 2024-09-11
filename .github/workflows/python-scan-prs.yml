@@ -56,5 +56,6 @@ jobs:
         uses: anchore/scan-action@v3
         with:
           image: ${{ github.repository }}:latest
-          fail-severity: 'high'
+          fail-build: true
+          severity-cutoff: high
           format: 'table'

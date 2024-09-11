@@ -24,5 +24,6 @@ jobs:
         uses: anchore/scan-action@v3
         with:
           image: ${{ inputs.IMAGE_NAME }}
-          fail-severity: 'high'
+          fail-build: true
+          severity-cutoff: high
           format: 'table'
