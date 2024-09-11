@@ -1,13 +1,14 @@
 name: Scan Docker Hub Image for Vulnerabilities
 
 on:
-  workflow_dispatch:
+  workflow_call:
     inputs:
       IMAGE_NAME:
         description: 'The name of the Docker Hub image to scan (including tag e.g alpine:latest)'
         required: true
         type: string
-  workflow_call:
+
+  workflow_dispatch:
     inputs:
       IMAGE_NAME: {}
 
