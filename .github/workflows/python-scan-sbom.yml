@@ -42,14 +42,6 @@ jobs:
         if: always()
         run: cat ${{ steps.anchore-scan.outputs.sarif }}
 
-      - name: Upload Anchore Vulnerability Scan SARIF Report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ inputs.SCAN_NAME }}-anchore-report
-          path: ${{ steps.anchore-scan.outputs.sarif }}
-          retention-days: 30
-
 
   scan-and-store-full-report:
     name: Scan for all vulnerabilities and store the report
