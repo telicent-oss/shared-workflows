@@ -39,6 +39,12 @@ jobs:
         run: |
           mv ${{ needs.generate_sbom.outputs.artifact-name }}-bom.json sbom.json
 
+      - name: Extract Repository Name
+        id: extract-repo-name
+        run: |
+          REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+          echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
@@ -49,13 +55,13 @@ jobs:
           context: .
           file: ./Dockerfile
           platforms: linux/amd64
-          tags: ${{ github.repository }}:latest
+          tags: ${{ env.REPO_NAME }}:latest
           load: true  # load image in runner so it can be scanned
 
       - name: Scan Docker Image with Anchore
         uses: anchore/scan-action@v3
         with:
-          image: ${{ github.repository }}:latest
+          image: ${{ env.REPO_NAME }}:latest
           fail-build: true
           severity-cutoff: high
           format: 'table'
