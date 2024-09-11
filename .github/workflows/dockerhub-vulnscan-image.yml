@@ -26,4 +26,4 @@ jobs:
           image: ${{ inputs.IMAGE_NAME }}
           fail-build: true
           severity-cutoff: high
-          format: 'table'
+          output-format: table

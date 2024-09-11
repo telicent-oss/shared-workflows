@@ -64,4 +64,4 @@ jobs:
           image: ${{ env.REPO_NAME }}:latest
           fail-build: true
           severity-cutoff: high
-          format: 'table'
+          output-format: table

@@ -35,7 +35,8 @@ jobs:
           sbom: ${{ inputs.SCAN_NAME }}-bom.json
           fail-build: true
           severity-cutoff: high
-          format: 'table'
+          output-format: table
+
 
   scan-and-store-full-report:
     name: Scan for all vulnerabilities and store the report
@@ -62,7 +63,7 @@ jobs:
           output: ${{ inputs.SCAN_NAME }}-anchore-scan-report.json
           fail-build: true
           severity-cutoff: high
-          format: 'json'
+          output-format: json
 
       - name: Upload Trivy Vulnerability Scan Results
         uses: actions/upload-artifact@v4
