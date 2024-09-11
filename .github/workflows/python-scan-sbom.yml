@@ -17,7 +17,7 @@ jobs:
       - name: Download SBOM
         uses: actions/download-artifact@v4
         with:
-          name: ${{ inputs.SCAN_NAME}}
+          name: ${{ inputs.SCAN_NAME }}
 
       - name: Trivy Scan for HIGH and CRITICAL vulnerabilities
         uses: aquasecurity/trivy-action@master
@@ -36,16 +36,18 @@ jobs:
           sbom: ${{ inputs.SCAN_NAME }}-bom.json
           fail-build: true
           severity-cutoff: high
-          output-format: json
+          output-format: sarif
 
-      - name: Save Anchore Scan Report as JSON
-        run: echo "${{ steps.anchore-scan.outputs.scan-results }}" > ${{ inputs.SCAN_NAME }}-anchore-scan-report.json
+      - name: Inspect Anchore SARIF Report
+        if: always()
+        run: cat ${{ steps.anchore-scan.outputs.sarif }}
 
-      - name: Upload Anchore Vulnerability Scan Results
+      - name: Upload Anchore Vulnerability Scan SARIF Report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.SCAN_NAME }}-anchore-report
-          path: ${{ inputs.SCAN_NAME }}-anchore-scan-report.json
+          path: ${{ steps.anchore-scan.outputs.sarif }}
           retention-days: 30
 
 
@@ -56,7 +58,7 @@ jobs:
       - name: Download SBOM
         uses: actions/download-artifact@v4
         with:
-          name: ${{ inputs.SCAN_NAME}}
+          name: ${{ inputs.SCAN_NAME }}
 
       - name: Trivy Full Vulnerability Scan
         uses: aquasecurity/trivy-action@master
@@ -74,10 +76,11 @@ jobs:
           sbom: ${{ inputs.SCAN_NAME }}-bom.json
           fail-build: true
           severity-cutoff: high
-          output-format: json
+          output-format: sarif
 
-      - name: Save Anchore Full Scan Report as JSON
-        run: echo "${{ steps.anchore-full-scan.outputs.scan-results }}" > ${{ inputs.SCAN_NAME }}-anchore-scan-report.json
+      - name: Inspect Anchore Full SARIF Report
+        if: always()
+        run: cat ${{ steps.anchore-full-scan.outputs.sarif }}
 
       - name: Upload Trivy Vulnerability Scan Results
         uses: actions/upload-artifact@v4
@@ -86,9 +89,10 @@ jobs:
           path: ${{ inputs.SCAN_NAME }}-trivy-scan-report.json
           retention-days: 30
 
-      - name: Upload Anchore Vulnerability Scan Results
+      - name: Upload Anchore Vulnerability Scan SARIF Report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.SCAN_NAME }}-anchore-report
-          path: ${{ inputs.SCAN_NAME }}-anchore-scan-report.json
+          path: ${{ steps.anchore-full-scan.outputs.sarif }}
           retention-days: 30

@@ -77,14 +77,16 @@ jobs:
           image: ${{ env.REPO_NAME }}:latest
           fail-build: true
           severity-cutoff: high
-          output-format: json
+          output-format: sarif
 
-      - name: Save Anchore Scan Report as JSON
-        run: echo "${{ steps.anchore-scan.outputs.scan-results }}" > anchore-scan-report.json
+      - name: Inspect Anchore SARIF Report
+        if: always()
+        run: cat ${{ steps.anchore-scan.outputs.sarif }}
 
-      - name: Upload Anchore Vulnerability Scan Results
+      - name: Upload Anchore Vulnerability Scan SARIF Report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: anchore-scan-report
-          path: anchore-scan-report.json
+          path: ${{ steps.anchore-scan.outputs.sarif }}
           retention-days: 30
