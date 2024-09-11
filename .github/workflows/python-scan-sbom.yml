@@ -30,12 +30,23 @@ jobs:
           scanners: 'vuln'
 
       - name: Anchore Scan for HIGH and CRITICAL vulnerabilities
+        id: anchore-scan
         uses: anchore/scan-action@v3
         with:
           sbom: ${{ inputs.SCAN_NAME }}-bom.json
           fail-build: true
           severity-cutoff: high
-          output-format: table
+          output-format: json
+
+      - name: Save Anchore Scan Report as JSON
+        run: echo "${{ steps.anchore-scan.outputs.scan-results }}" > ${{ inputs.SCAN_NAME }}-anchore-scan-report.json
+
+      - name: Upload Anchore Vulnerability Scan Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.SCAN_NAME }}-anchore-report
+          path: ${{ inputs.SCAN_NAME }}-anchore-scan-report.json
+          retention-days: 30
 
 
   scan-and-store-full-report:
@@ -57,13 +68,16 @@ jobs:
           exit-code: '0'
 
       - name: Anchore Full Vulnerability Scan
+        id: anchore-full-scan
         uses: anchore/scan-action@v3
         with:
           sbom: ${{ inputs.SCAN_NAME }}-bom.json
-          output: ${{ inputs.SCAN_NAME }}-anchore-scan-report.json
           fail-build: true
           severity-cutoff: high
           output-format: json
+
+      - name: Save Anchore Full Scan Report as JSON
+        run: echo "${{ steps.anchore-full-scan.outputs.scan-results }}" > ${{ inputs.SCAN_NAME }}-anchore-scan-report.json
 
       - name: Upload Trivy Vulnerability Scan Results
         uses: actions/upload-artifact@v4

@@ -26,9 +26,19 @@ jobs:
           docker pull ${{ inputs.IMAGE_NAME }}
 
       - name: Scan Docker Image with Anchore
+        id: anchore-scan
         uses: anchore/scan-action@v3
         with:
           image: ${{ inputs.IMAGE_NAME }}
           fail-build: true
           severity-cutoff: high
-          output-format: table
+          output-format: json  # Change output format to JSON
+
+      - name: Save Anchore Scan Report as JSON
+        run: echo "${{ steps.anchore-scan.outputs.scan-results }}" > anchore-scan-report.json
+
+      - name: Upload Anchore Vulnerability Scan Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: anchore-scan-report
+          path: anchore-scan-report.json

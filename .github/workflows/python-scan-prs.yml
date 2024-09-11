@@ -8,6 +8,18 @@ on:
         required: false
         default: false
         type: boolean
+      DOCKERFILE:
+        description: |
+          The name of the Dockerfile to build the image from. This is relative to the PATH input.
+        required: true
+        default: 'Dockerfile'
+        type: string
+      PATH:
+        description: |
+          The path in which the Dockerfile is located. For current path leave empty. Otherwise e.g. ./frontend
+        required: false
+        default: '.'
+        type: string
 
 jobs:
   generate_sbom:
@@ -52,16 +64,27 @@ jobs:
         id: build-image
         uses: docker/build-push-action@v2
         with:
-          context: .
-          file: ./Dockerfile
+          context: ${{ inputs.PATH }}
+          file: ${{ inputs.DOCKERFILE }}
           platforms: linux/amd64
           tags: ${{ env.REPO_NAME }}:latest
           load: true  # load image in runner so it can be scanned
 
       - name: Scan Docker Image with Anchore
+        id: anchore-scan
         uses: anchore/scan-action@v3
         with:
           image: ${{ env.REPO_NAME }}:latest
           fail-build: true
           severity-cutoff: high
-          output-format: table
+          output-format: json
+
+      - name: Save Anchore Scan Report as JSON
+        run: echo "${{ steps.anchore-scan.outputs.scan-results }}" > anchore-scan-report.json
+
+      - name: Upload Anchore Vulnerability Scan Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: anchore-scan-report
+          path: anchore-scan-report.json
+          retention-days: 30
