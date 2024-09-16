@@ -24,6 +24,14 @@ jobs:
         run: |
           docker pull ${{ inputs.IMAGE_NAME }}
 
+      - name: Trivy Vulnerability Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ inputs.IMAGE_NAME }}
+          format: 'json'
+          exit-code: '0'
+          output: trivy-scan-report.json
+
       - name: Scan Docker Image with Anchore
         id: anchore-scan
         uses: anchore/scan-action@v3
@@ -37,10 +45,12 @@ jobs:
         if: always()
         run: cat ${{ steps.anchore-scan.outputs.sarif }}
 
-      - name: Upload Anchore Vulnerability Scan SARIF Report
+      - name: Upload Trivy and Anchore Vulnerability Scan Reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: anchore-scan-report-docker-hub-image.sarif
-          path: ${{ steps.anchore-scan.outputs.sarif }}
+          name: vulnerability-scan-reports
+          path: |
+            trivy-scan-report.json
+            ${{ steps.anchore-scan.outputs.sarif }}
           retention-days: 30
