@@ -28,6 +28,7 @@ jobs:
           scan-ref: ${{ inputs.SCAN_NAME }}-bom.json
           scan-type: 'sbom'
           scanners: 'vuln'
+          cache-dir: .trivy
 
       - name: Anchore Scan for HIGH and CRITICAL vulnerabilities
         id: anchore-scan
@@ -60,6 +61,7 @@ jobs:
           output: ${{ inputs.SCAN_NAME }}-trivy-scan-report.json
           format: 'json'
           exit-code: '0'
+          cache-dir: .trivy
 
       - name: Anchore Full Vulnerability Scan
         id: anchore-full-scan
