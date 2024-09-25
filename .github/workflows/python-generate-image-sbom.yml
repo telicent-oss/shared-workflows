@@ -28,21 +28,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Trivy Cache
-        id: trivy-cache
-        uses: yogeshlonkar/trivy-cache-action@c09b68f72328987374e9daf2245707addf8910cb
-        with:
-          gh-token: ${{ secrets.GITHUB_TOKEN }}
-          prefix: ${{ github.workflow }}
-
       - name: Generate SBOM for image
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.20.0
         with:
           scan-type: 'image'
           format: 'cyclonedx'
           output: ${{ inputs.SCAN_NAME }}-bom.json
           image-ref: ${{ inputs.IMAGE_REF }}
-          cache-dir: .trivy
 
       - name: Store the SBOM
         uses: actions/upload-artifact@v4
