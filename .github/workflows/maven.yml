@@ -219,6 +219,23 @@ jobs:
             mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P-${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
           fi
 
+      - name: Trivy Cache
+        id: trivy-cache
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        uses: yogeshlonkar/trivy-cache-action@c09b68f72328987374e9daf2245707addf8910cb
+        with:
+          gh-token: ${{ secrets.GITHUB_TOKEN }}
+          prefix: ${{ github.workflow }}
+
+      - name: Download Trivy Java DB
+        if: ${{ matrix.os == 'ubuntu-latest' && (steps.trivy-cache.outputs.cache-hit == '' || steps.trivy-cache.outputs.cache-hit == 'false') }}
+        uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_DOWNLOAD_JAVA_DB_ONLY: true
+        with:
+          scan-type: image
+          cache-dir: .trivy
+
       - name: Trivy Vulnerability Scan
         if: ${{ matrix.os == 'ubuntu-latest' }}
         uses: aquasecurity/trivy-action@master
@@ -228,6 +245,7 @@ jobs:
           format: json
           scan-ref: .
           exit-code: 0
+          cache-dir: .trivy
 
       - name: Upload Vulnerability Scan Results
         if: ${{ matrix.os == 'ubuntu-latest' }}
@@ -247,6 +265,7 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: 1
+          cache-dir: .trivy
 
       - name: Detect Maven version
         id: project

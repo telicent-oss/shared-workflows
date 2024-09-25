@@ -256,6 +256,22 @@ jobs:
         run: |
           echo "args=-Dgpg.skip=true" >> "$GITHUB_OUTPUT"
 
+      - name: Trivy Cache
+        id: trivy-cache
+        uses: yogeshlonkar/trivy-cache-action@c09b68f72328987374e9daf2245707addf8910cb
+        with:
+          gh-token: ${{ secrets.GITHUB_TOKEN }}
+          prefix: ${{ github.workflow }}
+
+      - name: Download Trivy Java DB
+        if: ${{ steps.trivy-cache.outputs.cache-hit == '' || steps.trivy-cache.outputs.cache-hit == 'false' }}
+        uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_DOWNLOAD_JAVA_DB_ONLY: true
+        with:
+          scan-type: image
+          cache-dir: .trivy
+
       - name: Trivy Vulnerability Scan
         uses: aquasecurity/trivy-action@master
         with:
@@ -264,6 +280,7 @@ jobs:
           format: json
           scan-ref: .
           exit-code: 0
+          cache-dir: .trivy
 
       - name: Upload Vulnerability Scan Results
         uses: actions/upload-artifact@v4
@@ -281,6 +298,7 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: 1
+          cache-dir: .trivy
 
       - name: Detect Maven version
         id: project
