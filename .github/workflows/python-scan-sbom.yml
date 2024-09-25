@@ -32,7 +32,7 @@ jobs:
 
       - name: Anchore Scan for HIGH and CRITICAL vulnerabilities
         id: anchore-scan
-        uses: anchore/scan-action@v4
+        uses: anchore/scan-action@v4.1.2
         with:
           sbom: ${{ inputs.SCAN_NAME }}-bom.json
           fail-build: true
@@ -65,7 +65,7 @@ jobs:
 
       - name: Anchore Full Vulnerability Scan
         id: anchore-full-scan
-        uses: anchore/scan-action@v4
+        uses: anchore/scan-action@v4.1.2
         with:
           sbom: ${{ inputs.SCAN_NAME }}-bom.json
           fail-build: true
