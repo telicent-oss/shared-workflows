@@ -161,5 +161,14 @@ jobs:
           files: |
             **/*-bom.json
             ${{ inputs.RELEASE_FILES }}
-        
-        
+
+      - name: Open Release PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+             --base main \
+             --head release/${{ steps.project.outputs.version }} \
+             --body-file ${{ steps.release-notes.outputs.release-notes-file }} \
+             --title "Complete Release ${{ steps.project.outputs.version }}"
+
