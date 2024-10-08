@@ -17,8 +17,9 @@ jobs:
       - name: Download SBOM
         uses: actions/download-artifact@v4
         with:
-          name: ${{ inputs.SCAN_NAME}}
-      - name: Scan SBOM
+          name: ${{ inputs.SCAN_NAME }}
+
+      - name: Trivy Scan for HIGH and CRITICAL vulnerabilities
         uses: aquasecurity/trivy-action@master
         with:
           exit-code: '1'
@@ -27,6 +28,21 @@ jobs:
           scan-ref: ${{ inputs.SCAN_NAME }}-bom.json
           scan-type: 'sbom'
           scanners: 'vuln'
+          cache-dir: .trivy
+
+      - name: Anchore Scan for HIGH and CRITICAL vulnerabilities
+        id: anchore-scan
+        uses: anchore/scan-action@v4.1.2
+        with:
+          sbom: ${{ inputs.SCAN_NAME }}-bom.json
+          fail-build: true
+          severity-cutoff: high
+          output-format: sarif
+
+      - name: Inspect Anchore SARIF Report
+        if: always()
+        run: cat ${{ steps.anchore-scan.outputs.sarif }}
+
 
   scan-and-store-full-report:
     name: Scan for all vulnerabilities and store the report
@@ -35,20 +51,42 @@ jobs:
       - name: Download SBOM
         uses: actions/download-artifact@v4
         with:
-          name: ${{ inputs.SCAN_NAME}}
+          name: ${{ inputs.SCAN_NAME }}
 
-      - name: Trivy Vulnerability Scan
+      - name: Trivy Full Vulnerability Scan
         uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'sbom'
           scan-ref: ${{ inputs.SCAN_NAME }}-bom.json
-          output: ${{ inputs.SCAN_NAME }}-scan-report.json
+          output: ${{ inputs.SCAN_NAME }}-trivy-scan-report.json
           format: 'json'
           exit-code: '0'
+          cache-dir: .trivy
 
-      - name: Upload Vulnerability Scan Results
+      - name: Anchore Full Vulnerability Scan
+        id: anchore-full-scan
+        uses: anchore/scan-action@v4.1.2
+        with:
+          sbom: ${{ inputs.SCAN_NAME }}-bom.json
+          fail-build: true
+          severity-cutoff: high
+          output-format: sarif
+
+      - name: Inspect Anchore Full SARIF Report
+        if: always()
+        run: cat ${{ steps.anchore-full-scan.outputs.sarif }}
+
+      - name: Upload Trivy Vulnerability Scan Results
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.SCAN_NAME }}-trivy-report
-          path: ${{ inputs.SCAN_NAME }}-scan-report.json
+          path: ${{ inputs.SCAN_NAME }}-trivy-scan-report.json
+          retention-days: 30
+
+      - name: Upload Anchore Vulnerability Scan SARIF Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.SCAN_NAME }}-anchore-report
+          path: ${{ steps.anchore-full-scan.outputs.sarif }}
           retention-days: 30

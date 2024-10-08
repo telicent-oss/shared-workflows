@@ -1,9 +1,10 @@
 # Maven Shared Workflow
 
-The Maven Shared Workflow definition may be found [here](../.github/workflows/maven.yml)
+The Maven Shared Workflow definition may be found [here (serial buld)](../.github/workflows/maven.yml) and 
+[here (parallel build)](../.github/workflows/parallel-maven.yml)
 
-This workflow is designed to build Maven based projects and includes automation of `SNAPSHOT` deployment, Maven Central
-releases and GitHub Releases.  See [What this Does](#what-this-workflow-does) for more details on exactly what's
+These workflows are designed to build Maven based projects and includes automation of `SNAPSHOT` deployment, Maven
+Central releases and GitHub Releases.  See [What this Does](#what-this-workflow-does) for more details on exactly what's
 contained within this workflow.
 
 ## Requirements
@@ -12,12 +13,15 @@ This workflow has the following requirements:
 
 - The repository it is called from **MUST** contain a `pom.xml` file in the root of the repository
 - The Maven project **MUST** be configured such that it meets the Maven Central requirements, the helper script
-  [`isMavenCentralReady.sh`](../isMavenCentralReady.sh) in this repository can be used to check whether a repository meets these requirements:
+  [`isMavenCentralReady.sh`](../isMavenCentralReady.sh) in this repository can be used to check whether a repository
+  meets these requirements:
   ```bash
   $ ./isMavenCentralReady.sh /path/to/repository/
   ```
   Which will do a bunch of sanity checks to see if various Maven Central requirements are being met.  This script is not
-  perfect so the first release you attempt to make with this workflow **MAY** still fail in some circumstances.  Telicent developers should refer to our internal documentation on preparing a repository for open source for more specific details.
+  perfect so the first release you attempt to make with this workflow **MAY** still fail in some circumstances.
+  Telicent developers should refer to our internal documentation on preparing a repository for open source for more
+  specific details.
 
 ## Private vs Public Workflow
 
@@ -27,10 +31,13 @@ repositories there is a private workflow whose documentation may be found in the
 The key differences with this workflow versus the private workflow are as follows:
 
 - This workflow automates the deployment of release artifacts to Maven Central
+- This workflow is designed to build **only** for public artifact repositories
+- This workflow imports a GPG Key for code signing when supplied as a secret
+- This workflow only releases GPG signed artifacts
 
 ## What this Workflow Does
 
-The shared Maven workflow does the following:
+The serial Maven workflow does the following:
 
 1. A `cache-dependencies` job that:
     - Configures Java and Maven
@@ -56,7 +63,42 @@ The shared Maven workflow does the following:
       auto-generation is configured on the repository
     - Generates a GitHub
 
+For the parallel build version of the workflow the steps are slightly different:
+
+1. A `cache-dependencies` job, this is the same as for the serial workflow
+2. A `detect-modules` job that:
+    - Configures Java and Maven
+    - Generates a JSON Output that is an array of the modules found in the repository
+3. A `build` job for each detected module that:
+    - Configures Java and Maven
+    - Optionally logs into DockerHub if configured to do so (see `USES_DOCKERHUB_IMAGES` in [workflow
+      inputs](#workflow-inputs))
+    - Builds the module and its dependencies with `mvn install -DskipTests -am -pl :module`
+    - Tests the module with `mvn install -pl :module`
+4. A `scan-and-publish` job that: 
+    - Configures Java and Maven
+    - Does a quick Maven build (`mvn install -DskipTests`) since this job is dependent on the `build` jobs being
+      successful which has built and verified each individual module
+    - Scans the project for high/critical severity vulnerabilities attaching reports to the build vulnerabilities with
+   `trivy`
+    - Adds the detected Maven project version (value of `project.version`) to the job outputs
+    - Optionally deploys `SNAPSHOT`s if the build is a `SNAPSHOT` and it's on the `MAIN_BRANCH`, and `PUBLISH_SNAPSHOTS`
+      is configured appropriately, i.e. `mvn deploy -DskipTests`, tests are skipped as this step only runs if the
+      earlier full build was successful
+5. A `github-release` job that is the same as the serial build
+
 Note that many aspects of the above may be configured via [workflow inputs](#workflow-inputs).
+
+### Choosing the Serial vs Parallel Builds
+
+They key motivator for whether to use the serial or parallel build is how long your build takes.  For shorter builds
+(10-15 minutes) the serial build should be used as it is simpler.  However, for longer builds the parallel build should
+be used as this can significantly improve CI/CD runtime as the observed runtime will be dictated by the slowest building
+module (typically the module with the most complex/largest number of tests).
+
+Additionally if your build has some tests that can experience transient failures, e.g. due to timing or container setup
+issues, then you may benefit from using the parallel build as in the event of a failure you can restart just the failing
+module build and not the entire build.
 
 ## Simple Usage Example
 
@@ -91,6 +133,35 @@ Key notes:
 - You **MUST** include `secrets: inherit` when calling the reusable workflow otherwise releases won't succeed
 - Your workflow trigger criteria **MUST** include a `tags` trigger otherwise the `github-release` job will
 never be run.
+
+### Using the Parallel Build
+
+Workflow inputs are identical across both the serial and parallel build so you merely need to change the referenced
+workflow in the `uses` clause to be `parallel-maven.yml` instead e.g.
+
+```yaml
+name: Maven Parallel Build
+
+on:
+  # Run workflow for any push to a branch or a tag
+  push:
+    branches:
+      - '**'
+    tags:
+      - '**'
+  # Allow manual triggering of the workflow
+  workflow_dispatch:
+
+jobs:
+  maven-build:
+    uses: telicent-oss/shared-workflows/.github/workflows/parallel-maven.yml@main
+    with:
+      # Want SNAPSHOTs to be published from main
+      PUBLISH_SNAPSHOTS: true
+      # Included more detailed logging when debugging (i.e. re-running failed tasks)
+      MAVEN_DEBUG_ARGS: -Dlogback.configurationFile=logback-debug.xml
+    secrets: inherit
+```
 
 ### Combining with other workflows
 
@@ -165,11 +236,14 @@ Key Notes:
 
 ### Do I need a release branch?
 
-No, some repositories may prefer to do it this way because of how they've configured
-[concurrency](#combining-with-other-workflows) in their workflow files, but is isn't required.
+Yes, our open source repositories protect the `main` branch from direct pushes, this means you **MUST** always create a
+release from a branch and then merge that release back to `main` once it is completed.  If you try to release directly
+from `main` then the Maven Release plugin will fail as the push will be rejected by GitHub.
 
-The workflow will produce an automatic GitHub release when you tag the repository provided that the tag does not point
-to a `SNAPSHOT` version.
+### What triggers the actual GitHub and Maven Central releaes?
+
+The workflow will produce an automatic GitHub release, and publish artifacts to Maven Central whenever you tag the
+repository, provided that the tag does not point to a `SNAPSHOT` version.
 
 ### How do I make a release?
 
@@ -192,14 +266,18 @@ something other than `CHANGELOG.md` then please set the [`CHANGELOG_FILE`](#work
 
 Secondly, the release note extraction is based on reading through the Change Log and finding a line that starts `#
 <version>` where `<version>` is the declared version of your release.  It then grabs all lines from that point onwards
-until the next line starting with a `#`.  If your Change Log is formatted differently, or there is no section for the
-current release, then this will not be successfully detected.
+until the next line starting with an equivalent number of `#`.  If your Change Log is formatted differently, or there is
+no section for the current release, then this will not be successfully detected.  Please see our [Extract Release Notes
+Action documentation](https://github.com/telicent-oss/extract-release-notes-action/blob/main/README.md#changelog-format)
+for more detail about the supported Change Log formats.
 
 ### Can I generate release notes automatically instead?
 
 Yes, if you provide a `.github/release.yml` file in your repository then you can take advantage of GitHub's [Automatic
 Release
 Notes](https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes#configuring-automatically-generated-release-notes)
+
+If this file is present then these will automatically be combined with any manually provided Change Log entries.
 
 # Workflow Inputs
 

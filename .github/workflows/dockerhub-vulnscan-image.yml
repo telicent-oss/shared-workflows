@@ -1,0 +1,56 @@
+name: Scan Docker Hub Image for Vulnerabilities
+
+on:
+  workflow_call:
+    inputs:
+      IMAGE_NAME:
+        description: 'The name of the Docker Hub image to scan (including tag e.g alpine:latest)'
+        required: true
+        type: string
+
+  workflow_dispatch:
+    inputs:
+      IMAGE_NAME: {}
+
+jobs:
+  scan-docker-hub-image:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Pull Image from Docker Hub
+        run: |
+          docker pull ${{ inputs.IMAGE_NAME }}
+
+      - name: Trivy Vulnerability Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ inputs.IMAGE_NAME }}
+          format: 'json'
+          exit-code: '0'
+          output: trivy-scan-report.json
+
+      - name: Scan Docker Image with Anchore
+        id: anchore-scan
+        uses: anchore/scan-action@v4.1.2
+        with:
+          image: ${{ inputs.IMAGE_NAME }}
+          fail-build: true
+          severity-cutoff: high
+          output-format: sarif  # Use SARIF format
+
+      - name: Inspect action SARIF report
+        if: always()
+        run: cat ${{ steps.anchore-scan.outputs.sarif }}
+
+      - name: Upload Trivy and Anchore Vulnerability Scan Reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulnerability-scan-reports
+          path: |
+            trivy-scan-report.json
+            ${{ steps.anchore-scan.outputs.sarif }}
+          retention-days: 30
