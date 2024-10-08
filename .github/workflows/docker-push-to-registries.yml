@@ -121,7 +121,7 @@ jobs:
         # Unsure if SBOM exists (for now)
         continue-on-error: true
         with:
-          name: ${{ github.run_number }}${{ inputs.package-directory }}.sbom.json
+          name: ${{ github.run_number }}${{ (inputs.package-directory == '.' && '') || inputs.package-directory }}.sbom.json
           path: ${{ inputs.PATH }} 
 
       - name: Set up QEMU
