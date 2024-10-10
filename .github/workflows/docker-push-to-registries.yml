@@ -81,12 +81,12 @@ on:
         type: boolean
         default: true
         description: |
-          Set `false` to avoid adding mutable tags like `latest` and `development` e.g. if AWS ECR has mutable tags disabled, and 400s
+          Set `false` to avoid adding mutable tags like `latest` and `development` e.g. if image registry has mutable tags disabled, and it will 400s when given mutable tags
       PACKAGE_DIRECTORY:
         required: false
         type: string
         default: .
-        description: If release has multiple package that are SBOM targets, then set this to disambiguate SBOMs
+        description: If Github release has multiple packages with SBOMs, then this can be used to disambiguate each package's SBOM
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -118,7 +118,8 @@ jobs:
 
       - name: Get SBOM from artifact
         uses: actions/download-artifact@v4
-        # Unsure if SBOM exists (for now)
+        # The existence of this SBOM is context dependent, some teams build workflows may not generate a
+        # SBOM in this fashion hence continue-on-error: true
         continue-on-error: true
         with:
           name: ${{ github.run_number }}${{ (inputs.PACKAGE_DIRECTORY == '.' && '') || inputs.PACKAGE_DIRECTORY }}.sbom.json
