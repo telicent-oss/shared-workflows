@@ -76,7 +76,13 @@ on:
         default: temurin
         description: |
           Specifies the JDK to use, defaults to temurin.
-  # Allows you to run this workflow manually from the Actions tab
+      DOWNLOAD_SBOM:
+        required: false
+        type: boolean
+        default: true
+        description: |
+          Whether to download the SBOM from the artifact. Only needed in some flows - hence being disabled so as to avoid errors.
+      # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 jobs:
@@ -107,6 +113,7 @@ jobs:
       # SBOM in this fashion hence continue-on-error: true
       - name: Get SBOM from artifact
         uses: actions/download-artifact@v4
+        if: ${{ input.DOWNLOAD_SBOM }}
         continue-on-error: true
         with:
           name: ${{ github.run_number }}-sbom.json
