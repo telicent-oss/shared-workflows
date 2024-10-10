@@ -150,7 +150,7 @@ jobs:
 
       - name: Prepare Docker Image Names and Tags
         id: meta
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
           # Defines the base image names in repository/name format
           images: |
