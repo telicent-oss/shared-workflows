@@ -60,16 +60,16 @@ jobs:
       cancel-in-progress: false
     steps:
       - name: Git Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.1
 
       - name: Install Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v4.4.0
         with:
           java-version: 17
           distribution: temurin
 
       - name: Install jira-sync
-        uses: jaxxstorm/action-install-gh-release@71d17cb091aa850acb2a1a4cf87258d183eb941b #v1.11.0
+        uses: jaxxstorm/action-install-gh-release@v1.12.0
         with: # Grab the latest version
           repo: telicent-oss/jira-sync
           platform: jvm
@@ -77,7 +77,7 @@ jobs:
 
       - name: Restore Cached Cross Links
         id: cache-cross-links
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v4.1.1
         with:
           path: ${{ inputs.cross-links-file }}
           key: jira-sync-cross-links-${{ hashFiles(inputs.cross-links-file) }}
@@ -116,7 +116,7 @@ jobs:
       # This step is needed so that if the cross links file gets updated we
       # generate a new cache from it
       - name: Update Cached Cross Links
-        uses: actions/cache@v4
+        uses: actions/cache@v4.1.1
         with:
           path: ${{ inputs.cross-links-file }}
           key: jira-sync-cross-links-${{ hashFiles(inputs.cross-links-file) }}
