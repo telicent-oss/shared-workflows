@@ -76,20 +76,33 @@ on:
         default: temurin
         description: |
           Specifies the JDK to use, defaults to temurin.
+      ALLOW_MUTABLE_TAGS:
+        required: false
+        type: boolean
+        default: true
+        description: |
+          Set `false` to avoid adding mutable tags like `latest` and `development` e.g. if image registry has mutable tags disabled, and it will 400s when given mutable tags
+      PACKAGE_DIRECTORY:
+        required: false
+        type: string
+        default: .
+        description: If Github release has multiple packages with SBOMs, then this can be used to disambiguate each package's SBOM
       DOWNLOAD_SBOM:
         required: false
         type: boolean
         default: true
         description: |
-          Whether to download the SBOM from the artifact. Only needed in some flows - hence being disabled so as to avoid errors.
-      # Allows you to run this workflow manually from the Actions tab
+          Set `false` to avoid trying to download SBOM artifacts (and if it fails, avoid "sbom not found" errors). Used by certain workflows that don't need to download SBOMs
+  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
+      id-token: write
       contents: read
+      packages: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4.2.1
@@ -109,14 +122,13 @@ jobs:
         run: |
           mvn verify --batch-mode -DskipTests -Dgpg.skip=true
 
-      # The existence of this SBOM is context dependent, some teams build workflows may not generate a
-      # SBOM in this fashion hence continue-on-error: true
       - name: Get SBOM from artifact
         uses: actions/download-artifact@v4.1.8
         if: ${{ inputs.DOWNLOAD_SBOM }}
         continue-on-error: true
         with:
-          name: ${{ github.run_number }}-sbom.json
+          name: ${{ github.run_number }}${{ (inputs.PACKAGE_DIRECTORY == '.' && '') || inputs.PACKAGE_DIRECTORY }}.sbom.json
+          path: ${{ inputs.PATH }} 
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3.2.0
@@ -170,9 +182,8 @@ jobs:
             type=semver,pattern={{version}}
             type=sha,format=long,prefix=
             type=raw,value=${{ inputs.VERSION }}${{ inputs.VERSION_SUFFIX }}
-            type=raw,value=latest,enable=${{ github.ref_name == inputs.MAIN_BRANCH }}
-            type=raw,value=development,enable=${{ github.ref_name != inputs.MAIN_BRANCH}}
-
+            type=raw,value=latest,enable=${{ inputs.ALLOW_MUTABLE_TAGS && github.ref_name == inputs.MAIN_BRANCH }}
+            type=raw,value=development,enable=${{ inputs.ALLOW_MUTABLE_TAGS && github.ref_name != inputs.MAIN_BRANCH}}
       - name: Build, tag, and push image to authenticated docker registry
         id: build-images
         uses: docker/build-push-action@v6.9.0
@@ -182,7 +193,7 @@ jobs:
           # Dependabot triggered PRs don't have credentials to push images
           push: ${{ github.actor != 'dependabot[bot]' }}
           context: ${{ inputs.PATH }}
-          file: ${{ inputs.DOCKERFILE }}
+          file: ${{ inputs.PATH }}/${{ inputs.DOCKERFILE }} # NOTE: relative path (inputs.PATH defaults to '.')
           tags: ${{ steps.meta.outputs.tags }}
           target: ${{ inputs.TARGET }}
           build-args: |
@@ -191,12 +202,12 @@ jobs:
   scan-dockerfile-configuration:
     uses: Telicent-oss/shared-workflows/.github/workflows/trivy-dockerfile-scan.yml@main
     with:
-      DOCKERFILE: ${{ inputs.PATH }}/${{ inputs.DOCKERFILE }}
+      DOCKERFILE: ${{ inputs.PATH }}/${{ inputs.DOCKERFILE }} # NOTE: relative path (inputs.PATH defaults to '.')
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
 
   trivy-scan-image:
     needs: build
-    uses: Telicent-oss/shared-workflows/.github/workflows/trivy-image-scan.yml@main
+    uses: telicent-oss/shared-workflows/.github/workflows/trivy-image-scan.yml@main
     secrets: inherit
     # Since Dependabot builds can't push an image we skip the scan workflow because there won't be
     # an image for it to pull down and scan
@@ -204,8 +215,6 @@ jobs:
     with:
       IMAGE_REF: telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}:${{ github.sha }}
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
-      RELEASE_SBOM_FILE: trivy-image-scan-sbom-${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}.json
-
   grype-scan-image:
     needs: build
     uses: Telicent-oss/shared-workflows/.github/workflows/grype-image-scan.yml@main
