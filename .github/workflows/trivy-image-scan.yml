@@ -13,11 +13,6 @@ on:
         description: |
           Specifies the full image reference (repository, name and tag) for an image you wish to scan.
         required: true
-      RELEASE_SBOM_FILE:
-        type: string
-        description: |
-          If release (i.e. has tags), the SBOM for image will be generated and attached to releases
-        required: true
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -68,7 +63,7 @@ jobs:
         with:
           scan-type: 'image'
           format: 'cyclonedx'
-          output: ${{ inputs.RELEASE_SBOM_FILE }}
+          output: trivy-image-scan-sbom-${{ inputs.SCAN_NAME }}.json
           image-ref: ${{ inputs.IMAGE_REF }}
           cache-dir: .trivy
 
@@ -77,7 +72,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-              ${{ inputs.RELEASE_SBOM_FILE }}
+            trivy-image-scan-sbom-${{ inputs.SCAN_NAME }}.json
 
       - name: Release report on docker sbom (IF has tags for release)
         if: startsWith(github.ref, 'refs/tags/')
@@ -85,7 +80,7 @@ jobs:
         with:
           files: |
             trivy-docker-report.json
-            
+
       - name: Fail Build on High/Critical Vulnerabilities
         uses: aquasecurity/trivy-action@master
         with:
