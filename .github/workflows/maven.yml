@@ -238,6 +238,17 @@ jobs:
           timeout: 10m0s
           cache-dir: .trivy
 
+      - name: Download Trivy Vulnerability DB
+        if: ${{ matrix.os == 'ubuntu-latest' && (steps.trivy-cache.outputs.cache-hit == '' || steps.trivy-cache.outputs.cache-hit == 'false') }}
+        uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_DOWNLOAD_DB_ONLY: true
+          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db,ghcr.io/aquasecurity/trivy-db:2
+        with:
+          scan-type: image
+          timeout: 10m0s
+          cache-dir: .trivy
+
       - name: Trivy Vulnerability Scan
         if: ${{ matrix.os == 'ubuntu-latest' }}
         uses: aquasecurity/trivy-action@master
