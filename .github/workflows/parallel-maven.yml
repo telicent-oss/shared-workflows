@@ -275,7 +275,7 @@ jobs:
           cache-dir: .trivy
 
       - name: Download Trivy Vulnerability DB
-        if: ${{ matrix.os == 'ubuntu-latest' && (steps.trivy-cache.outputs.cache-hit == '' || steps.trivy-cache.outputs.cache-hit == 'false') }}
+        if: ${{ steps.trivy-cache.outputs.cache-hit == '' || steps.trivy-cache.outputs.cache-hit == 'false' }}
         uses: aquasecurity/trivy-action@master
         env:
           TRIVY_DOWNLOAD_DB_ONLY: true
