@@ -40,8 +40,33 @@ jobs:
           gh-token: ${{ secrets.GITHUB_TOKEN }}
           prefix: ${{ github.workflow }}
 
+      - name: Download Trivy Java DB
+        if: ${{ steps.trivy-cache.outputs.cache-hit == '' || steps.trivy-cache.outputs.cache-hit == 'false' }}
+        uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_DOWNLOAD_JAVA_DB_ONLY: true
+          TRIVY_JAVA_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-java-db,ghcr.io/aquasecurity/trivy-java-db:1
+        with:
+          scan-type: image
+          timeout: 10m0s
+          cache-dir: .trivy
+
+      - name: Download Trivy Vulnerability DB
+        if: ${{ steps.trivy-cache.outputs.cache-hit == '' || steps.trivy-cache.outputs.cache-hit == 'false' }}
+        uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_DOWNLOAD_DB_ONLY: true
+          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db,ghcr.io/aquasecurity/trivy-db:2
+        with:
+          scan-type: image
+          timeout: 10m0s
+          cache-dir: .trivy
+
       - name: Trivy Vulnerability Scan
         uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_SKIP_DB_UPDATE: true
+          TRIVY_SKIP_JAVA_DB_UPDATE: true
         with:
           scan-type: "image"
           image-ref: ${{ inputs.IMAGE_REF }}
@@ -83,6 +108,9 @@ jobs:
 
       - name: Fail Build on High/Critical Vulnerabilities
         uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_SKIP_DB_UPDATE: true
+          TRIVY_SKIP_JAVA_DB_UPDATE: true
         with:
           scan-type: "image"
           image-ref: ${{ inputs.IMAGE_REF }}
