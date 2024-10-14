@@ -6,7 +6,7 @@ on:
       SCAN_NAME:
         type: string
         description: |
-          A developer friendly name for the image to diffentiate scan reports where a repository is
+          A developer friendly name for the image to differentiate scan reports where a repository is
           building multiple images.
       IMAGE_REF:
         type: string
@@ -25,17 +25,17 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.1
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3.3.0
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Trivy Cache
         id: trivy-cache
-        uses: yogeshlonkar/trivy-cache-action@c09b68f72328987374e9daf2245707addf8910cb
+        uses: yogeshlonkar/trivy-cache-action@v0.1.8
         with:
           gh-token: ${{ secrets.GITHUB_TOKEN }}
           prefix: ${{ github.workflow }}
@@ -82,7 +82,7 @@ jobs:
           cache: false
 
       - name: Upload Vulnerability Scan Results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.4.3
         with:
           name: trivy-docker-report-${{ inputs.SCAN_NAME }}
           path: trivy-docker-report.json
@@ -102,14 +102,14 @@ jobs:
 
       - name: Release SBOM for image (IF has tags for release)
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.0.8
         with:
           files: |
             trivy-image-scan-sbom-${{ inputs.SCAN_NAME }}.json
 
       - name: Release report on docker sbom (IF has tags for release)
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.0.8
         with:
           files: |
             trivy-docker-report.json
