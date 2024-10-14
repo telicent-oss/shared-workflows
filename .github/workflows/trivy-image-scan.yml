@@ -50,6 +50,8 @@ jobs:
           scan-type: image
           timeout: 10m0s
           cache-dir: .trivy
+          # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
+          cache: false
 
       - name: Download Trivy Vulnerability DB
         if: ${{ steps.trivy-cache.outputs.cache-hit == '' || steps.trivy-cache.outputs.cache-hit == 'false' }}
@@ -61,6 +63,8 @@ jobs:
           scan-type: image
           timeout: 10m0s
           cache-dir: .trivy
+          # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
+          cache: false
 
       - name: Trivy Vulnerability Scan
         uses: aquasecurity/trivy-action@master
@@ -74,6 +78,8 @@ jobs:
           format: json
           exit-code: 0
           cache-dir: .trivy
+          # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
+          cache: false
 
       - name: Upload Vulnerability Scan Results
         uses: actions/upload-artifact@v4
@@ -84,13 +90,15 @@ jobs:
 
       - name: Generate SBOM for image (IF has tags for release)
         if: startsWith(github.ref, 'refs/tags/')
-        uses: aquasecurity/trivy-action@0.20.0
+        uses: aquasecurity/trivy-action@master
         with:
           scan-type: 'image'
           format: 'cyclonedx'
           output: trivy-image-scan-sbom-${{ inputs.SCAN_NAME }}.json
           image-ref: ${{ inputs.IMAGE_REF }}
           cache-dir: .trivy
+          # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
+          cache: false
 
       - name: Release SBOM for image (IF has tags for release)
         if: startsWith(github.ref, 'refs/tags/')
@@ -119,3 +127,5 @@ jobs:
           ignore-unfixed: true
           exit-code: 1
           cache-dir: .trivy
+          # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
+          cache: false

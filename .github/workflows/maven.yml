@@ -237,6 +237,8 @@ jobs:
           scan-type: image
           timeout: 10m0s
           cache-dir: .trivy
+          # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
+          cache: false
 
       - name: Download Trivy Vulnerability DB
         if: ${{ matrix.os == 'ubuntu-latest' && (steps.trivy-cache.outputs.cache-hit == '' || steps.trivy-cache.outputs.cache-hit == 'false') }}
@@ -248,6 +250,8 @@ jobs:
           scan-type: image
           timeout: 10m0s
           cache-dir: .trivy
+          # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
+          cache: false
 
       - name: Trivy Vulnerability Scan
         if: ${{ matrix.os == 'ubuntu-latest' }}
@@ -262,6 +266,8 @@ jobs:
           scan-ref: .
           exit-code: 0
           cache-dir: .trivy
+          # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
+          cache: false
 
       - name: Upload Vulnerability Scan Results
         if: ${{ matrix.os == 'ubuntu-latest' }}
@@ -285,6 +291,8 @@ jobs:
           ignore-unfixed: true
           exit-code: 1
           cache-dir: .trivy
+          # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
+          cache: false
 
       - name: Detect Maven version
         id: project
