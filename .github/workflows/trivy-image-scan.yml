@@ -38,7 +38,7 @@ jobs:
         uses: yogeshlonkar/trivy-cache-action@v0.1.8
         with:
           gh-token: ${{ secrets.GITHUB_TOKEN }}
-          prefix: ${{ github.workflow }}
+          prefix: ${{ github.repository }}
 
       - name: Trivy Vulnerability Scan
         uses: aquasecurity/trivy-action@master
