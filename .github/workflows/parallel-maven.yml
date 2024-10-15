@@ -284,7 +284,7 @@ jobs:
           TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db,ghcr.io/aquasecurity/trivy-db:2
         with:
           scan-type: image
-          timeout: 10m0s
+          timeout: 10m0s # default 5m
           cache-dir: .trivy
           # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
           cache: false
