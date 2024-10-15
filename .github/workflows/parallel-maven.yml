@@ -268,12 +268,32 @@ jobs:
         uses: aquasecurity/trivy-action@master
         env:
           TRIVY_DOWNLOAD_JAVA_DB_ONLY: true
+          TRIVY_JAVA_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-java-db,ghcr.io/aquasecurity/trivy-java-db:1
         with:
           scan-type: image
+          timeout: 10m0s
           cache-dir: .trivy
+          # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
+          cache: false
+
+      - name: Download Trivy Vulnerability DB
+        if: ${{ steps.trivy-cache.outputs.cache-hit == '' || steps.trivy-cache.outputs.cache-hit == 'false' }}
+        uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_DOWNLOAD_DB_ONLY: true
+          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db,ghcr.io/aquasecurity/trivy-db:2
+        with:
+          scan-type: image
+          timeout: 10m0s # default 5m
+          cache-dir: .trivy
+          # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
+          cache: false
 
       - name: Trivy Vulnerability Scan
         uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_SKIP_DB_UPDATE: true
+          TRIVY_SKIP_JAVA_DB_UPDATE: true
         with:
           scan-type: "fs"
           output: trivy-report.json
@@ -281,6 +301,8 @@ jobs:
           scan-ref: .
           exit-code: 0
           cache-dir: .trivy
+          # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
+          cache: false
 
       - name: Upload Vulnerability Scan Results
         uses: actions/upload-artifact@v4.4.3
@@ -291,6 +313,9 @@ jobs:
 
       - name: Fail build on High/Criticial Vulnerabilities
         uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_SKIP_DB_UPDATE: true
+          TRIVY_SKIP_JAVA_DB_UPDATE: true
         with:
           scan-type: "fs"
           format: table
@@ -299,6 +324,8 @@ jobs:
           ignore-unfixed: true
           exit-code: 1
           cache-dir: .trivy
+          # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
+          cache: false
 
       - name: Detect Maven version
         id: project
