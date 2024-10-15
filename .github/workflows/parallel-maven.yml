@@ -261,7 +261,7 @@ jobs:
         uses: yogeshlonkar/trivy-cache-action@v0.1.8
         with:
           gh-token: ${{ secrets.GITHUB_TOKEN }}
-          prefix: ${{ github.repository }}
+          prefix: ${{ github.repository_id }}
 
       - name: Download Trivy Java DB
         if: ${{ steps.trivy-cache.outputs.cache-hit == '' || steps.trivy-cache.outputs.cache-hit == 'false' }}

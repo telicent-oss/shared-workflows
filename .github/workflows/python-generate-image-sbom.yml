@@ -33,7 +33,7 @@ jobs:
         uses: yogeshlonkar/trivy-cache-action@v0.1.8
         with:
           gh-token: ${{ secrets.GITHUB_TOKEN }}
-          prefix: ${{ github.repository }}
+          prefix: ${{ github.repository_id }}
 
       - name: Generate SBOM for image
         uses: aquasecurity/trivy-action@master
