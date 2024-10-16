@@ -10,25 +10,6 @@ on:
         required: true
 
 jobs:
-#  check-trivy-cache:
-#    name: Check Trivy Cache
-#    runs-on: ubuntu-latest
-#    outputs:
-#      cache-miss: ${{ steps.cache-checker.outputs.cache-miss }}
-#    steps:
-#      - name: Check if .trivy cache exists and is populated
-#        id: cache-checker
-#        run: |
-#          if [ -d ".trivy" ] && [ -n "$(ls -A .trivy)" ]; then
-#            echo "cache-miss=false" >> "$GITHUB_OUTPUT"
-#          else
-#            echo "cache-miss=true" >> "$GITHUB_OUTPUT"
-#  verify-trivy-cache-db:
-#    name: Verify Trivy Cache DB
-#    runs-on: ubuntu-latest
-#    steps:
-
-
   scan-sbom-for-high-crit:
     name: Scan SBOM for HIGH and CRITICAL
     runs-on: ubuntu-latest
@@ -52,7 +33,7 @@ jobs:
           TRIVY_DOWNLOAD_DB_ONLY: true
           TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db,ghcr.io/aquasecurity/trivy-db:2
         with:
-          scan-type: image
+          scan-type: sbom
           timeout: 10m0s
           cache-dir: .trivy
           cache: false
@@ -105,7 +86,7 @@ jobs:
           TRIVY_DOWNLOAD_DB_ONLY: true
           TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db,ghcr.io/aquasecurity/trivy-db:2
         with:
-          scan-type: image
+          scan-type: sbom
           timeout: 10m0s
           cache-dir: .trivy
           cache: false
@@ -148,4 +129,3 @@ jobs:
           name: ${{ inputs.SCAN_NAME }}-anchore-report
           path: ${{ steps.anchore-full-scan.outputs.sarif }}
           retention-days: 30
-
