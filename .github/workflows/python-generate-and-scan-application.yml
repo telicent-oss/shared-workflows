@@ -19,7 +19,7 @@ on:
 jobs:
   generate-application-sbom:
     name: Generate Application SBOM
-    uses: telicent-oss/shared-workflows/.github/workflows/python-generate-application-sbom.yml@main
+    uses: telicent-oss/shared-workflows/.github/workflows/python-generate-application-sbom.yml@TPT-220
     with:
       EXTRAS_ARG: ${{ inputs.EXTRAS_ARG }}
       SCAN_NAME: ${{ inputs.SCAN_NAME }}
@@ -28,6 +28,6 @@ jobs:
     name: Scan Application SBOM
     needs:
       - generate-application-sbom
-    uses: telicent-oss/shared-workflows/.github/workflows/python-scan-sbom.yml@main
+    uses: telicent-oss/shared-workflows/.github/workflows/python-scan-sbom.yml@TPT-220
     with:
       SCAN_NAME: ${{ needs.generate-application-sbom.outputs.artifact-name }}

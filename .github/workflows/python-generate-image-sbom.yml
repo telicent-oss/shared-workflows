@@ -35,6 +35,19 @@ jobs:
           gh-token: ${{ secrets.GITHUB_TOKEN }}
           prefix: ${{ github.repository_id }}
 
+      - name: Download Trivy Vulnerability DB
+        if: ${{ steps.trivy-cache.outputs.cache-hit == '' || steps.trivy-cache.outputs.cache-hit == 'false' }}
+        uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_DOWNLOAD_DB_ONLY: true
+          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db,ghcr.io/aquasecurity/trivy-db:2
+        with:
+          scan-type: image
+          timeout: 10m0s
+          cache-dir: .trivy
+          # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
+          cache: false
+
       - name: Generate SBOM for image
         uses: aquasecurity/trivy-action@master
         with:
@@ -43,6 +56,7 @@ jobs:
           output: ${{ inputs.SCAN_NAME }}-bom.json
           image-ref: ${{ inputs.IMAGE_REF }}
           cache-dir: .trivy
+          cache: false
 
       - name: Store the SBOM
         uses: actions/upload-artifact@v4.4.3
