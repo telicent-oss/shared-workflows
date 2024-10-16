@@ -32,7 +32,6 @@ jobs:
   scan-sbom-for-high-crit:
     name: Scan SBOM for HIGH and CRITICAL
     runs-on: ubuntu-latest
-    needs: [ verify-trivy-cache-db ]
     steps:
       - name: Download SBOM
         uses: actions/download-artifact@v4.1.8
@@ -86,7 +85,6 @@ jobs:
   scan-and-store-full-report:
     name: Scan for all vulnerabilities and store the report
     runs-on: ubuntu-latest
-    needs: [ verify-trivy-cache-db ]
     steps:
       - name: Download SBOM
         uses: actions/download-artifact@v4.1.8
