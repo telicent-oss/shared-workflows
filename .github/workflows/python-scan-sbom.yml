@@ -19,6 +19,25 @@ jobs:
         with:
           name: ${{ inputs.SCAN_NAME }}
 
+      - name: Trivy Cache
+        id: trivy-cache
+        uses: yogeshlonkar/trivy-cache-action@v0.1.8
+        with:
+          gh-token: ${{ secrets.GITHUB_TOKEN }}
+          prefix: ${{ github.repository_id }}
+
+      - name: Download Trivy Vulnerability DB
+        if: ${{ steps.trivy-cache.outputs.cache-hit == '' || steps.trivy-cache.outputs.cache-hit == 'false' }}
+        uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_DOWNLOAD_DB_ONLY: true
+          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db,ghcr.io/aquasecurity/trivy-db:2
+        with:
+          scan-type: sbom
+          timeout: 10m0s
+          cache-dir: .trivy
+          cache: false
+
       - name: Trivy Scan for HIGH and CRITICAL vulnerabilities
         uses: aquasecurity/trivy-action@master
         with:
@@ -29,6 +48,7 @@ jobs:
           scan-type: 'sbom'
           scanners: 'vuln'
           cache-dir: .trivy
+          cache: false
 
       - name: Anchore Scan for HIGH and CRITICAL vulnerabilities
         id: anchore-scan
@@ -43,7 +63,6 @@ jobs:
         if: always()
         run: cat ${{ steps.anchore-scan.outputs.sarif }}
 
-
   scan-and-store-full-report:
     name: Scan for all vulnerabilities and store the report
     runs-on: ubuntu-latest
@@ -52,6 +71,25 @@ jobs:
         uses: actions/download-artifact@v4.1.8
         with:
           name: ${{ inputs.SCAN_NAME }}
+
+      - name: Trivy Cache
+        id: trivy-cache
+        uses: yogeshlonkar/trivy-cache-action@v0.1.8
+        with:
+          gh-token: ${{ secrets.GITHUB_TOKEN }}
+          prefix: ${{ github.repository_id }}
+
+      - name: Download Trivy Vulnerability DB
+        if: ${{ steps.trivy-cache.outputs.cache-hit == '' || steps.trivy-cache.outputs.cache-hit == 'false' }}
+        uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_DOWNLOAD_DB_ONLY: true
+          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db,ghcr.io/aquasecurity/trivy-db:2
+        with:
+          scan-type: sbom
+          timeout: 10m0s
+          cache-dir: .trivy
+          cache: false
 
       - name: Trivy Full Vulnerability Scan
         uses: aquasecurity/trivy-action@master
@@ -62,6 +100,7 @@ jobs:
           format: 'json'
           exit-code: '0'
           cache-dir: .trivy
+          cache: false
 
       - name: Anchore Full Vulnerability Scan
         id: anchore-full-scan
