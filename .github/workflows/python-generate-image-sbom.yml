@@ -41,6 +41,7 @@ jobs:
         env:
           TRIVY_DOWNLOAD_DB_ONLY: true
           TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db,ghcr.io/aquasecurity/trivy-db:2
+          TRIVY_SKIP_JAVA_DB_UPDATE: true
         with:
           scan-type: image
           timeout: 10m0s
@@ -50,6 +51,9 @@ jobs:
 
       - name: Generate SBOM for image
         uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_SKIP_DB_UPDATE: true
+          TRIVY_SKIP_JAVA_DB_UPDATE: true
         with:
           scan-type: 'image'
           format: 'cyclonedx'
