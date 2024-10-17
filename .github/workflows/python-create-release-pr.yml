@@ -20,7 +20,7 @@ jobs:
   create-release-pr:
     runs-on: ubuntu-latest
     steps:
-      - uses: googleapis/release-please-action@v4.1.3
+      - uses: googleapis/release-please-action@v3
         with:
           release-type: python
           package-name: release-please-action
