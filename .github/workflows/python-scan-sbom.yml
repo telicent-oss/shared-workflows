@@ -32,6 +32,7 @@ jobs:
         env:
           TRIVY_DOWNLOAD_DB_ONLY: true
           TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db,ghcr.io/aquasecurity/trivy-db:2
+          TRIVY_SKIP_JAVA_DB_UPDATE: true
         with:
           scan-type: sbom
           timeout: 10m0s
@@ -40,6 +41,9 @@ jobs:
 
       - name: Trivy Scan for HIGH and CRITICAL vulnerabilities
         uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_SKIP_DB_UPDATE: true
+          TRIVY_SKIP_JAVA_DB_UPDATE: true
         with:
           exit-code: '1'
           format: 'table'
@@ -85,6 +89,7 @@ jobs:
         env:
           TRIVY_DOWNLOAD_DB_ONLY: true
           TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db,ghcr.io/aquasecurity/trivy-db:2
+          TRIVY_SKIP_JAVA_DB_UPDATE: true
         with:
           scan-type: sbom
           timeout: 10m0s
@@ -93,6 +98,9 @@ jobs:
 
       - name: Trivy Full Vulnerability Scan
         uses: aquasecurity/trivy-action@master
+        env:
+          TRIVY_SKIP_DB_UPDATE: true
+          TRIVY_SKIP_JAVA_DB_UPDATE: true
         with:
           scan-type: 'sbom'
           scan-ref: ${{ inputs.SCAN_NAME }}-bom.json
