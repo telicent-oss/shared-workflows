@@ -127,7 +127,7 @@ jobs:
         if: ${{ inputs.DOWNLOAD_SBOM }}
         continue-on-error: true
         with:
-          name: ${{ github.run_number }}${{ inputs.PACKAGE_DIRECTORY != '.' && '.' + inputs.PACKAGE_DIRECTORY || '' }}.sbom.json
+          name: ${{ github.run_number }}${{ inputs.PACKAGE_DIRECTORY != '.' && format('.{0}', inputs.PACKAGE_DIRECTORY) || '' }}.sbom.json
           path: ${{ inputs.PATH }} 
 
       - name: Set up QEMU
