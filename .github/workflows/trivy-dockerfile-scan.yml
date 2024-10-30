@@ -53,6 +53,7 @@ jobs:
         with:
           scan-type: "config"
           scan-ref: ${{ inputs.DOCKERFILE }}
+          severity: HIGH,CRITICAL
           output: trivy-docker-misconfiguration-report.json
           format: json
           exit-code: 0
