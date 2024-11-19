@@ -93,6 +93,15 @@ on:
         default: true
         description: |
           Set `false` to avoid trying to download SBOM artifacts (and if it fails, avoid "sbom not found" errors). Used by certain workflows that don't need to download SBOMs
+      TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE:
+        required: false
+        type: string
+        description: Name of trivy ignore file. Only allowed for BUILD image, MUST NOT be used with DEPLOY images.
+      GRYPE_CONFIG_ONLY_FOR_BUILD_IMAGE:
+        required: false
+        type: string
+        description: Path to custom grype yaml file. NEVER use .grype.yaml, must be non-default filename. Only allowed for BUILD image, MUST NOT be used with DEPLOY images.
+    
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -121,7 +130,6 @@ jobs:
         if: ${{ inputs.USES_MAVEN }}
         run: |
           mvn verify --batch-mode -DskipTests -Dgpg.skip=true
-
       - name: Get SBOM from artifact
         uses: actions/download-artifact@v4.1.8
         if: ${{ inputs.DOWNLOAD_SBOM }}
@@ -215,6 +223,7 @@ jobs:
     with:
       IMAGE_REF: telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}:${{ github.sha }}
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
+      PATH_TO_TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE: ${{ inputs.PACKAGE_DIRECTORY }}/${{ inputs.TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE }}
   grype-scan-image:
     needs: build
     uses: Telicent-oss/shared-workflows/.github/workflows/grype-image-scan.yml@main
@@ -225,3 +234,4 @@ jobs:
     with:
       IMAGE_REF: telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}:${{ github.sha }}
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
+      PATH_TO_GRYPE_CONFIG_ONLY_FOR_BUILD_IMAGE: ${{ inputs.PACKAGE_DIRECTORY }}/${{ inputs.GRYPE_CONFIG_ONLY_FOR_BUILD_IMAGE }}
