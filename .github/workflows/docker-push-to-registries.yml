@@ -234,4 +234,4 @@ jobs:
     with:
       IMAGE_REF: telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}:${{ github.sha }}
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
-      PATH_TO_GRYPE_CONFIG_ONLY_FOR_BUILD_IMAGE: ${{ inputs.PACKAGE_DIRECTORY }}/${{ inputs.GRYPE_CONFIG_ONLY_FOR_BUILD_IMAGE }}
+      PATH_TO_GRYPE_CONFIG_ONLY_FOR_BUILD_IMAGE: ${{ inputs.GRYPE_CONFIG_ONLY_FOR_BUILD_IMAGE != '' && format('{0}/{1}', inputs.PACKAGE_DIRECTORY, inputs.GRYPE_CONFIG_ONLY_FOR_BUILD_IMAGE) || '' }}
