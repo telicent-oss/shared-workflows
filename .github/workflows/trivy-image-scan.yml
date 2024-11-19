@@ -13,7 +13,11 @@ on:
         description: |
           Specifies the full image reference (repository, name and tag) for an image you wish to scan.
         required: true
-
+      PATH_TO_TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE:
+        required: false
+        type: string
+        description: Only allowed for BUILD image, MUST NOT be used with DEPLOY image. Full relative path to trivy ignore file.
+    
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -80,6 +84,7 @@ jobs:
           cache-dir: .trivy
           # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
           cache: false
+          trivyignores: ${{ inputs.PATH_TO_TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE }}
 
       - name: Upload Vulnerability Scan Results
         uses: actions/upload-artifact@v4.4.3
@@ -99,6 +104,7 @@ jobs:
           cache-dir: .trivy
           # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
           cache: false
+          trivyignores: ${{ inputs.PATH_TO_TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE }}
 
       - name: Release SBOM for image (IF has tags for release)
         if: startsWith(github.ref, 'refs/tags/')
@@ -129,3 +135,4 @@ jobs:
           cache-dir: .trivy
           # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
           cache: false
+          trivyignores: ${{ inputs.PATH_TO_TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE }}
