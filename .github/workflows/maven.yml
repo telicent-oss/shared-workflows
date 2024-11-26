@@ -76,6 +76,12 @@ on:
           Specifies whether Maven `SNAPSHOT`s are published from this build.  Note that even when enabled (as is
           the default) `SNAPSHOT`s are only published when a build occurs on the main branch.  The main branch 
           can be separately configured via the `MAIN_BRANCH` parameter.
+      RUN_WINDOWS_BUILD:
+        required: false
+        type: boolean
+        default: true
+        description: |
+          Specifies whether to build, run and verify against Windows.
       CHANGELOG_FILE:
         required: false
         type: string
@@ -209,7 +215,7 @@ jobs:
           fi
 
       - name: Build and Verify Maven Package (Windows - Docker Profile disabled)
-        if: ${{ matrix.os == 'windows-latest' }}
+        if: ${{ matrix.os == 'windows-latest' && inputs.RUN_WINDOWS_BUILD }}
         shell: bash
         # Remember that Windows Action runners DO NOT support Docker so explicitly disable the Docker profile
         run: |
