@@ -49,6 +49,14 @@ jobs:
           npm config set "//www.npmjs.com//:_authToken" ${{ secrets.NPM_REGISTRY_TOKEN }} 
       - name: Install dependencies
         run: yarn install
+      - name: yarn tsc --noEmit if needed
+        run: |
+          if [ -f tsconfig.json ]; then
+            echo "TypeScript config found. Running tsc --noEmit..."
+            yarn tsc --noEmit
+          else
+            echo "No TypeScript config found. Skipping tsc..."
+          fi
       - name: run integrated tests
         run: yarn ${{ inputs.yarn-test-command }}
     env:
