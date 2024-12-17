@@ -20,6 +20,11 @@ on:
         type: string
         description: |
           The name of the Dockerfile to build the image from.  This is relative to the PATH input
+      BUILD_ARTIFACT:
+        required: false
+        type: string
+        description: |
+          Artifact used as part of the Docker build.
       PATH:
         type: string
         description: |
@@ -82,6 +87,12 @@ on:
         default: true
         description: |
           Set `false` to avoid adding mutable tags like `latest` and `development` e.g. if image registry has mutable tags disabled, and it will 400s when given mutable tags
+      ENABLE_BUILDKIT_CACHE:
+        required: false
+        default: true
+        type: boolean
+        description: |
+          Whether the docker buildkit cache is required.
       PACKAGE_DIRECTORY:
         required: false
         type: string
@@ -101,7 +112,7 @@ on:
         required: false
         type: string
         description: Path to custom grype yaml file. NEVER use .grype.yaml, must be non-default filename. Only allowed for BUILD image, MUST NOT be used with DEPLOY images.
-    
+
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -124,19 +135,27 @@ jobs:
           distribution: ${{ inputs.JDK }}
           cache: maven
 
-      # NB - Assumption here is that this workflow has been called after the Maven workflow has been called so the 
+      # NB - Assumption here is that this workflow has been called after the Maven workflow has been called so the
       #      Maven Cache already has all our dependencies present in it and tests have already passed
       - name: Quick Maven Build
         if: ${{ inputs.USES_MAVEN }}
         run: |
           mvn verify --batch-mode -DskipTests -Dgpg.skip=true
+
       - name: Get SBOM from artifact
         uses: actions/download-artifact@v4.1.8
         if: ${{ inputs.DOWNLOAD_SBOM }}
         continue-on-error: true
         with:
           name: ${{ github.run_number }}${{ inputs.PACKAGE_DIRECTORY != '.' && format('.{0}', inputs.PACKAGE_DIRECTORY) || '' }}.sbom.json
-          path: ${{ inputs.PATH }} 
+          path: ${{ inputs.PATH }}
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        if: ${{ inputs.BUILD_ARTIFACT }}
+        with:
+          name: ${{ inputs.BUILD_ARTIFACT }}
+          path: ${{ inputs.BUILD_ARTIFACT }}/
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3.2.0
@@ -149,6 +168,7 @@ jobs:
 
       - name: Enable buildkit cache
         uses: actions/cache@v4.1.1
+        if: ${{ inputs.ENABLE_BUILDKIT_CACHE }}
         with:
           path: /tmp/buildkit-cache/buildkit-state.tar
           key: ${{ runner.os }}-buildkit-${{ github.sha }}
@@ -157,6 +177,7 @@ jobs:
 
       - name: Load buildkit state from cache
         uses: dashevo/gh-action-cache-buildkit-state@v1.0.3
+        if: ${{ inputs.ENABLE_BUILDKIT_CACHE }}
         with:
           builder: buildx_buildkit_${{ steps.buildx.outputs.name }}0
           cache-path: /tmp/buildkit-cache
