@@ -251,7 +251,7 @@ jobs:
         if: ${{ inputs.DRY_RUN }}
         run: ls /tmp
       - name: Upload Docker image
-        if: ${{ input.DRY_RUN }}
+        if: ${{ inputs.DRY_RUN }}
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
