@@ -254,7 +254,7 @@ jobs:
         if: ${{ inputs.DRY_RUN }}
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
+          name: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}.tar
           path: /tmp/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}.tar
 
   scan-dockerfile-configuration:
