@@ -231,6 +231,10 @@ jobs:
           target: ${{ inputs.TARGET }}
           build-args: |
             ${{ inputs.BUILD_ARGS }}
+          outputs: ${{ inputs.DRY_RUN && 'type=docker,dest=/tmp/telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}:${{ github.sha }}.tar' ?? '' }}
+      - name: Save image
+        run: docker save --output /tmp/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}.tar telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}:${{ github.sha }} && ls /tmp
+        if: ${{ inputs.DRY_RUN }}
 
   scan-dockerfile-configuration:
     uses: Telicent-oss/shared-workflows/.github/workflows/trivy-dockerfile-scan.yml@main
