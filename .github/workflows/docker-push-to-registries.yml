@@ -231,6 +231,15 @@ jobs:
           target: ${{ inputs.TARGET }}
           build-args: |
             ${{ inputs.BUILD_ARGS }}
+          output: ${{inputs.DRY_RUN && "type=docker,dest=/tmp/${{ steps.meta.outputs.tags[0] }}.tar" }}
+      - name: Check docker export exists
+        run: ls /tmp
+      - name: Upload Docker Image
+        if: ${{ inputs.DRY_RUN }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.tags[0] }}
+          path: /tmp/${{ steps.meta.outputs.tags[0] }}.tar
 
   scan-dockerfile-configuration:
     uses: Telicent-oss/shared-workflows/.github/workflows/trivy-dockerfile-scan.yml@main
