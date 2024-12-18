@@ -189,6 +189,7 @@ jobs:
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3.3.0
+        if: ${{ !inputs.DRY_RUN }}
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
@@ -220,11 +221,24 @@ jobs:
       - name: Build, tag, and push image to authenticated docker registry
         id: build-images
         uses: docker/build-push-action@v6.9.0
+        if: ${{ !inputs.DRY_RUN }}
         with:
           builder: ${{ steps.buildx.outputs.name }}
           platforms: linux/amd64,linux/arm64
           # Dependabot triggered PRs don't have credentials to push images
           push: ${{ github.actor != 'dependabot[bot]' && !inputs.DRY_RUN }}
+          context: ${{ inputs.PATH }}
+          file: ${{ inputs.PATH }}/${{ inputs.DOCKERFILE }} # NOTE: relative path (inputs.PATH defaults to '.')
+          tags: ${{ steps.meta.outputs.tags }}
+          target: ${{ inputs.TARGET }}
+          build-args: |
+            ${{ inputs.BUILD_ARGS }}
+      - name: Build and tag image
+        uses: docker/build-push-action@v6.9.0
+        if: ${{ inputs.DRY_RUN }}
+        with:
+          builder: ${{ steps.buildx.outputs.name }}
+          # Dependabot triggered PRs don't have credentials to push images
           context: ${{ inputs.PATH }}
           file: ${{ inputs.PATH }}/${{ inputs.DOCKERFILE }} # NOTE: relative path (inputs.PATH defaults to '.')
           tags: ${{ steps.meta.outputs.tags }}
