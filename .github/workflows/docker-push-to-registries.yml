@@ -232,10 +232,11 @@ jobs:
           build-args: |
             ${{ inputs.BUILD_ARGS }}
       - name: Save image
-        run: docker save --output /tmp/$filename && ls /tmp
+        run: echo '$FILENAME' && docker save --output /tmp/${{ env.FILENAME }} ${{ env.IMAGE_NAME }} && ls /tmp
         if: ${{ inputs.DRY_RUN }}
         env:
-          filename: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}.tar telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}:${{ github.sha }}
+          FILENAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}.tar
+          IMAGE_NAME: telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}:${{ github.sha }}
 
   scan-dockerfile-configuration:
     uses: Telicent-oss/shared-workflows/.github/workflows/trivy-dockerfile-scan.yml@main
