@@ -255,7 +255,7 @@ jobs:
 
   trivy-scan-image:
     needs: build
-    uses: telicent-oss/shared-workflows/.github/workflows/trivy-image-scan.yml@main
+    uses: telicent-oss/shared-workflows/.github/workflows/trivy-image-scan.yml@update-workflow-for-docker-with-build-artifact
     secrets: inherit
     # Since Dependabot builds can't push an image we skip the scan workflow because there won't be
     # an image for it to pull down and scan
