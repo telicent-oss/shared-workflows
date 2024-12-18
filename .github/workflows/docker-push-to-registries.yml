@@ -112,7 +112,11 @@ on:
         required: false
         type: string
         description: Path to custom grype yaml file. NEVER use .grype.yaml, must be non-default filename. Only allowed for BUILD image, MUST NOT be used with DEPLOY images.
-
+      DRY_RUN:
+        required: false
+        type: boolean
+        default: false
+        description: Input flag to test the build but not push to the registry
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -220,7 +224,7 @@ jobs:
           builder: ${{ steps.buildx.outputs.name }}
           platforms: linux/amd64,linux/arm64
           # Dependabot triggered PRs don't have credentials to push images
-          push: ${{ github.actor != 'dependabot[bot]' }}
+          push: ${{ github.actor != 'dependabot[bot]' && !inputs.DRY_RUN }}
           context: ${{ inputs.PATH }}
           file: ${{ inputs.PATH }}/${{ inputs.DOCKERFILE }} # NOTE: relative path (inputs.PATH defaults to '.')
           tags: ${{ steps.meta.outputs.tags }}
