@@ -246,7 +246,7 @@ jobs:
           target: ${{ inputs.TARGET }}
           build-args: |
             ${{ inputs.BUILD_ARGS }}
-          outputs: type=local,dest=/tmp/docker
+          outputs: type=docker,dest=/tmp/docker/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}:${{ github.sha }}.tar
       - name: View outputs
         if: ${{ inputs.DRY_RUN }}
         run: ls /tmp/docker
