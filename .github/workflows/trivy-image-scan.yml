@@ -21,6 +21,7 @@ on:
         required: false
         default: false
         type: boolean
+        description: Flag to download an artifact image (named as ${SCAN_NAME}.tar) and scan
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
