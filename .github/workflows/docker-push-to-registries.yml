@@ -231,9 +231,9 @@ jobs:
           target: ${{ inputs.TARGET }}
           build-args: |
             ${{ inputs.BUILD_ARGS }}
-          output: ${{ inputs.DRY_RUN && 'type=docker,dest=/tmp/${{ steps.meta.outputs.tags[0] }}.tar' || '' }}
+          outputs: ${{ inputs.DRY_RUN && 'type=docker,dest=/tmp/${{ steps.meta.outputs.tags[0] }}.tar' || '' }}
       - name: Check docker export exists
-        run: ls /tmp
+        run: ls /tmp && echo /tmp/${{ steps.meta.outputs.tags[0] }}.tar
       - name: Upload Docker Image
         if: ${{ inputs.DRY_RUN }}
         uses: actions/upload-artifact@v4
