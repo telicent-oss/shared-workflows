@@ -235,6 +235,7 @@ jobs:
             ${{ inputs.BUILD_ARGS }}
       - name: Build and tag image
         uses: docker/build-push-action@v6.9.0
+        id: build-local-image
         if: ${{ inputs.DRY_RUN }}
         with:
           builder: ${{ steps.buildx.outputs.name }}
@@ -245,7 +246,10 @@ jobs:
           target: ${{ inputs.TARGET }}
           build-args: |
             ${{ inputs.BUILD_ARGS }}
-          load: ${{ inputs.DRY_RUN }}
+          outputs: type=local,dest=/tmp/docker
+      - name: View outputs
+        if: ${{ inputs.DRY_RUN }}
+        run: ls /tmp/docker
 
   scan-dockerfile-configuration:
     uses: Telicent-oss/shared-workflows/.github/workflows/trivy-dockerfile-scan.yml@main
