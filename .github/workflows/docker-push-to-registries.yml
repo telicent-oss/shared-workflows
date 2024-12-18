@@ -231,15 +231,7 @@ jobs:
           target: ${{ inputs.TARGET }}
           build-args: |
             ${{ inputs.BUILD_ARGS }}
-          cache-to: type=local,src=/tmp/images
-      - name: See what is in the tmp folder
-        run: ls /tmp/images
-      - name: Save image
-        run: echo '$FILENAME' && docker save --output /tmp/${{ env.FILENAME }} ${{ env.IMAGE_NAME }} && ls /tmp
-        if: ${{ inputs.DRY_RUN }}
-        env:
-          FILENAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}.tar
-          IMAGE_NAME: telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}:${{ github.sha }}
+          load: ${{ inputs.DRY_RUN }}
 
   scan-dockerfile-configuration:
     uses: Telicent-oss/shared-workflows/.github/workflows/trivy-dockerfile-scan.yml@main
