@@ -261,6 +261,7 @@ jobs:
     # an image for it to pull down and scan
     if: ${{ github.actor != 'dependabot[bot]' }}
     with:
+      DRY_RUN: ${{ inputs.DRY_RUN }}
       IMAGE_REF: telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}:${{ github.sha }}
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
       PATH_TO_TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE: ${{ inputs.TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE != '' && format('{0}/{1}', inputs.PACKAGE_DIRECTORY, inputs.TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE) || '' }}
