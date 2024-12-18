@@ -155,7 +155,7 @@ jobs:
         if: ${{ inputs.BUILD_ARTIFACT }}
         with:
           name: ${{ inputs.BUILD_ARTIFACT }}
-          path: ${{ inputs.BUILD_ARTIFACT }}/
+          path: ${{ inputs.PATH}}/${{ inputs.BUILD_ARTIFACT }}/
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3.2.0
