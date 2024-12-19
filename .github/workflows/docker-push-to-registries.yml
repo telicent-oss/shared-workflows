@@ -233,7 +233,7 @@ jobs:
           target: ${{ inputs.TARGET }}
           build-args: |
             ${{ inputs.BUILD_ARGS }}
-      - name: Build and tag image
+      - name: Build Docker Tarball
         uses: docker/build-push-action@v6.9.0
         id: build-local-image
         if: ${{ inputs.DRY_RUN }}
@@ -265,25 +265,25 @@ jobs:
 
   trivy-scan-image:
     needs: build
-    uses: telicent-oss/shared-workflows/.github/workflows/trivy-image-scan.yml@update-workflow-for-docker-with-build-artifact
+    uses: telicent-oss/shared-workflows/.github/workflows/trivy-image-scan.yml@main
     secrets: inherit
     # Since Dependabot builds can't push an image we skip the scan workflow because there won't be
     # an image for it to pull down and scan
     if: ${{ github.actor != 'dependabot[bot]' }}
     with:
-      DRY_RUN: ${{ inputs.DRY_RUN }}
+      IMAGE_FROM_ARTIFACT: ${{ inputs.DRY_RUN }}
       IMAGE_REF: telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}:${{ github.sha }}
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
       PATH_TO_TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE: ${{ inputs.TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE != '' && format('{0}/{1}', inputs.PACKAGE_DIRECTORY, inputs.TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE) || '' }}
   grype-scan-image:
     needs: build
-    uses: Telicent-oss/shared-workflows/.github/workflows/grype-image-scan.yml@update-workflow-for-docker-with-build-artifact
+    uses: Telicent-oss/shared-workflows/.github/workflows/grype-image-scan.yml@main
     secrets: inherit
     # Since Dependabot builds can't push an image we skip the scan workflow because there won't be
     # an image for it to pull down and scan
     if: ${{ github.actor != 'dependabot[bot]' }}
     with:
-      DRY_RUN: ${{ inputs.DRY_RUN }}
+      IMAGE_FROM_ARTIFACT: ${{ inputs.DRY_RUN }}
       IMAGE_REF: telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}:${{ github.sha }}
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
       PATH_TO_GRYPE_CONFIG_ONLY_FOR_BUILD_IMAGE: ${{ inputs.GRYPE_CONFIG_ONLY_FOR_BUILD_IMAGE != '' && format('{0}/{1}', inputs.PACKAGE_DIRECTORY, inputs.GRYPE_CONFIG_ONLY_FOR_BUILD_IMAGE) || '' }}

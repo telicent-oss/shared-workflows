@@ -17,11 +17,13 @@ on:
         required: false
         type: string
         description: Path to custom grype yaml file. NEVER use .grype.yaml, must be non-default filename. Only allowed for BUILD image, MUST NOT be used with DEPLOY images.
-      DRY_RUN:
+      IMAGE_FROM_ARTIFACT:
         required: false
         default: false
         type: boolean
-        description: Flag to download an artifact image (named as ${SCAN_NAME}.tar) and scan
+        description: |
+          Scan a Docker image tar stored as an artifact (name must be ${SCAN_NAME}.tar), rather
+          than an image stored in a remote repository
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -41,20 +43,20 @@ jobs:
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3.3.0
-        if: ${{ !inputs.DRY_RUN }}
+        if: ${{ !inputs.IMAGE_FROM_ARTIFACT }}
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Download image artifact
         uses: actions/download-artifact@v4
-        if: ${{ inputs.DRY_RUN }}
+        if: ${{ inputs.IMAGE_FROM_ARTIFACT }}
         with:
           name: ${{ inputs.SCAN_NAME }}.tar
           path: .
 
       - name: Load docker image for dry run scans
-        if: ${{ inputs.DRY_RUN }}
+        if: ${{ inputs.IMAGE_FROM_ARTIFACT }}
         run: docker load --input ${{ inputs.SCAN_NAME }}.tar
 
       - name: Grype Container Vulnerability Scan
