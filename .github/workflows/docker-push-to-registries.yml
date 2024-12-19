@@ -218,6 +218,7 @@ jobs:
             type=raw,value=${{ inputs.VERSION }}${{ inputs.VERSION_SUFFIX }}
             type=raw,value=latest,enable=${{ inputs.ALLOW_MUTABLE_TAGS && github.ref_name == inputs.MAIN_BRANCH }}
             type=raw,value=development,enable=${{ inputs.ALLOW_MUTABLE_TAGS && github.ref_name != inputs.MAIN_BRANCH}}
+
       - name: Build, tag, and push image to authenticated docker registry
         id: build-images
         uses: docker/build-push-action@v6.9.0
@@ -233,6 +234,7 @@ jobs:
           target: ${{ inputs.TARGET }}
           build-args: |
             ${{ inputs.BUILD_ARGS }}
+
       - name: Build Docker Tarball
         uses: docker/build-push-action@v6.9.0
         id: build-local-image
@@ -247,9 +249,7 @@ jobs:
           build-args: |
             ${{ inputs.BUILD_ARGS }}
           outputs: type=docker,dest=/tmp/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}.tar
-      - name: View outputs
-        if: ${{ inputs.DRY_RUN }}
-        run: ls /tmp
+
       - name: Upload Docker image
         if: ${{ inputs.DRY_RUN }}
         uses: actions/upload-artifact@v4
