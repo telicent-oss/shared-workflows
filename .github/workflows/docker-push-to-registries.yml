@@ -218,6 +218,7 @@ jobs:
             type=raw,value=${{ inputs.VERSION }}${{ inputs.VERSION_SUFFIX }}
             type=raw,value=latest,enable=${{ inputs.ALLOW_MUTABLE_TAGS && github.ref_name == inputs.MAIN_BRANCH }}
             type=raw,value=development,enable=${{ inputs.ALLOW_MUTABLE_TAGS && github.ref_name != inputs.MAIN_BRANCH}}
+
       - name: Build, tag, and push image to authenticated docker registry
         id: build-images
         uses: docker/build-push-action@v6.9.0
@@ -233,6 +234,7 @@ jobs:
           target: ${{ inputs.TARGET }}
           build-args: |
             ${{ inputs.BUILD_ARGS }}
+
       - name: Build Docker Tarball
         uses: docker/build-push-action@v6.9.0
         id: build-local-image
@@ -275,6 +277,7 @@ jobs:
       IMAGE_REF: telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}:${{ github.sha }}
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
       PATH_TO_TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE: ${{ inputs.TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE != '' && format('{0}/{1}', inputs.PACKAGE_DIRECTORY, inputs.TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE) || '' }}
+
   grype-scan-image:
     needs: build
     uses: Telicent-oss/shared-workflows/.github/workflows/grype-image-scan.yml@main
