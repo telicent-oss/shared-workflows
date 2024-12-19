@@ -17,7 +17,13 @@ on:
         required: false
         type: string
         description: Only allowed for BUILD image, MUST NOT be used with DEPLOY image. Full relative path to trivy ignore file.
-    
+      IMAGE_FROM_ARTIFACT:
+        required: false
+        default: false
+        type: boolean
+        description: |
+          Scan a Docker image tar stored as an artifact (name must be ${SCAN_NAME}.tar), rather
+          than an image stored in a remote repository
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -33,9 +39,21 @@ jobs:
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3.3.0
+        if: ${{ !inputs.IMAGE_FROM_ARTIFACT }}
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        if: ${{ inputs.IMAGE_FROM_ARTIFACT }}
+        with:
+          name: ${{ inputs.SCAN_NAME }}.tar
+          path: .
+
+      - name: Load docker image for dry run scans
+        if: ${{ inputs.IMAGE_FROM_ARTIFACT }}
+        run: docker load --input ${{ inputs.SCAN_NAME }}.tar
 
       - name: Trivy Cache
         id: trivy-cache
@@ -97,8 +115,8 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: aquasecurity/trivy-action@master
         with:
-          scan-type: 'image'
-          format: 'cyclonedx'
+          scan-type: "image"
+          format: "cyclonedx"
           output: trivy-image-scan-sbom-${{ inputs.SCAN_NAME }}.json
           image-ref: ${{ inputs.IMAGE_REF }}
           cache-dir: .trivy
