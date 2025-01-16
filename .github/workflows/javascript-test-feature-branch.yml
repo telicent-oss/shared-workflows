@@ -45,8 +45,8 @@ jobs:
           key: ${{ runner.os }}-node_modules-${{ hashFiles('**/yarn.lock') }}-${{ steps.node.outputs.version }}
       - name: create .yarnrc file
         run: |
-          npm config set "@telicent-oss:registry" "https://www.npmjs.com/"
-          npm config set "//www.npmjs.com//:_authToken" ${{ secrets.NPM_REGISTRY_TOKEN }} 
+          npm config set "@telicent-oss:registry" "https://registry.npmjs.org/"
+          npm config set "//registry.npmjs.org/:_authToken" ${{ secrets.NPM_REGISTRY_TOKEN }}
       - name: Install dependencies
         run: yarn install
       - name: yarn tsc --noEmit if needed
