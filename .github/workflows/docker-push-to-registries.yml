@@ -283,7 +283,7 @@ jobs:
       PATH_TO_TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE: ${{ inputs.TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE != '' && format('{0}/{1}', inputs.PACKAGE_DIRECTORY, inputs.TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE) || '' }}
   grype-scan-image:
     needs: build
-    uses: Telicent-oss/shared-workflows/.github/workflows/grype-image-scan.yml@main
+    uses: Telicent-oss/shared-workflows/.github/workflows/grype-image-scan.yml@TELFE-528/grype-only-fixed
     secrets: inherit
     # Since Dependabot builds can't push an image we skip the scan workflow because there won't be
     # an image for it to pull down and scan
