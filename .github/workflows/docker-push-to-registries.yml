@@ -117,6 +117,12 @@ on:
         type: boolean
         default: false
         description: Flag to test the build and scan without pushing to the registry
+      GRYPE_SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE:
+        required: false
+        default: false
+        type: boolean
+        description: |
+          Sets --only-fixed flag for Grype
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -287,3 +293,4 @@ jobs:
       IMAGE_REF: telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}:${{ github.sha }}
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
       PATH_TO_GRYPE_CONFIG_ONLY_FOR_BUILD_IMAGE: ${{ inputs.GRYPE_CONFIG_ONLY_FOR_BUILD_IMAGE != '' && format('{0}/{1}', inputs.PACKAGE_DIRECTORY, inputs.GRYPE_CONFIG_ONLY_FOR_BUILD_IMAGE) || '' }}
+      SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE: ${{ inputs.GRYPE_SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE }}
