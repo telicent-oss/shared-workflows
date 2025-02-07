@@ -24,6 +24,12 @@ on:
         description: |
           Scan a Docker image tar stored as an artifact (name must be ${SCAN_NAME}.tar), rather
           than an image stored in a remote repository
+      SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE:
+        required: false
+        default: false
+        type: boolean
+        description: |
+          Sets --only-fixed flag
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -81,3 +87,4 @@ jobs:
           output-format: table
           severity-cutoff: high
           fail-build: true
+          only-fixed: ${{ inputs.SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE }}
