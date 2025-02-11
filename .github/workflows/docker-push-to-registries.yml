@@ -177,7 +177,7 @@ jobs:
         uses: docker/setup-buildx-action@v3.7.1
 
       - name: Enable buildkit cache
-        uses: actions/cache@v4.1.1
+        uses: actions/cache@v4.2.0
         if: ${{ inputs.ENABLE_BUILDKIT_CACHE }}
         with:
           path: /tmp/buildkit-cache/buildkit-state.tar
