@@ -8,12 +8,6 @@ on:
         description: |
           The name of the scan to download the artifact of to scan
         required: true
-      TRIVY_CACHE_PREFIX:
-        type: string
-        description: |
-          Support control of trivy cache for debugging
-        required: true
-        default: "cache"
 
 jobs:
   scan-sbom-for-high-crit:
@@ -30,7 +24,7 @@ jobs:
         uses: yogeshlonkar/trivy-cache-action@v0.1.8
         with:
           gh-token: ${{ secrets.GITHUB_TOKEN }}
-          prefix: ${{ github.repository_id }}-${{ inputs.TRIVY_CACHE_PREFIX }}
+          prefix: ${{ github.repository_id }}-cache
 
       - name: Download Trivy Vulnerability DB
         if: ${{ steps.trivy-cache.outputs.cache-hit == '' || steps.trivy-cache.outputs.cache-hit == 'false' }}
@@ -87,7 +81,7 @@ jobs:
         uses: yogeshlonkar/trivy-cache-action@v0.1.8
         with:
           gh-token: ${{ secrets.GITHUB_TOKEN }}
-          prefix: ${{ github.repository_id }}
+          prefix: ${{ github.repository_id }}-cache
 
       - name: Download Trivy Vulnerability DB
         if: ${{ steps.trivy-cache.outputs.cache-hit == '' || steps.trivy-cache.outputs.cache-hit == 'false' }}

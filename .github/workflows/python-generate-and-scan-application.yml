@@ -12,12 +12,6 @@ on:
         required: false
         type: string
         description: Any extra dependencies to be included in SBOM scan
-      TRIVY_CACHE_PREFIX:
-        type: string
-        description: |
-          Support control of trivy cache for debugging
-        default: "cache"
-        required: true
     outputs:
       artifact-name:
         value: ${{ jobs.generate-application-sbom.outputs.artifact-name }}
@@ -37,4 +31,3 @@ jobs:
     uses: telicent-oss/shared-workflows/.github/workflows/python-scan-sbom.yml@main
     with:
       SCAN_NAME: ${{ needs.generate-application-sbom.outputs.artifact-name }}
-      TRIVY_CACHE_PREFIX: ${{ inputs.TRIVY_CACHE_PREFIX }}
