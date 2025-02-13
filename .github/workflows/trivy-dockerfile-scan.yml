@@ -13,6 +13,12 @@ on:
         description: |
           Specifies the full path to the Dockerfile within the repository.
         required: true
+      TRIVY_CACHE_PREFIX:
+        type: string
+        description: |
+          Support control of trivy cache for debugging
+        default: "cache"
+        required: true
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -31,7 +37,7 @@ jobs:
         uses: yogeshlonkar/trivy-cache-action@v0.1.8
         with:
           gh-token: ${{ secrets.GITHUB_TOKEN }}
-          prefix: ${{ github.repository_id }}
+          prefix: ${{ github.repository_id }}-${{ inputs.TRIVY_CACHE_PREFIX }}
 
       - name: Download Trivy Vulnerability DB
         if: ${{ steps.trivy-cache.outputs.cache-hit == '' || steps.trivy-cache.outputs.cache-hit == 'false' }}
