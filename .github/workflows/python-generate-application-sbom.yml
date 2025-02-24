@@ -13,6 +13,11 @@ on:
         required: false
         type: string
         description: Any extra dependencies to be included in SBOM scan
+      PYTHON_VERSION:
+        required: false
+        type: string
+        description: The Python version to use
+        default: "3.x"
     outputs:
       artifact-name:
         value: ${{ inputs.SCAN_NAME }}
@@ -29,7 +34,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5.2.0
       with:
-        python-version: "3.x"
+        python-version: "3.12"
 
     - name: Prepare pip and and pip-tools
       run: |
