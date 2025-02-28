@@ -52,8 +52,15 @@ jobs:
       - name: yarn tsc --noEmit if needed
         run: |
           if [ -f tsconfig.json ]; then
-            echo "TypeScript config found. Running tsc --noEmit..."
-            yarn tsc --noEmit
+            echo "TypeScript config found."
+            TSC_IGNORE=$(node -p "require('./package.json').ci?.['shared-workflows/.github/workflows/javascript-test-feature-branch.yml']?.['WARNING: TSC CHECK NO ERROR'] || ''")
+            if [ "$TSC_IGNORE" != "" ]; then
+              echo "WARNING flag found in package.json. Running tsc --noEmit (errors will be ignored)..."
+              yarn tsc --noEmit || echo "tsc failed but error ignored due to warning flag."
+            else
+              echo "Running tsc --noEmit..."
+              yarn tsc --noEmit
+            fi
           else
             echo "No TypeScript config found. Skipping tsc..."
           fi
