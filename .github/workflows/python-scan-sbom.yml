@@ -8,6 +8,12 @@ on:
         description: |
           The name of the scan to download the artifact of to scan
         required: true
+      SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE:
+        required: false
+        default: false
+        type: boolean
+        description: |
+          Sets --only-fixed flag
 
 jobs:
   scan-sbom-for-high-crit:
@@ -53,6 +59,7 @@ jobs:
           scanners: 'vuln'
           cache-dir: .trivy
           cache: false
+          ignore-unfixed: ${{ inputs.SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE }}
 
       - name: Anchore Scan for HIGH and CRITICAL vulnerabilities
         id: anchore-scan
@@ -62,6 +69,7 @@ jobs:
           fail-build: true
           severity-cutoff: high
           output-format: sarif
+          only-fixed: ${{ inputs.SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE }}
 
       - name: Inspect Anchore SARIF Report
         if: always()
