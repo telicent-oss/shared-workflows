@@ -24,6 +24,13 @@ on:
         description: |
           Scan a Docker image tar stored as an artifact (name must be ${SCAN_NAME}.tar), rather
           than an image stored in a remote repository
+      SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE:
+        required: false
+        default: false
+        type: boolean
+        description: |
+          Sets ignore-unfixed flag
+          
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -148,7 +155,7 @@ jobs:
           image-ref: ${{ inputs.IMAGE_REF }}
           format: table
           severity: HIGH,CRITICAL
-          ignore-unfixed: true
+          ignore-unfixed: ${{ inputs.SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE }}
           exit-code: 1
           cache-dir: .trivy
           # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
