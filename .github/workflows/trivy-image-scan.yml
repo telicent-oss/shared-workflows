@@ -30,6 +30,13 @@ on:
         type: boolean
         description: |
           Sets ignore-unfixed flag
+      USES_JAVA:
+        required: false
+        default: false
+        type: boolean
+        description: |
+          Indicates whether the image includes Java artifacts, we need to know this in order to determine which Trivy
+          vulnerability databases to obtain.
           
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -62,61 +69,15 @@ jobs:
         if: ${{ inputs.IMAGE_FROM_ARTIFACT }}
         run: docker load --input ${{ inputs.SCAN_NAME }}.tar
 
-      - name: Trivy Cache
-        id: trivy-cache
-        uses: yogeshlonkar/trivy-cache-action@v0.1.8
+      - name: Trivy Vulnerability Scanning
+        id: trivy-scan
+        uses: telicent-oss/trivy-action@v1
         with:
           gh-token: ${{ secrets.GITHUB_TOKEN }}
-          prefix: ${{ github.repository_id }}
-
-      - name: Download Trivy Java DB
-        if: ${{ steps.trivy-cache.outputs.cache-hit == '' || steps.trivy-cache.outputs.cache-hit == 'false' }}
-        uses: aquasecurity/trivy-action@master
-        env:
-          TRIVY_DOWNLOAD_JAVA_DB_ONLY: true
-          TRIVY_JAVA_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-java-db,ghcr.io/aquasecurity/trivy-java-db:1
-        with:
           scan-type: image
-          timeout: 10m0s
-          cache-dir: .trivy
-          # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
-          cache: false
-
-      - name: Download Trivy Vulnerability DB
-        if: ${{ steps.trivy-cache.outputs.cache-hit == '' || steps.trivy-cache.outputs.cache-hit == 'false' }}
-        uses: aquasecurity/trivy-action@master
-        env:
-          TRIVY_DOWNLOAD_DB_ONLY: true
-          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db,ghcr.io/aquasecurity/trivy-db:2
-        with:
-          scan-type: image
-          timeout: 10m0s
-          cache-dir: .trivy
-          # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
-          cache: false
-
-      - name: Trivy Vulnerability Scan
-        uses: aquasecurity/trivy-action@master
-        env:
-          TRIVY_SKIP_DB_UPDATE: true
-          TRIVY_SKIP_JAVA_DB_UPDATE: true
-        with:
-          scan-type: "image"
-          image-ref: ${{ inputs.IMAGE_REF }}
-          output: trivy-docker-report.json
-          format: json
-          exit-code: 0
-          cache-dir: .trivy
-          # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
-          cache: false
-          trivyignores: ${{ inputs.PATH_TO_TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE }}
-
-      - name: Upload Vulnerability Scan Results
-        uses: actions/upload-artifact@v4.4.3
-        with:
-          name: trivy-docker-report-${{ inputs.SCAN_NAME }}
-          path: trivy-docker-report.json
-          retention-days: 30
+          scan-name: docker-${{ inputs.SCAN_NAME }}
+          scan-ref: ${{ inputs.IMAGE_REF }}
+          uses-java: ${{ inputs.USES_JAVA }}
 
       - name: Generate SBOM for image (IF has tags for release)
         if: startsWith(github.ref, 'refs/tags/')
@@ -143,7 +104,7 @@ jobs:
         uses: softprops/action-gh-release@v2.0.8
         with:
           files: |
-            trivy-docker-report.json
+            ${{ steps.trivy-scan.outputs.scan-results-file }}
 
       - name: Fail Build on High/Critical Vulnerabilities
         uses: aquasecurity/trivy-action@master
