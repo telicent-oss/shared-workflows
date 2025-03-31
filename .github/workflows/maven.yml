@@ -315,14 +315,6 @@ jobs:
             target/site/jacoco/
             **/target/site/jacoco/
 
-      - name: Publish Code Coverage Results
-        if: ${{ matrix.os == 'ubuntu-latest'  && inputs.PUBLISH_JACOCO_REPORT }}
-        uses: dorny/test-reporter@master
-        with:
-          name: Code Coverage Report
-          path: target/site/jacoco/index.html
-          reporter: jacoco
-
       - name: Detect Maven version
         id: project
         if: ${{ matrix.os == 'ubuntu-latest' }}
