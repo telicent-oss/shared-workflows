@@ -211,7 +211,7 @@ jobs:
           fi
 
       - name: JaCoCo Report - ${{ matrix.module }})
-        if: ${{ matrix.os == 'ubuntu-latest'  && inputs.PUBLISH_JACOCO_REPORT }}
+        if: ${{ inputs.PUBLISH_JACOCO_REPORT }}
         uses: actions/upload-artifact@v4.4.3
         with:
           name: jacoco-report-${{ matrix.module }}
