@@ -209,7 +209,17 @@ jobs:
           else
             mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} -Dgpg.skip ${{ inputs.MAVEN_ARGS }}
           fi
-    
+
+      - name: JaCoCo Report - ${{ matrix.module }})
+        if: ${{ matrix.os == 'ubuntu-latest'  && inputs.PUBLISH_JACOCO_REPORT }}
+        uses: actions/upload-artifact@v4.4.3
+        with:
+          name: jacoco-report-${{ matrix.module }}
+          path: |
+            target/site/jacoco/
+            **/target/site/jacoco/
+  
+
   scan-and-publish:
     needs: build
     runs-on: ubuntu-latest
@@ -332,16 +342,6 @@ jobs:
           cache-dir: .trivy
           # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
           cache: false
-
-      - name: Upload JaCoCo Report
-        if: ${{ matrix.os == 'ubuntu-latest'  && inputs.PUBLISH_JACOCO_REPORT }}
-        uses: actions/upload-artifact@v4.4.3
-        with:
-          name: jacoco-report
-          path: |
-            target/site/jacoco/
-            **/target/site/jacoco/
-
       - name: Detect Maven version
         id: project
         run: |
