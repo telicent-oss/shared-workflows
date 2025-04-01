@@ -89,6 +89,12 @@ on:
           Specifies the release files that should be attached to the GitHub release.  For example a 
           downloadable package that is generated from the repository.  Regardless of this value we 
           will always attach the SBOMs to the release.
+      PUBLISH_JACOCO_REPORT:
+        required: false
+        type: boolean
+        default: false
+        description: |
+          Specifies that Jacoco Code Coverage reports be published as part of the build.
     secrets:
       MVN_USER_NAME:
         required: false
@@ -203,7 +209,17 @@ jobs:
           else
             mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} -Dgpg.skip ${{ inputs.MAVEN_ARGS }}
           fi
-    
+
+      - name: JaCoCo Report - ${{ matrix.module }})
+        if: ${{ inputs.PUBLISH_JACOCO_REPORT }}
+        uses: actions/upload-artifact@v4.4.3
+        with:
+          name: jacoco-report-${{ matrix.module }}
+          path: |
+            target/site/jacoco/
+            **/target/site/jacoco/
+  
+
   scan-and-publish:
     needs: build
     runs-on: ubuntu-latest
