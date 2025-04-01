@@ -15,6 +15,16 @@ on:
         default: false
         description: |
           Specifies whether this build needs to pull images from DockerHub.
+      PUBLIC_IMAGES:
+        required: false
+        type: string
+        default: ""
+        description: |
+          Specifies a newline separated list of public image references that the build should pull
+          and cache to speed up builds.
+
+          Images are only pulled and cached on the specified `MAIN_BRANCH`, other branches will only
+          restore the cache if it exists.
       MAVEN_ARGS:
         required: false
         type: string
@@ -66,8 +76,10 @@ on:
         type: string
         default: main
         description: |
-          Specifies the main branch for the repository.  Used in determining whether to publish `SNAPSHOT`s in 
-          conjunction with the `PUBLISH_SNAPSHOTS` parameter.
+          Used in determining whether to publish `SNAPSHOT`s in conjunction with the `PUBLISH_SNAPSHOTS` parameter.
+
+          Also used in determining whether to pull and cache Docker images in conjunction with the `PUBLIC_IMAGES`
+          parameter.
       PUBLISH_SNAPSHOTS:
         required: false
         type: boolean
@@ -165,16 +177,35 @@ jobs:
       #      if this is the very first build for that version e.g. just after a version bump
       - name: Quick Maven Build
         run: |
-          mvn install -DskipTests -Dgpg.skip -q
+          mvn install -DskipTests -Dgpg.skip -Dcyclonedx.skip -q
 
       - name: Detect Maven Modules
         id: modules
         run: |
           echo -n "modules=" >> "$GITHUB_OUTPUT"
           mvn exec:exec -Dexec.executable=echo -Dexec.args='${project.artifactId}' -q | jq --raw-input --slurp -c 'split("\n") | map(select(. != ""))' >> "${GITHUB_OUTPUT}"
+
+  cache-docker-images:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3.3.0
+        if: ${{ inputs.USES_DOCKERHUB_IMAGES && inputs.PUBLIC_IMAGES != '' && github.ref_name == inputs.MAIN_BRANCH }}
+        with:
+          username: ${{ secrets.DOCKER_READ_USER }}
+          password: ${{ secrets.DOCKER_READ_PWD }}
+
+      - name: Cache Docker Images
+        uses: telicent-oss/docker-image-cache-action@v1
+        if: ${{ inputs.PUBLIC_IMAGES != '' && github.ref_name == inputs.MAIN_BRANCH }}
+        with:
+          images: ${{ inputs.PUBLIC_IMAGES }}
+          restore-only: false
   
   build:
-    needs: detect-modules
+    needs: 
+      - detect-modules
+      - cache-docker-images
     strategy:
       matrix:
         module: ${{ fromJSON(needs.detect-modules.outputs.modules) }} 
@@ -201,6 +232,35 @@ jobs:
           else
             mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} -am -DskipTests -Dgpg.skip ${{ inputs.MAVEN_ARGS }}
           fi
+
+      - name: Determine if Cached Docker Images are needed
+        id: profile-check
+        shell: bash
+        run: |
+          # Basically check whether we have the docker profile in our active profiles for the module we
+          # are going to build
+          mvn help:active-profiles -q -Doutput="$PWD/.active-profiles" -pl :${{ matrix.module }}
+          if grep "${{ inputs.DOCKER_PROFILE }}" "$PWD/.active-profiles" >/dev/null 2>&1; then
+            echo "docker=true" >> ${GITHUB_OUTPUT}
+          else
+            echo "docker=false" >> ${GITHUB_OUTPUT}
+          fi
+          rm -f "$PWD/.active-profiles"
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3.3.0
+        if: ${{ inputs.USES_DOCKERHUB_IMAGES && inputs.PUBLIC_IMAGES != '' && steps.profile-check.outputs.docker == 'true' }}
+        with:
+          username: ${{ secrets.DOCKER_READ_USER }}
+          password: ${{ secrets.DOCKER_READ_PWD }}
+
+      - name: Restore Cached Docker Images
+        # Can skip restoring the cache if the module doesn't include a docker profile
+        if: ${{ inputs.PUBLIC_IMAGES != '' && steps.profile-check.outputs.docker == 'true' }}
+        uses: telicent-oss/docker-image-cache-action@v1
+        with:
+          images: ${{ inputs.PUBLIC_IMAGES }}
+          restore-only: ${{ github.ref_name != inputs.MAIN_BRANCH }}
 
       - name: Build and Verify Maven Module
         run: |

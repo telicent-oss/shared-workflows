@@ -42,10 +42,13 @@ The serial Maven workflow does the following:
 1. A `cache-dependencies` job that:
     - Configures Java and Maven
     - Does a `mvn dependency:go-offline` to populate a GitHub Actions Cache used in the subsequent job
-2. A `build` job that:
+2. A `cache-docker-images` job that:
+    - Pulls and caches specified `PUBLIC_IMAGES` if on the `MAIN_BRANCH`
+3. A `build` job that:
     - Configures Java and Maven
     - Optionally logs into DockerHub if configured to do so (see `USES_DOCKERHUB_IMAGES` in [workflow
       inputs](#workflow-inputs))
+    - Restores the cached Docker images if `PUBLIC_IMAGES` is set
     - Builds the project with `mvn install`
     - Scans the project for high/critical severity vulnerabilities attaching reports to the build
    vulnerabilities with `trivy`
@@ -53,7 +56,7 @@ The serial Maven workflow does the following:
     - Optionally deploys `SNAPSHOT`s if the build is a `SNAPSHOT` and it's on the `MAIN_BRANCH`, and `PUBLISH_SNAPSHOTS`
       is configured appropriately, i.e. `mvn deploy -DskipTests`, tests are skipped as this step only runs if the
       earlier full build was successful
-3. A `github-release` job that runs only when the built version is not a `SNAPSHOT` and the workflow was triggered from
+4. A `github-release` job that runs only when the built version is not a `SNAPSHOT` and the workflow was triggered from
    a Git tag:
     - Configures Java and Maven
     - Does a quick Maven build (`mvn install -DskipTests`) since this job is dependent on the `build` job being
@@ -66,13 +69,15 @@ The serial Maven workflow does the following:
 For the parallel build version of the workflow the steps are slightly different:
 
 1. A `cache-dependencies` job, this is the same as for the serial workflow
-2. A `detect-modules` job that:
+2. A `cache-docker-images` job, this is the same as for the serial workflow
+3. A `detect-modules` job that:
     - Configures Java and Maven
     - Generates a JSON Output that is an array of the modules found in the repository
-3. A `build` job for each detected module that:
+4. A `build` job for each detected module that:
     - Configures Java and Maven
     - Optionally logs into DockerHub if configured to do so (see `USES_DOCKERHUB_IMAGES` in [workflow
       inputs](#workflow-inputs))
+    - Restores the cached Docker images if `PUBLIC_IMAGES` is set
     - Builds the module and its dependencies with `mvn install -DskipTests -am -pl :module`
     - Tests the module with `mvn install -pl :module`
 4. A `scan-and-publish` job that: 
@@ -298,4 +303,5 @@ The following table provides a complete reference to the available inputs.
 | `PUBLISH_SNAPSHOTS`     | `false `  | `boolean ` | `true `         | Specifies whether Maven `SNAPSHOT`s are published from this build.  Note that even when enabled (as is the default) `SNAPSHOT`s are only published when a build occurs on the main branch.  The main branch  can be separately configured via the `MAIN_BRANCH` parameter. |
 | `RELEASE_FILES`         | `false `  | `string `  | `null `         | Specifies the release files that should be attached to the GitHub release.  For example a  downloadable package that is generated from the repository.  Regardless of this value we  will always attach the SBOMs to the release.                                          |
 | `USES_DOCKERHUB_IMAGES` | `false `  | `boolean ` | `false `        | Specifies whether this build needs to pull images from DockerHub.                                                                                                                                                                                                          |
+| `PUBLIC_IMAGES`         | `false `  | `string `  | `null`          | Specifies a new line separated list of public image references that should be pulled and cached on the `MAIN_BRANCH` and restored during builds to avoid pulling images on every build. | 
 
