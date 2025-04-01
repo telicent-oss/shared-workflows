@@ -151,7 +151,7 @@ jobs:
           fail-if-missing: false
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2.0.8
+        uses: softprops/action-gh-release@v2.2.1
         with:
           body_path: ${{ steps.release-notes.outputs.release-notes-file }}
           generate_release_notes: ${{ steps.release-notes.outputs.auto-release-notes }}
