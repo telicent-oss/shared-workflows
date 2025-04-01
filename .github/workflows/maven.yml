@@ -231,80 +231,15 @@ jobs:
             mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P-${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
           fi
 
-      - name: Trivy Cache
-        id: trivy-cache
+      - name: Trivy Vulnerability Scanning
+        id: trivy-scan
         if: ${{ matrix.os == 'ubuntu-latest' }}
-        uses: yogeshlonkar/trivy-cache-action@v0.1.8
+        uses: telicent-oss/trivy-action@v1
         with:
           gh-token: ${{ secrets.GITHUB_TOKEN }}
-          prefix: ${{ github.repository_id }}
-
-      - name: Download Trivy Java DB
-        if: ${{ matrix.os == 'ubuntu-latest' && (steps.trivy-cache.outputs.cache-hit == '' || steps.trivy-cache.outputs.cache-hit == 'false') }}
-        uses: aquasecurity/trivy-action@master
-        env:
-          TRIVY_DOWNLOAD_JAVA_DB_ONLY: true
-          TRIVY_JAVA_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-java-db,ghcr.io/aquasecurity/trivy-java-db:1
-        with:
-          scan-type: image
-          timeout: 10m0s
-          cache-dir: .trivy
-          # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
-          cache: false
-
-      - name: Download Trivy Vulnerability DB
-        if: ${{ matrix.os == 'ubuntu-latest' && (steps.trivy-cache.outputs.cache-hit == '' || steps.trivy-cache.outputs.cache-hit == 'false') }}
-        uses: aquasecurity/trivy-action@master
-        env:
-          TRIVY_DOWNLOAD_DB_ONLY: true
-          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db,ghcr.io/aquasecurity/trivy-db:2
-        with:
-          scan-type: image
-          timeout: 10m0s
-          cache-dir: .trivy
-          # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
-          cache: false
-
-      - name: Trivy Vulnerability Scan
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        uses: aquasecurity/trivy-action@master
-        env:
-          TRIVY_SKIP_DB_UPDATE: true
-          TRIVY_SKIP_JAVA_DB_UPDATE: true
-        with:
-          scan-type: "fs"
-          output: trivy-report.json
-          format: json
+          scan-type: fs
+          scan-name: maven
           scan-ref: .
-          exit-code: 0
-          cache-dir: .trivy
-          # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
-          cache: false
-
-      - name: Upload Vulnerability Scan Results
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        uses: actions/upload-artifact@v4.4.3
-        with:
-          name: trivy-report
-          path: trivy-report.json
-          retention-days: 30
-
-      - name: Fail build on High/Criticial Vulnerabilities
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        uses: aquasecurity/trivy-action@master
-        env:
-          TRIVY_SKIP_DB_UPDATE: true
-          TRIVY_SKIP_JAVA_DB_UPDATE: true
-        with:
-          scan-type: "fs"
-          format: table
-          scan-ref: .
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: 1
-          cache-dir: .trivy
-          # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
-          cache: false
 
       - name: Upload JaCoCo Report
         if: ${{ matrix.os == 'ubuntu-latest'  && inputs.PUBLISH_JACOCO_REPORT }}

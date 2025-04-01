@@ -281,6 +281,7 @@ jobs:
       IMAGE_REF: telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}:${{ github.sha }}
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
       PATH_TO_TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE: ${{ inputs.TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE != '' && format('{0}/{1}', inputs.PACKAGE_DIRECTORY, inputs.TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE) || '' }}
+      USES_JAVA: ${{ inputs.USES_MAVEN }}
   grype-scan-image:
     needs: build
     uses: Telicent-oss/shared-workflows/.github/workflows/grype-image-scan.yml@main
