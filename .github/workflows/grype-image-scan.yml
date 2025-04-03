@@ -67,7 +67,7 @@ jobs:
 
       - name: Grype Container Vulnerability Scan
         id: grype-scan
-        uses: anchore/scan-action@v4.1.2
+        uses: anchore/scan-action@v6.1.0
         with:
           image: ${{ inputs.IMAGE_REF }}
           output-format: json
@@ -81,7 +81,7 @@ jobs:
           retention-days: 30
 
       - name: Fail Build on High/Critical Vulnerabilities
-        uses: anchore/scan-action@v4.1.2
+        uses: anchore/scan-action@v6.1.0
         with:
           image: ${{ inputs.IMAGE_REF }}
           output-format: table
