@@ -24,6 +24,15 @@ on:
         description: |
           Scan a Docker image tar stored as an artifact (name must be ${SCAN_NAME}.tar), rather
           than an image stored in a remote repository
+      REMOTE_VEX:
+        required: false
+        type: string
+        description: |
+          Supplies references to one/more repositories from which additional VEX statements should be obtained and used
+          to filter out vulnerabilities that have been assessed as to not apply to our software products.
+
+          Note that telicent-oss/telicent-base-images is always included by default so this is only needed if the image
+          being built relies on other images/libraries for which VEX statements are required.
       SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE:
         required: false
         default: false
@@ -78,6 +87,10 @@ jobs:
           scan-name: docker-${{ inputs.SCAN_NAME }}
           scan-ref: ${{ inputs.IMAGE_REF }}
           uses-java: ${{ inputs.USES_JAVA }}
+          allow-unfixed: ${{ inputs.SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE }}
+          remote-vex: |
+            telicent-oss/telicent-base-images
+            ${{ inputs.REMOTE_VEX }}
 
       - name: Generate SBOM for image (IF has tags for release)
         if: startsWith(github.ref, 'refs/tags/')
@@ -105,20 +118,3 @@ jobs:
         with:
           files: |
             ${{ steps.trivy-scan.outputs.scan-results-file }}
-
-      - name: Fail Build on High/Critical Vulnerabilities
-        uses: aquasecurity/trivy-action@master
-        env:
-          TRIVY_SKIP_DB_UPDATE: true
-          TRIVY_SKIP_JAVA_DB_UPDATE: true
-        with:
-          scan-type: "image"
-          image-ref: ${{ inputs.IMAGE_REF }}
-          format: table
-          severity: HIGH,CRITICAL
-          ignore-unfixed: ${{ inputs.SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE }}
-          exit-code: 1
-          cache-dir: .trivy
-          # Counter-intuitive BUT trivy-action has its own cache which duplicates our own but in a less flexible way
-          cache: false
-          trivyignores: ${{ inputs.PATH_TO_TRIVY_IGNORES_ONLY_FOR_BUILD_IMAGE }}

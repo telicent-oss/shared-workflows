@@ -107,6 +107,15 @@ on:
         default: false
         description: |
           Specifies that Jacoco Code Coverage reports be published as part of the build.
+      REMOTE_VEX:
+        required: false
+        type: string
+        default: ""
+        description: |
+          Specifies a new line separated list of repository references from which remote VEX statements should be
+          obtained and supplied to security scanners to filter out vulnerabilities.
+
+          Generally only needed if your repository relies on other libraries that have applicable VEX statements.
     secrets:
       MVN_USER_NAME:
         required: false
@@ -340,6 +349,8 @@ jobs:
           scan-type: fs
           scan-name: maven
           scan-ref: .
+          remote-vex: |
+            ${{ inputs.REMOTE_VEX }}
 
       - name: Detect Maven version
         id: project
