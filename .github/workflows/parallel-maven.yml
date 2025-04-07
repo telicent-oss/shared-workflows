@@ -173,7 +173,7 @@ jobs:
       modules: ${{ steps.modules.outputs.modules }}
     steps:
       - name: Check out Git repository
-        uses: actions/checkout@v4.2.1
+        uses: actions/checkout@v4.2.2
 
       - name: Install Java and Maven
         uses: actions/setup-java@v4.4.0
@@ -225,7 +225,7 @@ jobs:
       contents: read
     steps:
       - name: Check out Git repository
-        uses: actions/checkout@v4.2.1
+        uses: actions/checkout@v4.2.2
       
       - name: Install Java and Maven
         uses: actions/setup-java@v4.4.0
@@ -304,7 +304,7 @@ jobs:
       version: ${{ steps.project.outputs.version }}
     steps:
       - name: Check out Git repository
-        uses: actions/checkout@v4.2.1
+        uses: actions/checkout@v4.2.2
 
       - name: Install Java and Maven
         uses: actions/setup-java@v4.4.0

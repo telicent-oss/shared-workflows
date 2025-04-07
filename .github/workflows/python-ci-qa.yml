@@ -23,7 +23,7 @@ jobs:
   test_and_build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4.2.1
+      - uses: actions/checkout@v4.2.2
       - name: Set up Python ${{ inputs.PYTHON_VERSION }}
         uses: actions/setup-python@v5.5.0
         with:
