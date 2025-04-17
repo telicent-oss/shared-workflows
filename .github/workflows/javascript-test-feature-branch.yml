@@ -28,7 +28,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4.2.1
       - name: configure-node
-        uses: actions/setup-node@v4.0.4
+        uses: actions/setup-node@v4.4.0
         with:
           node-version: 20
       - name: Get node version
