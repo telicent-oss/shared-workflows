@@ -139,7 +139,7 @@ jobs:
 
       - name: Install Java and Maven
         if: ${{ inputs.USES_MAVEN }}
-        uses: actions/setup-java@v4.4.0
+        uses: actions/setup-java@v4.7.1
         with:
           java-version: ${{ inputs.JAVA_VERSION }}
           distribution: ${{ inputs.JDK }}
