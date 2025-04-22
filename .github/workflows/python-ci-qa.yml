@@ -20,7 +20,7 @@ on:
       TEST_WINDOWS:
         required: false
         type: boolean
-        description: Whether to test on Windows
+        description: Whether to test on a Windows runner as well
         default: false
   workflow_dispatch:
 
@@ -59,6 +59,7 @@ jobs:
 
   test_and_build_windows:
     runs-on: windows-latest
+    if: ${{ inputs.TEST_WINDOWS == true }}
     steps:
       - run: choco install gh
       - run: gh version
