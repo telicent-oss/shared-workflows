@@ -17,6 +17,11 @@ on:
         type: boolean
         description: Whether to skip the build test (i.e. for non-libraries)
         default: false
+      TEST_WINDOWS:
+        required: false
+        type: boolean
+        description: Whether to test on a Windows runner as well
+        default: false
   workflow_dispatch:
 
 jobs:
@@ -44,6 +49,37 @@ jobs:
 
       - name: ruff Python Style Checking
         run:  python -m ruff check --output-format=github .
+
+      - name: Unit Tests
+        run: ${{ inputs.test_command }}
+
+      - name: Build
+        if: ${{ inputs.SKIP_BUILD == false }}
+        run: python -m build
+
+  test_and_build_windows:
+    runs-on: windows-latest
+    if: ${{ inputs.TEST_WINDOWS == true }}
+    steps:
+      - run: choco install gh
+      - run: gh version
+
+      - uses: actions/checkout@v4.2.2
+
+      - name: Set up Python ${{ inputs.PYTHON_VERSION }}
+        uses: actions/setup-python@v5.5.0
+        with:
+          python-version: ${{ inputs.PYTHON_VERSION }}
+
+      - name: Prepare pip and and pip-tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pip-tools
+
+      - name: Generate requirements
+        run: |
+          python -m piptools compile --all-extras -o requirements.txt pyproject.toml
+          pip install -r requirements.txt
 
       - name: Unit Tests
         run: ${{ inputs.test_command }}
