@@ -17,6 +17,11 @@ on:
         type: boolean
         description: Whether to skip the build test (i.e. for non-libraries)
         default: false
+      TEST_WINDOWS:
+        required: false
+        type: boolean
+        description: Whether to test on Windows
+        default: false
   workflow_dispatch:
 
 jobs:
@@ -51,3 +56,16 @@ jobs:
       - name: Build
         if: ${{ inputs.SKIP_BUILD == false }}
         run: python -m build
+
+  test_and_build_windows:
+    runs-on: windows-latest
+    steps:
+      - run: choco install gh
+      - run: gh version
+
+      - uses: actions/checkout@v4.2.2
+
+      - name: Set up Python ${{ inputs.PYTHON_VERSION }}
+        uses: actions/setup-python@v5.5.0
+        with:
+          python-version: ${{ inputs.PYTHON_VERSION }}
