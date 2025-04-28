@@ -77,7 +77,7 @@ jobs:
 
       - name: Restore Cached Cross Links
         id: cache-cross-links
-        uses: actions/cache/restore@v4.2.0
+        uses: actions/cache/restore@v4.2.3
         with:
           path: ${{ inputs.cross-links-file }}
           key: jira-sync-cross-links-${{ hashFiles(inputs.cross-links-file) }}
@@ -116,7 +116,7 @@ jobs:
       # This step is needed so that if the cross links file gets updated we
       # generate a new cache from it
       - name: Update Cached Cross Links
-        uses: actions/cache@v4.2.0
+        uses: actions/cache@v4.2.3
         with:
           path: ${{ inputs.cross-links-file }}
           key: jira-sync-cross-links-${{ hashFiles(inputs.cross-links-file) }}
