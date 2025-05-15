@@ -102,7 +102,7 @@ jobs:
           mv ${{ needs.generate-and-scan-application-sbom.outputs.artifact-name }}-bom.json sbom.json
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3.2.0
+        uses: docker/setup-qemu-action@v3.6.0
         with:
           platforms: all
 
