@@ -80,7 +80,7 @@ jobs:
 
       - name: Trivy Vulnerability Scanning
         id: trivy-scan
-        uses: telicent-oss/trivy-action@v1
+        uses: telicent-oss/trivy-action@v1.1.3
         with:
           gh-token: ${{ secrets.GITHUB_TOKEN }}
           scan-type: image
