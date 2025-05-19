@@ -283,7 +283,7 @@ jobs:
       - name: Trivy Vulnerability Scanning
         id: trivy-scan
         if: ${{ matrix.os == 'ubuntu-latest' }}
-        uses: telicent-oss/trivy-action@v1
+        uses: telicent-oss/trivy-action@v1.1.3
         with:
           gh-token: ${{ secrets.GITHUB_TOKEN }}
           scan-type: fs
