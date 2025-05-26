@@ -30,7 +30,7 @@ jobs:
 
       - name: Trivy Cache
         id: trivy-cache
-        uses: yogeshlonkar/trivy-cache-action@v0.1.8
+        uses: yogeshlonkar/trivy-cache-action@v0.1.14
         with:
           gh-token: ${{ secrets.GITHUB_TOKEN }}
           prefix: ${{ github.repository_id }}
