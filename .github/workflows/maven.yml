@@ -166,7 +166,7 @@ on:
 
 jobs:
   cache-dependencies:
-    uses: telicent-oss/shared-workflows/.github/workflows/maven-cache-dependencies.yml@main
+    uses: telicent-oss/shared-workflows/.github/workflows/maven-cache-dependencies.yml@vuln-scan-improvements
     with:
       JAVA_VERSION: ${{ inputs.JAVA_VERSION }}
       JDK: ${{ inputs.JDK }}
@@ -328,7 +328,7 @@ jobs:
   github-release:
     needs: build
     if: ${{ github.ref_type == 'tag' && needs.build.outputs.version != '' && !contains(needs.build.outputs.version, 'SNAPSHOT') }}
-    uses: telicent-oss/shared-workflows/.github/workflows/maven-github-release.yml@main
+    uses: telicent-oss/shared-workflows/.github/workflows/maven-github-release.yml@vuln-scan-improvements
     with:
       CHANGELOG_FILE: ${{ inputs.CHANGELOG_FILE }}
       DOCKER_PROFILE: ${{ inputs.DOCKER_PROFILE }}
