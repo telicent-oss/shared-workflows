@@ -17,7 +17,7 @@ on:
 jobs:
   generate-and-scan-application-sbom:
     name: Generate and Scan Application SBOM
-    uses: telicent-oss/shared-workflows/.github/workflows/python-generate-and-scan-application.yml@main
+    uses: telicent-oss/shared-workflows/.github/workflows/python-generate-and-scan-application.yml@vuln-scan-improvements
     with:
       SCAN_NAME: ${{ inputs.PACKAGE }}-${{ inputs.VERSION }}
 

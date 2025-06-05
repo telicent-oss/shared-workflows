@@ -75,7 +75,7 @@ on:
 jobs:
   generate-and-scan-application-sbom:
     name: Generate and Scan Application SBOM
-    uses: telicent-oss/shared-workflows/.github/workflows/python-generate-and-scan-application.yml@main
+    uses: telicent-oss/shared-workflows/.github/workflows/python-generate-and-scan-application.yml@vuln-scan-improvements
     with:
       EXTRAS_ARG: ${{ inputs.EXTRAS_ARG }}
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}-${{ inputs.VERSION }}${{ inputs.VERSION_SUFFIX }}-application
@@ -184,7 +184,7 @@ jobs:
     name: Generate and Store the SBOM
     needs:
       - build
-    uses: Telicent-oss/shared-workflows/.github/workflows/python-generate-image-sbom.yml@main
+    uses: Telicent-oss/shared-workflows/.github/workflows/python-generate-image-sbom.yml@vuln-scan-improvements
     with:
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}-${{ inputs.VERSION }}${{ inputs.VERSION_SUFFIX }}-image
       IMAGE_REF: ${{ needs.build.outputs.image-ref }}
@@ -193,7 +193,8 @@ jobs:
     name: Scan the image SBOM
     needs:
       - generate-image-sbom
-    uses: telicent-oss/shared-workflows/.github/workflows/python-scan-sbom.yml@main
+    uses: telicent-oss/shared-workflows/.github/workflows/python-scan-sbom.yml@vuln-scan-improvements
     with:
       SCAN_NAME: ${{ needs.generate-image-sbom.outputs.artifact-name }}
+      SBOM_FILE: ${{ needs.generate-image-sbom.outputs.sbom-file }}
       SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE: true
