@@ -24,6 +24,14 @@ on:
         description: |
           Scan a Docker image tar stored as an artifact (name must be ${SCAN_NAME}.tar), rather
           than an image stored in a remote repository
+      REMOTE_VEX:
+        required: false
+        type: string
+        description: |
+          Supplies references to one/more repositories from which additional VEX statements should be obtained and used
+          to filter out vulnerabilities that have been assessed as to not apply to our software products.
+          Note that telicent-oss/telicent-base-images is always included by default so this is only needed if the image
+          being built relies on other images/libraries for which VEX statements are required.
       SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE:
         required: false
         default: false
@@ -67,24 +75,13 @@ jobs:
 
       - name: Grype Container Vulnerability Scan
         id: grype-scan
-        uses: anchore/scan-action@v6.2.0
+        uses: telicent-oss/grype-action@v1
         with:
-          image: ${{ inputs.IMAGE_REF }}
-          output-format: json
-          fail-build: false
-
-      - name: Upload Vulnerability Scan Results
-        uses: actions/upload-artifact@v4.4.3
-        with:
-          name: grype-docker-report-${{ inputs.SCAN_NAME }}
-          path: ${{ steps.grype-scan.outputs.json }}
-          retention-days: 30
-
-      - name: Fail Build on High/Critical Vulnerabilities
-        uses: anchore/scan-action@v6.2.0
-        with:
-          image: ${{ inputs.IMAGE_REF }}
-          output-format: table
-          severity-cutoff: high
-          fail-build: true
-          only-fixed: ${{ inputs.SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE }}
+          gh-token: ${{ secrets.GITHUB_TOKEN }}
+          scan-type: image
+          scan-name: ${{ inputs.SCAN_NAME }}
+          scan-ref: ${{ inputs.IMAGE_REF }}
+          allow-unfixed: ${{ inputs.SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE }}
+          remote-vex: |
+            telicent-oss/telicent-base-images
+            ${{ inputs.REMOTE_VEX }}
