@@ -69,7 +69,7 @@ jobs:
           distribution: temurin
 
       - name: Install jira-sync
-        uses: jaxxstorm/action-install-gh-release@v1.12.0
+        uses: jaxxstorm/action-install-gh-release@v2.1.0
         with: # Grab the latest version
           repo: telicent-oss/jira-sync
           platform: jvm
