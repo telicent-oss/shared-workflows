@@ -25,32 +25,18 @@ jobs:
           docker pull ${{ inputs.IMAGE_NAME }}
 
       - name: Trivy Vulnerability Scan
-        uses: aquasecurity/trivy-action@master
+        id: trivy-scan
+        uses: telicent-oss/trivy-action@v1
         with:
-          image-ref: ${{ inputs.IMAGE_NAME }}
-          format: 'json'
-          exit-code: '0'
-          output: trivy-scan-report.json
+          scan-type: image
+          scan-name: ${{ inputs.IMAGE_NAME }}
+          scan-ref: ${{ inputs.IMAGE_NAME }}
 
-      - name: Scan Docker Image with Anchore
+      - name: Grype Vulnerability Scan
         id: anchore-scan
-        uses: anchore/scan-action@v6.2.0
+        uses: telicent-oss/grype-action@v1
         with:
-          image: ${{ inputs.IMAGE_NAME }}
-          fail-build: true
-          severity-cutoff: high
-          output-format: sarif  # Use SARIF format
+          scan-type: image
+          scan-name: ${{ inputs.IMAGE_NAME }}
+          scan-ref: ${{ inputs.IMAGE_NAME }}
 
-      - name: Inspect action SARIF report
-        if: always()
-        run: cat ${{ steps.anchore-scan.outputs.sarif }}
-
-      - name: Upload Trivy and Anchore Vulnerability Scan Reports
-        if: always()
-        uses: actions/upload-artifact@v4.4.3
-        with:
-          name: vulnerability-scan-reports
-          path: |
-            trivy-scan-report.json
-            ${{ steps.anchore-scan.outputs.sarif }}
-          retention-days: 30

@@ -30,6 +30,7 @@ on:
         description: |
           Supplies references to one/more repositories from which additional VEX statements should be obtained and used
           to filter out vulnerabilities that have been assessed as to not apply to our software products.
+
           Note that telicent-oss/telicent-base-images is always included by default so this is only needed if the image
           being built relies on other images/libraries for which VEX statements are required.
       SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE:
@@ -79,7 +80,7 @@ jobs:
         with:
           gh-token: ${{ secrets.GITHUB_TOKEN }}
           scan-type: image
-          scan-name: ${{ inputs.SCAN_NAME }}
+          scan-name: docker-${{ inputs.SCAN_NAME }}
           scan-ref: ${{ inputs.IMAGE_REF }}
           allow-unfixed: ${{ inputs.SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE }}
           remote-vex: |
