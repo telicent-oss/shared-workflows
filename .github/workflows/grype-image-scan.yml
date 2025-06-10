@@ -86,4 +86,3 @@ jobs:
           remote-vex: |
             telicent-oss/telicent-base-images
             ${{ inputs.REMOTE_VEX }}
-
