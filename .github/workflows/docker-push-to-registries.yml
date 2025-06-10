@@ -272,14 +272,14 @@ jobs:
           path: /tmp/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}.tar
 
   scan-dockerfile-configuration:
-    uses: Telicent-oss/shared-workflows/.github/workflows/trivy-dockerfile-scan.yml@vuln-scan-improvements
+    uses: Telicent-oss/shared-workflows/.github/workflows/trivy-dockerfile-scan.yml@main
     with:
       DOCKERFILE: ${{ inputs.PATH }}/${{ inputs.DOCKERFILE }} # NOTE: relative path (inputs.PATH defaults to '.')
       SCAN_NAME: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}
 
   trivy-scan-image:
     needs: build
-    uses: telicent-oss/shared-workflows/.github/workflows/trivy-image-scan.yml@vuln-scan-improvements
+    uses: telicent-oss/shared-workflows/.github/workflows/trivy-image-scan.yml@main
     secrets: inherit
     # Since Dependabot builds can't push an image we skip the scan workflow because there won't be
     # an image for it to pull down and scan
@@ -294,7 +294,7 @@ jobs:
       REMOTE_VEX: ${{ inputs.REMOTE_VEX }}
   grype-scan-image:
     needs: build
-    uses: Telicent-oss/shared-workflows/.github/workflows/grype-image-scan.yml@vuln-scan-improvements
+    uses: Telicent-oss/shared-workflows/.github/workflows/grype-image-scan.yml@main
     secrets: inherit
     # Since Dependabot builds can't push an image we skip the scan workflow because there won't be
     # an image for it to pull down and scan

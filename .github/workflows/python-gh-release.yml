@@ -10,6 +10,6 @@ on:
 
 jobs:
   do-release:
-    uses: telicent-oss/shared-workflows/.github/workflows/python-create-release-pr.yml@vuln-scan-improvements
+    uses: telicent-oss/shared-workflows/.github/workflows/python-create-release-pr.yml@main
     with:
       SKIP_GITHUB_RELEASE: false
