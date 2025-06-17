@@ -31,4 +31,5 @@ jobs:
     uses: telicent-oss/shared-workflows/.github/workflows/python-scan-sbom.yml@main
     with:
       SCAN_NAME: ${{ needs.generate-application-sbom.outputs.artifact-name }}
+      SBOM_FILE: ${{ needs.generate-application-sbom.outputs.artifact-name }}-bom.json
       SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE: true
