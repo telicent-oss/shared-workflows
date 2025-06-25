@@ -19,7 +19,7 @@ on:
 jobs:
   generate-application-sbom:
     name: Generate Application SBOM
-    uses: telicent-oss/shared-workflows/.github/workflows/python-generate-application-sbom.yml@main
+    uses: telicent-oss/shared-workflows/.github/workflows/python-generate-application-sbom.yml@python-consistency-fixes
     with:
       EXTRAS_ARG: ${{ inputs.EXTRAS_ARG }}
       SCAN_NAME: ${{ inputs.SCAN_NAME }}
