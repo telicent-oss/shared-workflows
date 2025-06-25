@@ -28,8 +28,8 @@ jobs:
     name: Scan Application SBOM
     needs:
       - generate-application-sbom
-    uses: telicent-oss/shared-workflows/.github/workflows/python-scan-sbom.yml@main
+    uses: telicent-oss/shared-workflows/.github/workflows/python-scan-sbom.yml@python-consistency-fixes
     with:
       SCAN_NAME: ${{ needs.generate-application-sbom.outputs.artifact-name }}
-      SBOM_FILE: ${{ needs.generate-application-sbom.outputs.artifact-name }}-bom.json
+      SBOM_FILE: ${{ needs.generate-application-sbom.outputs.artifact-name }}-cyclonedx.sbom.json
       SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE: true
