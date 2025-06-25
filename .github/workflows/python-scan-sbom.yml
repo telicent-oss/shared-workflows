@@ -38,6 +38,9 @@ jobs:
           scan-name: ${{ inputs.SCAN_NAME }}
           scan-ref: ${{ inputs.SBOM_FILE }}
           allow-unfixed: ${{ inputs.SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE }}
+          remote-vex: |
+            telicent-oss/telicent-base-images
+            ${{ inputs.REMOTE_VEX }}
 
       - name: Grype Vulnerability Scan
         id: grype-scan
@@ -47,3 +50,6 @@ jobs:
           scan-name: ${{ inputs.SCAN_NAME }}
           scan-ref: ${{ inputs.SCAN_NAME }}-bom.json
           allow-unfixed: ${{ inputs.SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE }}
+          remote-vex: |
+            telicent-oss/telicent-base-images
+            ${{ inputs.REMOTE_VEX }}
