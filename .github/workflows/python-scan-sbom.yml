@@ -48,7 +48,7 @@ jobs:
         with:
           scan-type: sbom
           scan-name: ${{ inputs.SCAN_NAME }}
-          scan-ref: ${{ inputs.SCAN_NAME }}-bom.json
+          scan-ref: ${{ inputs.SBOM_FILE }}
           allow-unfixed: ${{ inputs.SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE }}
           remote-vex: |
             telicent-oss/telicent-base-images
