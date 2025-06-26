@@ -27,4 +27,4 @@ jobs:
         with:
           tag_name: v${{ inputs.VERSION }}
           files: |
-            ${{ inputs.SBOM_ARTIFACT }}-bom.json
+            *-cyclonedx.sbom.json

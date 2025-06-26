@@ -45,5 +45,5 @@ jobs:
         with:
           scan-type: sbom
           scan-name: ${{ inputs.SCAN_NAME }}
-          scan-ref: ${{ inputs.SCAN_NAME }}-bom.json
-          allow-unfixed: ${{ inputs.SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE }}
+          scan-ref: ${{ inputs.SBOM_FILE }}
+          allow-unfixed: ${{ inputs.SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE }}=
