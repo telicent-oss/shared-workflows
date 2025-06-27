@@ -34,10 +34,10 @@ jobs:
     runs-on: ${{ inputs.OS }}
     steps:
       - name: Install Github (Windows only)
-        if: ${{ inputs.OS =~ 'windows-*' }}
+        if: ${{ contains(inputs.OS, 'windows-') }}
         run: choco install gh
       - run: gh version
-        if: ${{ inputs.OS =~ 'windows-*' }}
+        if: ${{ contains(inputs.OS, 'windows-') }}
 
       - uses: actions/checkout@v4.2.2
 
