@@ -25,7 +25,7 @@ on:
       TEST_WINDOWS:
         required: false
         type: boolean
-        description: Deprecarted - please specify OS as part of the matrix
+        description: DEPRECATED - please specify OS as part of the matrix
         default: false
   workflow_dispatch:
 
@@ -34,10 +34,10 @@ jobs:
     runs-on: ${{ inputs.OS }}
     steps:
       - name: Install Github (Windows only)
-        if: ${{ inputs.OS == 'windows-latest' }}
+        if: ${{ inputs.OS =~ 'windows-*' }}
         run: choco install gh
       - run: gh version
-        if: ${{ inputs.OS == 'windows-latest' }}
+        if: ${{ inputs.OS =~ 'windows-*' }}
 
       - uses: actions/checkout@v4.2.2
 
