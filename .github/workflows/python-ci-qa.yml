@@ -31,6 +31,8 @@ on:
 
 jobs:
   test_and_build:
+    permissions:
+      contents: read
     runs-on: ${{ inputs.OS }}
     steps:
       - name: Install Github (Windows only)
