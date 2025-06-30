@@ -7,28 +7,46 @@ on:
         required: true
         type: string
         description: The python version to test and build against
-      TEST_COMMAND:
+      OS:
         required: false
         type: string
-        description: The command to run for tests
-        default: "python -m unittest discover --verbose"
+        description: OS to test on
+        default: ubuntu-latest
       SKIP_BUILD:
         required: false
         type: boolean
         description: Whether to skip the build test (i.e. for non-libraries)
         default: false
-      TEST_WINDOWS:
+      TEST_COMMAND:
         required: false
-        type: boolean
-        description: Whether to test on a Windows runner as well
-        default: false
+        type: string
+        description: The command to run for tests
+        default: "python -m unittest discover --verbose"
+
+        # This parameter has been deprecated in favour of allowing OS tp be passed in.
+        # By accepting an OS input, OS choices can be set through a matrix.
+        # This comment will be removed entirely in the future.
+#      TEST_WINDOWS:
+#        required: false
+#        type: boolean
+#        description: DEPRECATED - please specify OS as part of the matrix
+#        default: false
   workflow_dispatch:
 
 jobs:
   test_and_build:
-    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    runs-on: ${{ inputs.OS }}
     steps:
+      - name: Install Github (Windows only)
+        if: ${{ contains(inputs.OS, 'windows-') }}
+        run: choco install gh
+      - run: gh version
+        if: ${{ contains(inputs.OS, 'windows-') }}
+
       - uses: actions/checkout@v4.2.2
+
       - name: Set up Python ${{ inputs.PYTHON_VERSION }}
         uses: actions/setup-python@v5.6.0
         with:
@@ -49,37 +67,6 @@ jobs:
 
       - name: ruff Python Style Checking
         run:  python -m ruff check --output-format=github .
-
-      - name: Unit Tests
-        run: ${{ inputs.test_command }}
-
-      - name: Build
-        if: ${{ inputs.SKIP_BUILD == false }}
-        run: python -m build
-
-  test_and_build_windows:
-    runs-on: windows-latest
-    if: ${{ inputs.TEST_WINDOWS == true }}
-    steps:
-      - run: choco install gh
-      - run: gh version
-
-      - uses: actions/checkout@v4.2.2
-
-      - name: Set up Python ${{ inputs.PYTHON_VERSION }}
-        uses: actions/setup-python@v5.6.0
-        with:
-          python-version: ${{ inputs.PYTHON_VERSION }}
-
-      - name: Prepare pip and and pip-tools
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install pip-tools
-
-      - name: Generate requirements
-        run: |
-          python -m piptools compile --all-extras -o requirements.txt pyproject.toml
-          pip install -r requirements.txt
 
       - name: Unit Tests
         run: ${{ inputs.test_command }}
