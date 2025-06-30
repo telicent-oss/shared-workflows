@@ -22,11 +22,15 @@ on:
         type: string
         description: The command to run for tests
         default: "python -m unittest discover --verbose"
-      TEST_WINDOWS:
-        required: false
-        type: boolean
-        description: DEPRECATED - please specify OS as part of the matrix
-        default: false
+
+        # This parameter has been deprecated in favour of allowing OS tp be passed in.
+        # By accepting an OS input, OS choices can be set through a matrix.
+        # This comment will be removed entirely in the future.
+#      TEST_WINDOWS:
+#        required: false
+#        type: boolean
+#        description: DEPRECATED - please specify OS as part of the matrix
+#        default: false
   workflow_dispatch:
 
 jobs:
