@@ -99,7 +99,7 @@ jobs:
 
       - name: Rename SBOM for inclusion in image build
         run: |
-          mv ${{ needs.generate-and-scan-application-sbom.outputs.artifact-name }}-bom.json sbom.json
+          mv ${{ needs.generate-and-scan-application-sbom.outputs.artifact-name }}-cyclonedx.sbom.json sbom.json
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3.6.0
@@ -121,7 +121,7 @@ jobs:
       - name: Load buildkit state from cache
         uses: dashevo/gh-action-cache-buildkit-state@v1.0.3
         with:
-          builder: buildx_buildkit_${{ steps.buildx.outputs.name }}0
+          builder: buildx_buildkit_${{ steps.buildx.outputs.name }}
           cache-path: /tmp/buildkit-cache
           cache-max-size: 3g
 

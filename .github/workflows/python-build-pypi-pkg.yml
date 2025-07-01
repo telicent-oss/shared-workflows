@@ -47,7 +47,7 @@ jobs:
 
     - name: Place SBOM in pkg
       run: |
-        mv ${{ needs.generate-and-scan-application-sbom.outputs.artifact-name }}-bom.json ${{ inputs.PACKAGE }}/sbom.json
+        mv ${{ needs.generate-and-scan-application-sbom.outputs.artifact-name }}-cyclonedx.sbom.json ${{ inputs.PACKAGE }}/sbom.json
 
     - name: Build a binary wheel and a source tarball
       run: python3 -m build
