@@ -54,7 +54,7 @@ on:
       MAVEN_REPOSITORY_ID:
         required: false
         type: string
-        default: sonatype-oss
+        default: central
         description: |
           Specifies the ID of the repository to which `SNAPSHOT`s and Releases are published, this **MUST** match 
           the ID of a repository defined in the `pom.xml` for the project in order for credentials to be correctly 
