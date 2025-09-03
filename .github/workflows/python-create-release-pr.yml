@@ -15,6 +15,10 @@ on:
         default: true
         required: false
         type: boolean
+      VERSION_FILE:
+        default: pyproject.toml
+        required: false
+        type: string
 
 jobs:
   create-release-pr:
@@ -27,8 +31,8 @@ jobs:
           prerelease: ${{ inputs.PRE_RELEASE }}
           default-branch: ${{ inputs.DEFAULT_BRANCH }}
           extra-files: |
-            "pyproject.toml"
-          version-file: pyproject.toml
+            ${{ inputs.VERSION_FILE }}
+          version-file: ${{ inputs.VERSION_FILE }}
           changelog-types: '[
           {"type":"feat","section":"Features","hidden":false},
           {"type":"fix","section":"Bug Fixes","hidden":false},
