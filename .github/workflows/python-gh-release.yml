@@ -18,7 +18,7 @@ on:
 
 jobs:
   do-release:
-    uses: telicent-oss/shared-workflows/.github/workflows/python-create-release-pr.yml@tpt-396-rust-builds
+    uses: telicent-oss/shared-workflows/.github/workflows/python-create-release-pr.yml@main
     with:
       SKIP_GITHUB_RELEASE: false
       VERSION_FILE: ${{ inputs.VERSION_FILE }}
