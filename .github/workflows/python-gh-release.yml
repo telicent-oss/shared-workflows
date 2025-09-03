@@ -11,6 +11,10 @@ on:
         default: pyproject.toml
         required: false
         type: string
+      RELEASE_TYPE:
+        default: python
+        required: false
+        type: string
 
 jobs:
   do-release:
@@ -18,3 +22,4 @@ jobs:
     with:
       SKIP_GITHUB_RELEASE: false
       VERSION_FILE: ${{ inputs.VERSION_FILE }}
+      RELEASE_TYPE: ${{ inputs.RELEASE_TYPE }}
