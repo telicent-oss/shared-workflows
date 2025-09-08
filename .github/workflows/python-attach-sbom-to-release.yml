@@ -23,7 +23,7 @@ jobs:
           name: ${{ inputs.SBOM_ARTIFACT }}
 
       - name: Attach files to release
-        uses: softprops/action-gh-release@v2.2.2
+        uses: softprops/action-gh-release@v2.3.3
         with:
           tag_name: v${{ inputs.VERSION }}
           files: |
