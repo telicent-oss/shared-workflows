@@ -15,6 +15,14 @@ on:
         default: true
         required: false
         type: boolean
+      VERSION_FILE:
+        default: pyproject.toml
+        required: false
+        type: string
+      RELEASE_TYPE:
+        default: python
+        required: false
+        type: string
 
 jobs:
   create-release-pr:
@@ -22,13 +30,13 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v3
         with:
-          release-type: python
+          release-type: ${{ inputs.RELEASE_TYPE }}
           package-name: release-please-action
           prerelease: ${{ inputs.PRE_RELEASE }}
           default-branch: ${{ inputs.DEFAULT_BRANCH }}
           extra-files: |
-            "pyproject.toml"
-          version-file: pyproject.toml
+            ${{ inputs.VERSION_FILE }}
+          version-file: ${{ inputs.VERSION_FILE }}
           changelog-types: '[
           {"type":"feat","section":"Features","hidden":false},
           {"type":"fix","section":"Bug Fixes","hidden":false},

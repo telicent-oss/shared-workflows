@@ -7,9 +7,19 @@ on:
         required: false
         type: string
         description: The version being released
+      VERSION_FILE:
+        default: pyproject.toml
+        required: false
+        type: string
+      RELEASE_TYPE:
+        default: python
+        required: false
+        type: string
 
 jobs:
   do-release:
     uses: telicent-oss/shared-workflows/.github/workflows/python-create-release-pr.yml@main
     with:
       SKIP_GITHUB_RELEASE: false
+      VERSION_FILE: ${{ inputs.VERSION_FILE }}
+      RELEASE_TYPE: ${{ inputs.RELEASE_TYPE }}
