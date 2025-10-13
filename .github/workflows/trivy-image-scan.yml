@@ -97,14 +97,14 @@ jobs:
 
       - name: Release SBOM for image (IF has tags for release)
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2.2.2
+        uses: softprops/action-gh-release@v2.4.1
         with:
           files: |
             ${{ runner.temp }}/${{ steps.trivy-scan.outputs.sbom-file }}
 
       - name: Release report on docker sbom (IF has tags for release)
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2.2.2
+        uses: softprops/action-gh-release@v2.4.1
         with:
           files: |
             ${{ steps.trivy-scan.outputs.scan-results-file }}
