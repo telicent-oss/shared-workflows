@@ -50,7 +50,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v5.0.0
 
       - name: Maybe setup custom Grype config
         if: ${{ inputs.PATH_TO_GRYPE_CONFIG_ONLY_FOR_BUILD_IMAGE != '' }}

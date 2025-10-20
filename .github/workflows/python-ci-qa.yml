@@ -45,7 +45,7 @@ jobs:
       - run: gh version
         if: ${{ contains(inputs.OS, 'windows-') }}
 
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@v5.0.0
 
       - name: Set up Python ${{ inputs.PYTHON_VERSION }}
         uses: actions/setup-python@v5.6.0
