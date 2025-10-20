@@ -41,7 +41,7 @@ jobs:
         --user
 
     - name: Download SBOM
-      uses: actions/download-artifact@v4.1.8
+      uses: actions/download-artifact@v5
       with:
         name: ${{ needs.generate-and-scan-application-sbom.outputs.artifact-name }}
 
