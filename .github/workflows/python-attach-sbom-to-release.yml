@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download SBOM
-        uses: actions/download-artifact@v4.1.8
+        uses: actions/download-artifact@v5
         with:
           name: ${{ inputs.SBOM_ARTIFACT }}
 
