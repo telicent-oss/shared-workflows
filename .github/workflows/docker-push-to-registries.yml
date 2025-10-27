@@ -161,7 +161,7 @@ jobs:
           mvn verify --batch-mode -DskipTests -Dgpg.skip=true
 
       - name: Get SBOM from artifact
-        uses: actions/download-artifact@v4.1.8
+        uses: actions/download-artifact@v6
         if: ${{ inputs.DOWNLOAD_SBOM }}
         continue-on-error: true
         with:
@@ -169,7 +169,7 @@ jobs:
           path: ${{ inputs.PATH }}
 
       - name: Download build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         if: ${{ inputs.BUILD_ARTIFACT }}
         with:
           name: ${{ inputs.BUILD_ARTIFACT }}
