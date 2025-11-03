@@ -54,7 +54,6 @@ jobs:
 
       - name: Prepare pip and and pip-tools
         run: |
-#         Keep below 25.3 due to known issue with pip
           python -m pip install --upgrade pip<25.3
           python -m pip install pip-tools
 
