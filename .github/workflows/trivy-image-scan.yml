@@ -68,7 +68,7 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Download image artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         if: ${{ inputs.IMAGE_FROM_ARTIFACT }}
         with:
           name: ${{ inputs.SCAN_NAME }}.tar
