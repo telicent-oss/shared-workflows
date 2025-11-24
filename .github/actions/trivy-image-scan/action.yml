@@ -37,7 +37,7 @@ runs:
   steps:
 
     - name: Validate registry inputs
-      uses: telicent-io/telicent-test/.github/actions/validate-registry-inputs@main
+      uses: telicent-oss/shared-workflows/.github/actions/validate-registry-inputs@main
       with:
         registry: "${{ inputs.registry }}"
         quay-username: "${{ inputs.quay-username }}"
