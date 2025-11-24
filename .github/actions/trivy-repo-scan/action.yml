@@ -12,10 +12,10 @@ inputs:
     description: Whether to apply the --frozen-lockfile argument to the 'yarn install' command.
     default: 'true'
   node-version:
-    required: true
+    required: false
     description: The node version to install.
   font-awesome-key:
-    required: true
+    required: false
     description: NPM Font Awesome token.
   package-pat:
     required: true
@@ -49,8 +49,6 @@ runs:
       with:
         node-version: ${{ inputs.node-version }}
         frozen-lockfile: ${{ inputs.frozen-lockfile }}
-        font-awesome-key: ${{ inputs.font-awesome-key }}
-        package-pat: ${{ inputs.package-pat }}
     - name: Add CycloneDX tool
       run: yarn global add @cyclonedx/cyclonedx-npm
       shell: bash
