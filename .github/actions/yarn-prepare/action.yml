@@ -29,13 +29,17 @@ inputs:
     required: false
     description: Whether to output a sanity check to displayed Node/NPM configuration.
     default: 'false'
+  create-yarnrc:
+    required: false
+    description: Whether to create the .yarnrc file before installing dependencies.
+    default: 'true'
 
   # Secrets
   font-awesome-key:
-    required: true
+    required: false
     description: NPM Font Awesome token.
   package-pat:
-    required: true
+    required: false
     description: NPM package feed token.
 
 runs:
@@ -62,6 +66,7 @@ runs:
           ${{ steps.prepare.outputs.yarn-cache-dir }}
         key: ${{ runner.os }}-node_modules-${{ hashFiles('**/yarn.lock') }}-${{ steps.prepare.outputs.node-version }}
     - name: Create .yarnrc file
+      if: ${{ inputs.create-yarnrc == 'true' }}
       run: ${{ github.action_path }}/create-yarnrc-file.sh
       shell: bash
       env:
