@@ -1,0 +1,35 @@
+name: Scan Dockerfile with Trivy
+description: Scan a Dockerfile for misconfigurations using Trivy
+
+# Requires permissions -
+# - contents: read
+
+inputs:
+  dockerfile:
+    required: true
+    description: |
+      Specifies the full path to the Dockerfile within the repository.
+  github-token:
+    required: true
+    description: GitHub token to allow the action to interact with the repository.
+  scan-name:
+    required: true
+    description: |
+      A developer friendly name for the image to differentiate scan reports where a repository is
+      building multiple images.
+
+runs:
+  using: composite
+  steps:
+
+    - name: Checkout
+      uses: actions/checkout@v5
+
+    - name: Trivy Misconfiguration Scanning
+      id: trivy-scan
+      uses: telicent-oss/trivy-action@v1
+      with:
+        gh-token: ${{ inputs.github-token }}
+        scan-type: config
+        scan-ref: ${{ inputs.dockerfile }}
+        scan-name: docker-misconfiguration-${{ inputs.scan-name }}

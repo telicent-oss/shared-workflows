@@ -1,0 +1,25 @@
+name: Validate Registry Inputs
+description: Ensure the registry type and supporting inputs are valid
+author: Telicent
+
+inputs:
+  registry:
+    required: true
+    description: The container registry to push the image to. Supported values are 'aws' (Amazon ECR) or 'quay' (Quay.io).
+  quay-username:
+    required: false
+    description: Quay username.
+  quay-token:
+    required: false
+    description: Quay token.
+
+runs:
+  using: composite
+  steps:
+    - name: Validate registry inputs
+      run: ${{ github.action_path }}/validate-registry-inputs.sh
+      shell: bash
+      env:
+        REGISTRY: "${{ inputs.registry }}"
+        QUAY_USERNAME: "${{ inputs.quay-username }}"
+        QUAY_TOKEN: "${{ inputs.quay-token }}"

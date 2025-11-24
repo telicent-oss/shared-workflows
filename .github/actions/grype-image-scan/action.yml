@@ -1,0 +1,95 @@
+name: Scan Container Image with Grype
+description: Scan a container image for vulnerabilities using Grype
+author: Telicent
+
+# Requires permissions -
+# - contents: read
+# - id-token: write
+
+inputs:
+  # Scan options
+  image-ref:
+    required: true
+    description: |
+      Specifies the full image reference (repository, name and tag) for an image you wish to scan.
+  scan-name:
+    required: true
+    description: |
+      A developer friendly name for the image to differentiate scan reports where a repository is
+      building multiple images.
+  fail-on-unfixed:
+    required: false
+    default: 'false'
+    description: Sets --only-fixed flag
+  remote-vex:
+    required: false
+    description: |
+      Supplies references to one/more repositories from which additional VEX statements should be obtained and used
+      to filter out vulnerabilities that have been assessed as to not apply to our software products.
+      Note that telicent-oss/telicent-base-images is always included by default so this is only needed if the image
+      being built relies on other images/libraries for which VEX statements are required.
+  gh-token:
+    required: false
+    default: ${{ github.token }}
+    description: |
+      A GitHub Token needed to determine the current grype database version for caching.
+
+  # Container registry options
+  registry:
+    required: true
+    description: The container registry to push the image to. Supported values are 'aws' (Amazon ECR) or 'quay' (Quay.io).
+  quay-username:
+    required: false
+    description: Quay username.
+  quay-token:
+    required: false
+    description: Quay token.
+
+runs:
+  using: composite
+  steps:
+
+    - name: Validate registry inputs
+      uses: telicent-io/telicent-test/.github/actions/validate-registry-inputs@main
+      with:
+        registry: "${{ inputs.registry }}"
+        quay-username: "${{ inputs.quay-username }}"
+        quay-token: "${{ inputs.quay-token }}"
+
+    - name: Checkout
+      uses: actions/checkout@v5
+
+    - name: Configure AWS credentials from main account
+      if: ${{ inputs.registry == 'aws' }}
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::098669589541:role/GitHubDeploymentRole
+        aws-region: eu-west-2
+        mask-aws-account-id: false
+
+    - name: Login to Amazon ECR
+      if: ${{ inputs.registry == 'aws' }}
+      uses: aws-actions/amazon-ecr-login@v1
+      with:
+        mask-password: true
+
+    - name: Docker Login to Quay
+      if: ${{ inputs.registry == 'quay' }}
+      uses: docker/login-action@v2
+      with:
+        registry: quay.io
+        username: ${{ inputs.quay-username }}
+        password: ${{ inputs.quay-token }}
+
+    - name: Grype Vulnerability Scanning
+      id: grype-scan
+      uses: telicent-oss/grype-action@v1
+      with:
+        gh-token: ${{ inputs.gh-token }}
+        scan-type: image
+        scan-name: ${{ inputs.scan-name }}
+        scan-ref: ${{ inputs.image-ref }}
+        allow-unfixed: ${{ inputs.fail-on-unfixed }}
+        remote-vex: |
+          telicent-oss/telicent-base-images
+          ${{ inputs.remote-vex }}
