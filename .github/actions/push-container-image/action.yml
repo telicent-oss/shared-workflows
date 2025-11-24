@@ -145,7 +145,7 @@ runs:
   steps:
 
     - name: Validate registry inputs
-      uses: telicent-io/telicent-test/.github/actions/validate-registry-inputs@main
+      uses: telicent-oss/shared-workflows/.github/actions/validate-registry-inputs@main
       with:
         registry: "${{ inputs.registry }}"
         quay-username: "${{ inputs.quay-username }}"
@@ -297,7 +297,7 @@ runs:
 
     - name: Trivy dockerfile scan
       if: ${{ inputs.trivy-scan-dockerfile == 'true' }}
-      uses: Telicent-io/telicent-test/.github/actions/trivy-dockerfile-scan@main
+      uses: telicent-oss/shared-workflows/.github/actions/trivy-dockerfile-scan@main
       with:
         dockerfile: ${{ inputs.path }}/${{ inputs.dockerfile }}
         github-token: ${{ inputs.github-token }}
@@ -305,7 +305,7 @@ runs:
 
     - name: Trivy image scan
       if: ${{ inputs.trivy-scan-image == 'true' }}
-      uses: telicent-io/telicent-test/.github/actions/trivy-image-scan@main
+      uses: telicent-oss/shared-workflows/.github/actions/trivy-image-scan@main
       with:
         image-ref: ${{ steps.capture-tags.outputs.image }}
         registry: ${{ inputs.registry }}
@@ -316,7 +316,7 @@ runs:
 
     - name: Grype image scan
       if: ${{ inputs.grype-scan-image == 'true' }}
-      uses: telicent-io/telicent-test/.github/actions/grype-image-scan@main
+      uses: telicent-oss/shared-workflows/.github/actions/grype-image-scan@main
       with:
         image-ref: ${{ steps.capture-tags.outputs.image }}
         registry: ${{ inputs.registry }}
@@ -328,7 +328,7 @@ runs:
 
     - name: Notify MS Teams
       if: always()
-      uses: Telicent-io/telicent-test/.github/actions/notify-teams@main
+      uses: telicent-oss/shared-workflows/.github/actions/notify-teams@main
       with:
         app-name: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-${{ inputs.dockerfile }}
         version: ${{ inputs.version }}${{ inputs.version-suffix }}
