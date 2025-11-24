@@ -1,0 +1,103 @@
+name: Trivy SBOM Scan
+description: Generate a SBOM for a Node.js project, then scan it for vulnerabilities using Trivy
+author: Telicent
+
+inputs:
+  app-name:
+    required: true
+    description: The Name of the app being checked
+    default: test
+  frozen-lockfile:
+    required: false
+    description: Whether to apply the --frozen-lockfile argument to the 'yarn install' command.
+    default: 'true'
+  node-version:
+    required: true
+    description: The node version to install.
+  font-awesome-key:
+    required: true
+    description: NPM Font Awesome token.
+  package-pat:
+    required: true
+    description: NPM package feed token.
+  trivy-ignores:
+    required: false
+    description: comma-separated list of relative paths to .trivyignore files
+  package-directory:
+    required: false
+    description: The package directory to run the scan in
+    default: .
+        
+runs:
+  using: composite
+  steps:
+
+    # Set some globals, as environment variables are not allowed in composite actions.
+    - name: Set globals
+      id: globals
+      run: ${{ github.action_path }}/globals.sh
+      shell: bash
+      env:
+        BOM_FILE_NAME: "${{ inputs.app-name }}${{ inputs.package-directory != '.' && format('-{0}', inputs.package-directory) || '' }}.sbom.json"
+        BOM_ARTIFACT_NAME: "${{ github.run_number }}${{ inputs.package-directory != '.' && format('-{0}', inputs.package-directory) || '' }}.sbom.json"
+
+    # Generate the SBOM
+    - name: Checkout repository
+      uses: actions/checkout@v5
+    - name: Prepare Yarn
+      uses: telicent-io/telicent-test/.github/actions/yarn-prepare@main
+      with:
+        node-version: ${{ inputs.node-version }}
+        frozen-lockfile: ${{ inputs.frozen-lockfile }}
+        font-awesome-key: ${{ inputs.font-awesome-key }}
+        package-pat: ${{ inputs.package-pat }}
+    - name: Add CycloneDX tool
+      run: yarn global add @cyclonedx/cyclonedx-npm
+      shell: bash
+    # RE: --ignore-npm-errors below: See https://github.com/CycloneDX/cyclonedx-node-npm/issues/810#issuecomment-1594252293
+    - name: Generate SBOM
+      run: cyclonedx-npm --ignore-npm-errors --output-file ${{ steps.globals.outputs.bom-file-name }}
+      shell: bash
+    - name: Upload SBOM artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ steps.globals.outputs.bom-artifact-name }}
+        path: ${{ steps.globals.outputs.bom-file-name }}
+
+    - name: Scan SBOM (ALL), format as JSON
+      uses: aquasecurity/trivy-action@master
+      with:
+        exit-code: "0" # Never fail job
+        scan-type: "sbom"
+        scan-ref: ${{ steps.globals.outputs.bom-file-name }} # Need; See /aquasecurity/trivy-action/pull/314
+        output: trivy-sbom-vuln-report.json
+        format: json
+        trivyignores: ${{ inputs.trivy-ignores }}
+    - name: Output HIGH,CRITICAL vulnerability report
+      run: cat trivy-sbom-vuln-report.json
+      shell: bash
+    - name: Attach SBOM to release
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: ${{ steps.globals.outputs.bom-file-name }}
+    - name: Attach trivy-sbom-vuln-report.txt to release
+      uses: softprops/action-gh-release@v2
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: trivy-sbom-vuln-report.txt
+
+    - name: Test SBOM (HIGH,CRITICAL)
+      uses: aquasecurity/trivy-action@master
+      with:
+        exit-code: "1"
+        scan-type: "sbom"
+        scan-ref: ${{ steps.globals.outputs.bom-file-name }}
+        format: "table"
+        output: trivy-sbom-HIGH-CRITICAL-vuln-report.txt
+        trivyignores: ${{ inputs.trivy-ignores }}
+        severity: "HIGH,CRITICAL"
+        ignore-unfixed: true
+        # Trivy has already been set up in the previous step, so skip setup here.
+        # https://github.com/aquasecurity/trivy-action?tab=readme-ov-file#skipping-setup-when-calling-trivy-action-multiple-times
+        skip-setup-trivy: true

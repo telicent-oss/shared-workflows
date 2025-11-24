@@ -1,0 +1,81 @@
+name: Prepare a Runner For Yarn Tests or Build
+description: Setup node, create the .yarnrc file, and install dependencies
+author: Telicent
+
+# Requires permissions -
+# - contents: read
+# - id-token: write
+
+inputs:
+  node-version:
+    required: true
+    description: The node version to install.
+  frozen-lockfile:
+    required: false
+    description: Whether to apply the --frozen-lockfile argument to the 'yarn install' command.
+    default: 'true'
+  network-concurrency:
+    required: false
+    description: The network concurrency to apply to the 'yarn install' command.
+    default: '1'
+  verbose:
+    required: false
+    description: Whether to output verbose logs for the 'yarn install' command.
+    default: 'false'
+  additional-args:
+    required: false
+    description: Additional arguments to apply to the 'yarn install' command.
+  sanity-check:
+    required: false
+    description: Whether to output a sanity check to displayed Node/NPM configuration.
+    default: 'false'
+
+  # Secrets
+  font-awesome-key:
+    required: true
+    description: NPM Font Awesome token.
+  package-pat:
+    required: true
+    description: NPM package feed token.
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+    - name: Setup node
+      uses: actions/setup-node@v6
+      with: 
+        node-version: ${{ inputs.node-version }}
+    - name: Prepare cache
+      id: prepare
+      run: |
+        echo "node-version=$(node -v)" >> $GITHUB_OUTPUT
+        echo "yarn-cache-dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+      shell: bash
+    - name: Cache node_modules
+      id: node_modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          **/node_modules
+          ${{ steps.prepare.outputs.yarn-cache-dir }}
+        key: ${{ runner.os }}-node_modules-${{ hashFiles('**/yarn.lock') }}-${{ steps.prepare.outputs.node-version }}
+    - name: Create .yarnrc file
+      run: ${{ github.action_path }}/create-yarnrc-file.sh
+      shell: bash
+      env:
+        FONT_AWESOME_KEY: ${{ inputs.font-awesome-key }}
+        PACKAGE_PAT: ${{ inputs.package-pat }}
+    - name: Sanity check registries/proxy (no secrets)
+      if: ${{ inputs.sanity-check == 'true' }}
+      run: ${{ github.action_path }}/sanity-check.sh
+      shell: bash
+    - name: Install dependencies
+      run: ${{ github.action_path }}/install-dependencies.sh
+      shell: bash
+      env:
+        FROZEN_LOCKFILE: ${{ inputs.frozen-lockfile == 'true' && '--frozen-lockfile' || '' }}
+        NETWORK_CONCURRENCY: ${{ inputs.network-concurrency != '' && format('--network-concurrency {0}', inputs.network-concurrency) || '' }}
+        VERBOSE: ${{ inputs.verbose == 'true' && '--verbose' || '' }}
+        ADDITIONAL_ARGS: ${{ inputs.additional-args == 'true' && inputs.additional-args || '' }}
