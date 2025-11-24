@@ -126,15 +126,6 @@ inputs:
       to filter out vulnerabilities that have been assessed as to not apply to our software products.
       Note that telicent-oss/telicent-base-images is always included by default so this is only needed if the image
       being built relies on other images/libraries for which VEX statements are required.
-
-
-  # Build secrets
-  font-awesome-key:
-    required: true
-    description: NPM Font Awesome token.
-  package-pat:
-    required: true
-    description: NPM package feed token.
 outputs:
   image:
     description: The versioned container image tag that was created and published.
@@ -278,9 +269,6 @@ runs:
         file: ${{ inputs.path }}/${{ inputs.dockerfile }}
         tags: ${{ steps.meta.outputs.tags }}
         target: ${{ inputs.target }}
-        secrets: |
-          npmTokenId=${{ inputs.package-pat }}
-          fontAwesomeTokenId=${{ inputs.font-awesome-key }}
         build-args: |
           ${{ inputs.build-args }}
 
