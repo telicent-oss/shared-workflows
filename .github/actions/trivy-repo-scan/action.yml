@@ -33,6 +33,9 @@ inputs:
     required: false
     description: The package directory to run the scan in
     default: .
+  github-token:
+    required: true
+    description: GitHub token to allow the action to interact with the repository.
         
 runs:
   using: composite

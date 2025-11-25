@@ -351,6 +351,7 @@ runs:
       if: ${{ inputs.trivy-scan-image == 'true' && github.actor != 'dependabot[bot]' }}
       uses: telicent-oss/shared-workflows/.github/actions/trivy-image-scan@TELDEVOPS-880-update-actions-for-oss
       with:
+        github-token: ${{ inputs.github-token }}
         image-ref: ${{ steps.capture-tags.outputs.image }}
         registry: ${{ inputs.registry }}
         quay-username: ${{ inputs.quay-username }}
@@ -365,6 +366,7 @@ runs:
       if: ${{ inputs.grype-scan-image == 'true' && github.actor != 'dependabot[bot]' }}
       uses: telicent-oss/shared-workflows/.github/actions/grype-image-scan@TELDEVOPS-880-update-actions-for-oss
       with:
+        github-token: ${{ inputs.github-token }}
         image-ref: ${{ steps.capture-tags.outputs.image }}
         registry: ${{ inputs.registry }}
         quay-username: ${{ inputs.quay-username }}

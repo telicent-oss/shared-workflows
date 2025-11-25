@@ -32,7 +32,7 @@ inputs:
       to filter out vulnerabilities that have been assessed as to not apply to our software products.
       Note that telicent-oss/telicent-base-images is always included by default so this is only needed if the image
       being built relies on other images/libraries for which VEX statements are required.
-  gh-token:
+  github-token:
     required: false
     default: ${{ github.token }}
     description: |
@@ -101,7 +101,7 @@ runs:
       id: grype-scan
       uses: telicent-oss/grype-action@v1
       with:
-        gh-token: ${{ inputs.gh-token }}
+        gh-token: ${{ inputs.github-token }}
         scan-type: image
         scan-name: ${{ inputs.scan-name }}
         scan-ref: ${{ inputs.image-ref }}
