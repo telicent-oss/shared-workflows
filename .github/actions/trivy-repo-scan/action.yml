@@ -21,7 +21,7 @@ inputs:
     required: false
     description: NPM package feed token.
   trivy-ignores:
-    required: true
+    required: false
     description: Only allowed for BUILD image, MUST NOT be used with DEPLOY image. Full relative path to trivy ignore file.
   uses-java:
     required: false

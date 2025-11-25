@@ -22,7 +22,7 @@ inputs:
       A developer friendly name for the image to differentiate scan reports where a repository is
       building multiple images.
   trivy-ignores:
-    required: true
+    required: false
     description: Only allowed for BUILD image, MUST NOT be used with DEPLOY image. Full relative path to trivy ignore file.
   fail-on-unfixed:
     required: false
