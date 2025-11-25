@@ -12,6 +12,10 @@ inputs:
     required: true
     description: |
       Specifies the full image reference (repository, name and tag) for an image you wish to scan.
+  image-from-artefact:
+    required: false
+    default: 'false'
+    description: Whether to scan an image artefact (e.g. a tar file), rather than an image in a remote repository.
   scan-name:
     required: true
     description: |
@@ -80,6 +84,18 @@ runs:
         registry: quay.io
         username: ${{ inputs.quay-username }}
         password: ${{ inputs.quay-token }}
+
+    - name: Download image artifact
+      uses: actions/download-artifact@v4
+      if: ${{ inputs.image-from-artefact }}
+      with:
+        name: ${{ inputs.scan-name }}.tar
+        path: .
+
+    - name: Load docker image for dry run scans
+      if: ${{ inputs.image-from-artefact }}
+      run: docker load --input ${{ inputs.scan-name }}.tar
+      shell: bash
 
     - name: Grype Vulnerability Scanning
       id: grype-scan

@@ -24,6 +24,10 @@ inputs:
   trivy-ignores:
     required: true
     description: Only allowed for BUILD image, MUST NOT be used with DEPLOY image. Full relative path to trivy ignore file.
+  fail-on-unfixed:
+    required: false
+    default: "false"
+    description: Whether to fail the scan if unfixed vulnerabilities are found.
   remote-vex:
     required: false
     description: |
@@ -32,10 +36,6 @@ inputs:
 
       Note that telicent-oss/telicent-base-images is always included by default so this is only needed if the image
       being built relies on other images/libraries for which VEX statements are required.
-  fail-on-unfixed:
-    required: false
-    default: "false"
-    description: Whether to fail the scan if unfixed vulnerabilities are found.
   uses-java:
     required: false
     default: "false"
@@ -95,14 +95,14 @@ runs:
 
     - name: Download image artifact
       uses: actions/download-artifact@v4
-      if: ${{ inputs.IMAGE_FROM_ARTIFACT }}
+      if: ${{ inputs.image-from-artefact }}
       with:
-        name: ${{ inputs.SCAN_NAME }}.tar
+        name: ${{ inputs.scan-name }}.tar
         path: .
 
     - name: Load docker image for dry run scans
-      if: ${{ inputs.IMAGE_FROM_ARTIFACT }}
-      run: docker load --input ${{ inputs.SCAN_NAME }}.tar
+      if: ${{ inputs.image-from-artefact }}
+      run: docker load --input ${{ inputs.scan-name }}.tar
       shell: bash
 
     - name: Trivy vulnerability scan
