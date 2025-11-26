@@ -80,7 +80,7 @@ runs:
         mask-aws-account-id: false
 
     - name: Login to Amazon ECR
-      if: ${{ inputs.registry == 'aws' }}
+      if: ${{ inputs.registry == 'aws' && inputs.image-from-artefact == 'false' }}
       uses: aws-actions/amazon-ecr-login@v1
       with:
         mask-password: true
@@ -95,13 +95,13 @@ runs:
 
     - name: Download image artifact
       uses: actions/download-artifact@v4
-      if: ${{ inputs.image-from-artefact }}
+      if: ${{ inputs.image-from-artefact == 'true' }}
       with:
         name: ${{ inputs.scan-name }}.tar
         path: .
 
     - name: Load docker image for dry run scans
-      if: ${{ inputs.image-from-artefact }}
+      if: ${{ inputs.image-from-artefact == 'true' }}
       run: docker load --input ${{ inputs.scan-name }}.tar
       shell: bash
 
