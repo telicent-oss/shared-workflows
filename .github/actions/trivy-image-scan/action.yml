@@ -116,7 +116,7 @@ runs:
         scan-name: docker-${{ inputs.scan-name }}
         scan-ref: ${{ inputs.image-ref }}
         uses-java: ${{ inputs.uses-java }}
-        allow-unfixed: ${{ inputs.fail-on-unfixed = 'false' }}
+        allow-unfixed: ${{ inputs.fail-on-unfixed == 'false' }}
         remote-vex: |
           telicent-oss/telicent-base-images
           ${{ inputs.remote-vex }}
