@@ -294,7 +294,7 @@ runs:
           ${{ inputs.build-args }}
 
     - name: Build container image tarball (dry run)
-      id: build-images
+      id: build-images-dry-run
       uses: docker/build-push-action@v6
       # Build a tarball if dry run is not explicitly set to 'false'.
       if: ${{ inputs.dry_run != 'false' }}
