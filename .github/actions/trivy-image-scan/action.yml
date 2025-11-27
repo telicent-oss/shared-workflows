@@ -12,14 +12,39 @@ inputs:
     required: true
     description: |
       Specifies the full image reference (repository, name and tag) for an image you wish to scan.
+  image-from-artefact:
+    required: false
+    default: 'false'
+    description: Whether to scan an image artefact (e.g. a tar file), rather than an image in a remote repository.
   scan-name:
     required: true
     description: |
       A developer friendly name for the image to differentiate scan reports where a repository is
       building multiple images.
   trivy-ignores:
-    required: true
+    required: false
     description: Only allowed for BUILD image, MUST NOT be used with DEPLOY image. Full relative path to trivy ignore file.
+  fail-on-unfixed:
+    required: false
+    default: "false"
+    description: Whether to fail the scan if unfixed vulnerabilities are found.
+  remote-vex:
+    required: false
+    description: |
+      Supplies references to one/more repositories from which additional VEX statements should be obtained and used
+      to filter out vulnerabilities that have been assessed as to not apply to our software products.
+
+      Note that telicent-oss/telicent-base-images is always included by default so this is only needed if the image
+      being built relies on other images/libraries for which VEX statements are required.
+  uses-java:
+    required: false
+    default: "false"
+    description: |
+      Indicates whether the image includes Java artifacts, we need to know this in order to determine which Trivy
+      vulnerability databases to obtain.
+  github-token:
+    required: true
+    description: GitHub token to allow the action to interact with the repository.
 
   # Container registry options
   registry:
@@ -47,7 +72,7 @@ runs:
       uses: actions/checkout@v5
 
     - name: Configure AWS credentials from main account
-      if: ${{ inputs.registry == 'aws' }}
+      if: ${{ inputs.registry == 'aws' && inputs.image-from-artefact == 'false' }}
       uses: aws-actions/configure-aws-credentials@v4
       with:
         role-to-assume: arn:aws:iam::098669589541:role/GitHubDeploymentRole
@@ -55,66 +80,58 @@ runs:
         mask-aws-account-id: false
 
     - name: Login to Amazon ECR
-      if: ${{ inputs.registry == 'aws' }}
+      if: ${{ inputs.registry == 'aws' && inputs.image-from-artefact == 'false' }}
       uses: aws-actions/amazon-ecr-login@v1
       with:
         mask-password: true
 
     - name: Docker Login to Quay
-      if: ${{ inputs.registry == 'quay' }}
-      uses: docker/login-action@v2
+      if: ${{ inputs.registry == 'quay' && inputs.image-from-artefact == 'false' }}
+      uses: docker/login-action@v3
       with:
         registry: quay.io
         username: ${{ inputs.quay-username }}
         password: ${{ inputs.quay-token }}
 
-    - name: Trivy Vulnerability Scan
-      uses: aquasecurity/trivy-action@master
+    - name: Download image artifact
+      uses: actions/download-artifact@v4
+      if: ${{ inputs.image-from-artefact == 'true' }}
       with:
-        scan-type: "image"
-        image-ref: ${{ inputs.image-ref }}
-        output: trivy-docker-report.json
-        format: json
-        exit-code: 0
-        trivyignores: ${{ inputs.trivy-ignores }}
+        name: ${{ inputs.scan-name }}.tar
+        path: .
 
-    - name: Upload Vulnerability Scan Results
-      uses: actions/upload-artifact@v4
+    - name: Load docker image for dry run scans
+      if: ${{ inputs.image-from-artefact == 'true' }}
+      run: docker load --input ${{ inputs.scan-name }}.tar
+      shell: bash
+
+    - name: Trivy vulnerability scan
+      id: trivy-scan
+      uses: telicent-oss/trivy-action@v1
+      env:
+        TRIVY_IGNOREFILE: ${{ inputs.trivy-ignores }}
       with:
-        name: trivy-docker-report-${{ inputs.scan-name }}
-        path: trivy-docker-report.json
-        retention-days: 30
+        gh-token: ${{ inputs.github-token }}
+        scan-type: image
+        scan-name: docker-${{ inputs.scan-name }}
+        scan-ref: ${{ inputs.image-ref }}
+        uses-java: ${{ inputs.uses-java }}
+        allow-unfixed: ${{ inputs.fail-on-unfixed == 'false' }}
+        remote-vex: |
+          telicent-oss/telicent-base-images
+          ${{ inputs.remote-vex }}
+        output-sbom: ${{ startsWith(github.ref, 'refs/tags/') && 'release' || '' }}
 
-    - name: Generate SBOM for image (IF has tags for release)
+    - name: Release SBOM for image (If has tags for release)
       if: startsWith(github.ref, 'refs/tags/')
-      uses: aquasecurity/trivy-action@0.20.0
-      with:
-        scan-type: 'image'
-        format: 'cyclonedx'
-        output: trivy-image-scan-sbom-${{ inputs.scan-name }}.json
-        image-ref: ${{ inputs.image-ref }}
-
-    - name: Release SBOM for image (IF has tags for release)
-      if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v2.4.1
       with:
         files: |
-          trivy-image-scan-sbom-${{ inputs.scan-name }}.json
+          ${{ runner.temp }}/${{ steps.trivy-scan.outputs.sbom-file }}
 
-    - name: Release report on docker sbom (IF has tags for release)
+    - name: Release report on docker sbom (If has tags for release)
       if: startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v2.4.1
       with:
         files: |
-          trivy-docker-report.json
-
-    - name: Fail Build on High/Critical Vulnerabilities
-      uses: aquasecurity/trivy-action@master
-      with:
-        scan-type: "image"
-        image-ref: ${{ inputs.image-ref }}
-        format: table
-        severity: HIGH,CRITICAL
-        ignore-unfixed: true
-        exit-code: 1
-        trivyignores: ${{ inputs.trivy-ignores }}
+          ${{ steps.trivy-scan.outputs.scan-results-file }}

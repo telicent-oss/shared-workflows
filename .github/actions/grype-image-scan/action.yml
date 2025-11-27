@@ -12,6 +12,10 @@ inputs:
     required: true
     description: |
       Specifies the full image reference (repository, name and tag) for an image you wish to scan.
+  image-from-artefact:
+    required: false
+    default: 'false'
+    description: Whether to scan an image artefact (e.g. a tar file), rather than an image in a remote repository.
   scan-name:
     required: true
     description: |
@@ -28,7 +32,7 @@ inputs:
       to filter out vulnerabilities that have been assessed as to not apply to our software products.
       Note that telicent-oss/telicent-base-images is always included by default so this is only needed if the image
       being built relies on other images/libraries for which VEX statements are required.
-  gh-token:
+  github-token:
     required: false
     default: ${{ github.token }}
     description: |
@@ -81,11 +85,23 @@ runs:
         username: ${{ inputs.quay-username }}
         password: ${{ inputs.quay-token }}
 
+    - name: Download image artifact
+      uses: actions/download-artifact@v4
+      if: ${{ inputs.image-from-artefact }}
+      with:
+        name: ${{ inputs.scan-name }}.tar
+        path: .
+
+    - name: Load docker image for dry run scans
+      if: ${{ inputs.image-from-artefact }}
+      run: docker load --input ${{ inputs.scan-name }}.tar
+      shell: bash
+
     - name: Grype Vulnerability Scanning
       id: grype-scan
       uses: telicent-oss/grype-action@v1
       with:
-        gh-token: ${{ inputs.gh-token }}
+        gh-token: ${{ inputs.github-token }}
         scan-type: image
         scan-name: ${{ inputs.scan-name }}
         scan-ref: ${{ inputs.image-ref }}

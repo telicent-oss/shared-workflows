@@ -22,11 +22,20 @@ inputs:
     description: NPM package feed token.
   trivy-ignores:
     required: false
-    description: comma-separated list of relative paths to .trivyignore files
+    description: Only allowed for BUILD image, MUST NOT be used with DEPLOY image. Full relative path to trivy ignore file.
+  uses-java:
+    required: false
+    default: "false"
+    description: |
+      Indicates whether the image includes Java artifacts, we need to know this in order to determine which Trivy
+      vulnerability databases to obtain.
   package-directory:
     required: false
     description: The package directory to run the scan in
     default: .
+  github-token:
+    required: true
+    description: GitHub token to allow the action to interact with the repository.
         
 runs:
   using: composite
@@ -64,40 +73,19 @@ runs:
         name: ${{ steps.globals.outputs.bom-artifact-name }}
         path: ${{ steps.globals.outputs.bom-file-name }}
 
-    - name: Scan SBOM (ALL), format as JSON
-      uses: aquasecurity/trivy-action@master
+    - name: Trivy vulnerability scan
+      id: trivy-scan
+      uses: telicent-oss/trivy-action@v1
+      env:
+        TRIVY_IGNOREFILE: ${{ inputs.trivy-ignores }}
       with:
-        exit-code: "0" # Never fail job
-        scan-type: "sbom"
-        scan-ref: ${{ steps.globals.outputs.bom-file-name }} # Need; See /aquasecurity/trivy-action/pull/314
-        output: trivy-sbom-vuln-report.json
-        format: json
-        trivyignores: ${{ inputs.trivy-ignores }}
-    - name: Output HIGH,CRITICAL vulnerability report
-      run: cat trivy-sbom-vuln-report.json
-      shell: bash
-    - name: Attach SBOM to release
-      uses: softprops/action-gh-release@v2
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
-        files: ${{ steps.globals.outputs.bom-file-name }}
-    - name: Attach trivy-sbom-vuln-report.txt to release
-      uses: softprops/action-gh-release@v2
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
-        files: trivy-sbom-vuln-report.txt
-
-    - name: Test SBOM (HIGH,CRITICAL)
-      uses: aquasecurity/trivy-action@master
-      with:
-        exit-code: "1"
-        scan-type: "sbom"
+        gh-token: ${{ inputs.github-token }}
+        scan-type: sbom
+        scan-name: repo-scan
         scan-ref: ${{ steps.globals.outputs.bom-file-name }}
-        format: "table"
-        output: trivy-sbom-HIGH-CRITICAL-vuln-report.txt
-        trivyignores: ${{ inputs.trivy-ignores }}
-        severity: "HIGH,CRITICAL"
-        ignore-unfixed: true
-        # Trivy has already been set up in the previous step, so skip setup here.
-        # https://github.com/aquasecurity/trivy-action?tab=readme-ov-file#skipping-setup-when-calling-trivy-action-multiple-times
-        skip-setup-trivy: true
+        uses-java: ${{ inputs.uses-java }}
+        allow-unfixed: true
+        remote-vex: |
+          telicent-oss/telicent-base-images
+          ${{ inputs.remote-vex }}
+        output-sbom: true
