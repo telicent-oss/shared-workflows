@@ -153,7 +153,7 @@ runs:
         quay-username: "${{ inputs.quay-username }}"
         quay-token: "${{ inputs.quay-token }}"
 
-    # Set some globals, as environment variables are not allowed in composite actions.
+    # Set some globals, as environment variables are not allowed in composite actions
     - name: Set globals
       id: globals
       run: ${{ github.action_path }}/globals.sh
@@ -212,6 +212,8 @@ runs:
         cache-max-size: 3g
 
     - name: Configure AWS credentials from main account
+      # Only run if dry run is explicitly set to 'false'
+      # Dependabot triggered PRs don't have credentials to push images, so no need to run in this case either
       if: ${{ inputs.registry == 'aws' && inputs.dry-run == 'false' && github.actor != 'dependabot[bot]' }}
       uses: aws-actions/configure-aws-credentials@v4
       with:
@@ -220,8 +222,8 @@ runs:
         mask-aws-account-id: false
 
     - name: Docker Login to Amazon ECR
-      # Only login if dry run is explicitly set to 'false'.
-      # Dependabot triggered PRs don't have credentials to push images, so no need to login in this case either.
+      # Only run if dry run is explicitly set to 'false'
+      # Dependabot triggered PRs don't have credentials to push images, so no need to run in this case either
       if: ${{ inputs.registry == 'aws' && inputs.dry-run == 'false' && github.actor != 'dependabot[bot]' }}
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
@@ -229,8 +231,8 @@ runs:
         mask-password: true
 
     - name: Docker Login to Quay
-      # Only login if dry run is explicitly set to 'false'.
-      # Dependabot triggered PRs don't have credentials to push images, so no need to login in this case either.
+      # Only run if dry run is explicitly set to 'false'
+      # Dependabot triggered PRs don't have credentials to push images, so no need to run in this case either
       if: ${{ inputs.registry == 'quay' && inputs.dry-run == 'false' && github.actor != 'dependabot[bot]' }}
       uses: docker/login-action@v3
       with:
@@ -270,16 +272,16 @@ runs:
         IMAGE_NAME: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}
 
     - name: Build, tag, and push container image
+      # Only run if dry run is explicitly set to 'false'
       id: build-images
       uses: docker/build-push-action@v6
-      # Only build, tag and push image if dry run is explicitly set to 'false'.
       if: ${{ inputs.dry-run == 'false' }}
       env:
         DOCKER_BUILDKIT: 1
       with:
         builder: ${{ steps.buildx.outputs.name }}
         platforms: linux/amd64,linux/arm64
-        # Dependabot triggered PRs don't have credentials to push images.
+        # Dependabot triggered PRs don't have credentials to push images
         push: ${{ github.actor != 'dependabot[bot]' }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
@@ -294,13 +296,15 @@ runs:
           ${{ inputs.build-args }}
 
     - name: Build container image tarball (dry run)
+      # Only run if dry run is set to anything other than 'false', indicating that this is a dry run
       id: build-images-dry-run
       uses: docker/build-push-action@v6
-      # Build a tarball if dry run is not explicitly set to 'false'.
       if: ${{ inputs.dry-run != 'false' }}
       env:
         DOCKER_BUILDKIT: 1
       with:
+        # The default image store in Docker Engine doesn't support loading multi-platform images.
+        # Because of this, the dry run excludes the 'platforms' input.
         builder: ${{ steps.buildx.outputs.name }}
         push: false
         cache-from: type=gha
@@ -314,14 +318,12 @@ runs:
           fontAwesomeTokenId=${{ inputs.font-awesome-key }}
         build-args: |
           ${{ inputs.build-args }}
-        # The default image store in Docker Engine doesn't support loading multi-platform images.
-        # Because of this, the dry run excludes the 'platforms' input.
         outputs: type=docker,dest=/tmp/${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}.tar
 
     - name: Upload container image tarball artefact
+      # Only run if dry run is set to anything other than 'false', indicating that this is a dry run
       id: upload-image-artefact
       uses: actions/upload-artifact@v4
-      # Tarball to upload as an artefact is created if dry run is not explicitly set to 'false'.
       if: ${{ inputs.dry-run != 'false' }}
       with:
         name: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}.tar
@@ -339,6 +341,7 @@ runs:
         IMAGE_VERSION: "${{ steps.meta.outputs.version }}"
 
     - name: Trivy dockerfile scan
+      # Only run if Trivy dockerfile scan is explicitly set to 'true'
       if: ${{ inputs.trivy-scan-dockerfile == 'true' }}
       uses: telicent-oss/shared-workflows/.github/actions/trivy-dockerfile-scan@main
       with:
@@ -347,11 +350,13 @@ runs:
         scan-name: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-${{ inputs.dockerfile }}
 
     - name: Trivy image scan
-      # Dependabot triggered PRs don't have credentials to push images, so there won't be an image to scan.
-      if: ${{ inputs.trivy-scan-image == 'true' && github.actor != 'dependabot[bot]' }}
+      # Only run if Trivy image scan is explicitly set to 'true' AND (is a dry run OR (is not a dry run AND user is not dependabot))
+      if: ${{ inputs.trivy-scan-image == 'true' && (inputs.dry-run != 'false' || (inputs.dry-run == 'false' && github.actor != 'dependabot[bot]')) }}
       uses: telicent-oss/shared-workflows/.github/actions/trivy-image-scan@main
       with:
         github-token: ${{ inputs.github-token }}
+        # Indicates that the image should be imported from a tarball artefact and scanned locally
+        image-from-artefact: ${{ inputs.dry-run != 'false' }}
         image-ref: ${{ steps.capture-tags.outputs.image }}
         registry: ${{ inputs.registry }}
         quay-username: ${{ inputs.quay-username }}
@@ -362,11 +367,13 @@ runs:
         trivy-ignores: ${{ inputs.trivy-ignores != '' && format('{0}/{1}', inputs.package-directory, inputs.trivy-ignores) || '' }}
 
     - name: Grype image scan
-      # Dependabot triggered PRs don't have credentials to push images, so there won't be an image to scan.
-      if: ${{ inputs.grype-scan-image == 'true' && github.actor != 'dependabot[bot]' }}
+      # Only run if Grype image scan is explicitly set to 'true' AND (is a dry run OR (is not a dry run AND user is not dependabot))
+      if: ${{ inputs.grype-scan-image == 'true' && (inputs.dry-run != 'false' || (inputs.dry-run == 'false' && github.actor != 'dependabot[bot]')) }}
       uses: telicent-oss/shared-workflows/.github/actions/grype-image-scan@main
       with:
         github-token: ${{ inputs.github-token }}
+        # Indicates that the image should be imported from a tarball artefact and scanned locally
+        image-from-artefact: ${{ inputs.dry-run != 'false' }}
         image-ref: ${{ steps.capture-tags.outputs.image }}
         registry: ${{ inputs.registry }}
         quay-username: ${{ inputs.quay-username }}
