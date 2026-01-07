@@ -186,6 +186,7 @@ jobs:
 
       - name: Enable buildkit cache
         uses: actions/cache@v4.2.3
+        id: buildkit-cache
         if: ${{ inputs.ENABLE_BUILDKIT_CACHE }}
         with:
           path: /tmp/buildkit-cache/buildkit-state.tar
@@ -195,7 +196,7 @@ jobs:
 
       - name: Load buildkit state from cache
         uses: dashevo/gh-action-cache-buildkit-state@v1.0.3
-        if: ${{ inputs.ENABLE_BUILDKIT_CACHE }}
+        if: ${{ inputs.ENABLE_BUILDKIT_CACHE && steps.buildkit-cache.outputs.cache-hit == 'true' }}
         with:
           builder: buildx_buildkit_${{ steps.buildx.outputs.name }}0
           cache-path: /tmp/buildkit-cache
