@@ -2,45 +2,80 @@ name: Notify Teams of Release Status
 description: Notify a Microsoft Teams channel of the success or failure of a release
 
 inputs:
+  # All of these inputs are optional.
+  # Please see the step below for the specific template you wish to use when
+  # sending a notification to see when inputs are required by it.
   app-name:
-    required: true
-    description: The name for the application.
-  version:
-    required: true
-    description: The version of the application.
-  image:
-    required: false 
-    description: The name of the container image created and pushed to a registry
-  status:
-    required: true
-    default: failure
-    description: Expects either 'success' or 'failure' values
-  teams-channel-connector-hash:
     required: false
-    description: The hash value for the Teams channel connector.
+    description: |
+      Name the application running this workflow.
+      Required by the 'trivy-repo-scan-failed' notification type.
+  download-artifact:
+    required: false
+    description: |
+      Name of the artifact to download.
+      Artifact contents will be extracted to \$\{\{ runner.temp \}\}/download-artifacts/\$\{\{ inputs.download-artifact \}\}.
+      Required by the 'trivy-repo-scan-failed' notification type.
+  trivy-report-file:
+    required: false
+    description: |
+      Path to the Trivy scan report file within the download artifact.
+      Required by the 'trivy-repo-scan-failed' notification type.
+    default: repo-scan-trivy-report.json
+
+  notification-type:
+    required: true
+    description: Type of notification to send to MS Teams.
+  teams-webhook-url:
+    required: true
+    description: MS Teams webhook or workflow URL to send the notification to.
 
 runs:
   using: "composite"
   steps:
-    - name: Notify of Success
-      if: ${{ (inputs.status == 'success') && (inputs.teams-channel-connector-hash != '') }}
+    - name: Download Trivy repo scan report artifact
+      uses: actions/download-artifact@v7
+      if: inputs.download-artifact
+      with:
+        name: ${{ inputs.download-artifact }}
+        path: ${{ runner.temp }}/download-artifacts/${{ inputs.download-artifact }}/
+
+    ###
+    # Only of of the following steps will be run, depending on the value of the 'notification-type' input
+    ###
+    - name: Generate MS Teams payload for failed Trivy repo scan
+      if: inputs.notification-type == 'trivy-repo-scan-failed'
       shell: bash
       run: |
-        curl -H 'Content-Type: application/json' -d '{"text": "<div style=\"border-style: solid; border-width: thick; background-color: #47d247; color: white; border-radius: 10px; padding-bottom: 10px; margin-left: 10px; margin-right: 10px; border-color: green; text-align: center \">
-            <h1 style=\"font-size: 2em;\">Success</h1>
-              <div>
-                <strong>Application: ${{ inputs.app-name }}:${{ inputs.version }} released successfully!</strong>
-                <p>${{ inputs.image }}</p>
-              </div>
-          </div>"
-          }' https://telicentio.webhook.office.com/webhookb2/${{ inputs.teams-channel-connector-hash }}
-    - name: Notify of failure
-      if: ${{ (inputs.status == 'failure') && (inputs.teams-channel-connector-hash != '') }}
+        # Ensure the input file exists
+        if [ ! -f "$INPUT" ]; then
+          echo "::error::Input file $INPUT does not exist."
+          echo "For reference, the contents of artifact '${{ inputs.download-artifact }}' can be found at '${{ runner.temp }}/download-artifacts/${{ inputs.download-artifact }}/'."
+          exit 1
+        fi
+
+        # Ensure an app name is provided
+        if [ -z "$APP_NAME" ]; then
+          echo "::error::An app name must be provided using the 'app-name' input."
+          exit 1
+        fi
+
+        # Generate the MS Teams notification payload
+        python ${{ github.action_path }}/scripts/trivy-repo-scan-failed.py "$INPUT" "$OUTPUT" -t "$TEMPLATE" -n "$APP_NAME" -w "$WORKFLOW_URL"
+      env:
+        INPUT: ${{ runner.temp }}/download-artifacts/${{ inputs.download-artifact }}/${{ inputs.trivy-report-file }}
+        OUTPUT: ${{ runner.temp }}/teams-payload.json
+        TEMPLATE: ${{ github.action_path }}/templates/trivy-repo-scan-failed.json
+        APP_NAME: ${{ inputs.app-name }}
+        WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+    ###
+    # Send the generated payload to MS Teams
+    ###
+    - name: Notify MS Teams
       shell: bash
       run: |
-        curl -H 'Content-Type: application/json' -d '{"text":"
-          <div style=\"border-style: solid; border-width: thick; border-color: red; text-align: center; background-color: #ee8787; color: white; border-radius: 10px; padding-bottom: 20px; margin-left: 10px; margin-right: 10px \">
-            <h1 style=\"font-size: 2em\">Failed</h1>
-          <strong>Application: ${{ inputs.app-name }}:${{ inputs.version }} release failed</strong>
-          </div>"
-        }' https://telicentio.webhook.office.com/webhookb2/${{ inputs.teams-channel-connector-hash }}
+        curl $URL -H 'Content-Type: application/json' -d "@$DATA"
+      env:
+        URL: ${{ inputs.teams-webhook-url }}
+        DATA: ${{ runner.temp }}/teams-payload.json
