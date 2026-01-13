@@ -14,8 +14,8 @@ JSON template by locating the object with `id == 'cve-table'` and setting its
 `rows` property.
 
 Usage:
-    python cve-table.py [-h] -t TEMPLATE [ -o OUTPUT-FILE ] [input-file]
-    cat report.json | python cve-table.py -t .github/workflows/templates/trivy-scan-teams-notification.json
+    python trivy-repo-scan-failed.py [-h] -t TEMPLATE [ -o OUTPUT-FILE ] [input-file]
+    cat report.json | python trivy-repo-scan-failed.py -t .github/workflows/templates/trivy-scan-teams-notification.json
 
 The -t/--template argument is required and must point to a JSON file containing an
 object with id `cve-table`. Output is printed to stdout by default or written to
@@ -38,48 +38,22 @@ class MyParser(argparse.ArgumentParser):
         self.print_help()
         sys.exit(2)
 
-    def format_help(self, groups=None):
-        formatter = self._get_formatter()
-
-        # Usage
-        formatter.add_usage(self.usage, self._actions,
-                            self._mutually_exclusive_groups)
-
-        # Description
-        formatter.add_text(self.description)
-
-        if groups is None:
-            groups = self._action_groups
-
-        # Positionals, optionals and user-defined groups
-        for action_group in groups:
-            formatter.start_section(action_group.title)
-            formatter.add_text(action_group.description)
-            formatter.add_arguments(action_group._group_actions)
-            formatter.end_section()
-
-        # Epilog
-        formatter.add_text(self.epilog)
-
-        # Determine help from format above
-        return formatter.format_help()
-
 
 def parse_args() -> argparse.Namespace:
     epilog = """
 Example usages:\n
 
   1. Input from stdin, output to stdout:
-  python cve-table.py -t templates/trivy-scan-teams-notification -n app -w <GitHub Workflow URL>
+  python trivy-repo-scan-failed.py -t templates/trivy-scan-teams-notification -n app -w <GitHub Workflow URL>
 
   2. Input from file, output to stdout:
-  python cve-table.py repo-scan-trivy-report.json -t templates/trivy-scan-teams-notification -n app -w <GitHub Workflow URL>
+  python trivy-repo-scan-failed.py repo-scan-trivy-report.json -t templates/trivy-scan-teams-notification -n app -w <GitHub Workflow URL>
 
   3. Input from stdin, output to file:
-  python cve-table.py - teams-notification-payload.json -t templates/trivy-scan-teams-notification -n app -w <GitHub Workflow URL>
+  python trivy-repo-scan-failed.py - teams-notification-payload.json -t templates/trivy-scan-teams-notification -n app -w <GitHub Workflow URL>
 
   4. Input from file, output to file:
-  python cve-table.py repo-scan-trivy-report.json teams-notification-payload.json -t templates/trivy-scan-teams-notification -n app -w <GitHub Workflow URL>
+  python trivy-repo-scan-failed.py repo-scan-trivy-report.json teams-notification-payload.json -t templates/trivy-scan-teams-notification -n app -w <GitHub Workflow URL>
 """
 
     p = MyParser(

@@ -1,0 +1,61 @@
+{
+    "attachments": [
+        {
+            "contentType": "application/vnd.microsoft.card.adaptive",
+            "content": {
+                "type": "AdaptiveCard",
+                "$schema": "https://adaptivecards.io/schemas/adaptive-card.json",
+                "version": "1.5",
+                "body": [
+                    {
+                        "type": "Container",
+                        "items": [
+                            {
+                                "type": "TextBlock",
+                                "id": "header-text",
+                                "text": "Image Push to Quay.io ${status}",
+                                "wrap": true,
+                                "style": "heading",
+                                "color": "Good"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "Container",
+                        "separator": true,
+                        "spacing": "Large",
+                        "items": [
+                            {
+                                "type": "FactSet",
+                                "facts": [
+                                    {
+                                        "title": "Application",
+                                        "id": "app-name",
+                                        "value": "${name}"
+                                    },
+                                    {
+                                        "title": "Image URL",
+                                        "id": "image-url",
+                                        "value": "${image_url}"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "ActionSet",
+                                "actions": [
+                                    {
+                                        "type": "Action.OpenUrl",
+                                        "id": "open-workflow-action",
+                                        "title": "GitHlub Workflow",
+                                        "style": "positive",
+                                        "url": "${workflow_url}"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    ]
+}

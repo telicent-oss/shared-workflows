@@ -1,15 +1,13 @@
 name: Notify Teams of Release Status
-description: Notify a Microsoft Teams channel of the success or failure of a release
+description: Notify a Microsoft Teams channel of an event, such as a failed Trivy repo scan or a container image push.
 
 inputs:
-  # All of these inputs are optional.
-  # Please see the step below for the specific template you wish to use when
-  # sending a notification to see when inputs are required by it.
-  app-name:
-    required: false
-    description: |
-      Name the application running this workflow.
-      Required by the 'trivy-repo-scan-failed' notification type.
+  ###
+  # The following inputs are optional, but technically required by the given
+  # notification type.
+  ###
+
+  # The following inputs are required by the 'trivy-repo-scan-failed' notification type.
   download-artifact:
     required: false
     description: |
@@ -23,9 +21,36 @@ inputs:
       Required by the 'trivy-repo-scan-failed' notification type.
     default: repo-scan-trivy-report.json
 
+  # The following inputs are required by the 'image-push' notification type.
+  image-url:
+    required: false
+    description: |
+      URL of the container image that was pushed to the registry.
+      Required by the 'image-push' notification type.
+  registry:
+    required: false
+    description: |
+      Name of the container registry to which the image was pushed, either 'Quay.io' or 'ECR'.
+      Required by the 'image-push' notification type
+  status:
+    required: false
+    description: |
+      Status of the image push action, either 'success' or 'failure'.
+      Required by the 'image-push' notification type
+
+  ###
+  # The following inputs are required for all notification types.
+  ###
+  app-name:
+    required: true
+    description: Name the application running this workflow.
   notification-type:
     required: true
-    description: Type of notification to send to MS Teams.
+    description: |
+      Type of notification to send to MS Teams.
+      Supported values are:
+        - image-push: Notify that a container image has been pushed to a registry.
+        - trivy-repo-scan-failed: Notify that a Trivy repository scan has failed.
   teams-webhook-url:
     required: true
     description: MS Teams webhook or workflow URL to send the notification to.
@@ -33,6 +58,41 @@ inputs:
 runs:
   using: "composite"
   steps:
+    ###
+    # Validate required inputs
+    ###
+    - name: Generate MS Teams payload for failed Trivy repo scan
+      if: inputs.notification-type == 'trivy-repo-scan-failed'
+      shell: bash
+      run: |
+        # Ensure an app name is provided
+        if [ -z "$APP_NAME" ]; then
+          echo "::error::An app name must be provided using the 'app-name' input."
+          exit 1
+        fi
+
+        # Ensure a notification type is provided
+        if [ -z "$NOTIFICATION_TYPE" ]; then
+          echo "::error::A notification type must be provided using the 'notification-type' input."
+          exit 1
+        fi
+
+        # Ensure a Teams webhook or workflow URL is provided
+        if [ -z "$TEAMS_WEBHOOK_URL" ]; then
+          echo "::error::A Teams webhook or workflow URL must be provided using the 'teams-webhook-url' input."
+          exit 1
+        fi
+
+        # Generate the MS Teams notification payload
+        python ${{ github.action_path }}/scripts/trivy-repo-scan-failed.py "$INPUT" "$OUTPUT" -t "$TEMPLATE" -n "$APP_NAME" -w "$WORKFLOW_URL"
+      env:
+        APP_NAME: ${{ inputs.app-name }}
+        NOTIFICATION_TYPE: ${{ inputs.notification-type }}
+        TEAMS_WEBHOOK_URL: ${{ inputs.teams-webhook-url }}
+
+    ###
+    # Download any required artifacts
+    ###
     - name: Download Trivy repo scan report artifact
       uses: actions/download-artifact@v7
       if: inputs.download-artifact
@@ -41,7 +101,7 @@ runs:
         path: ${{ runner.temp }}/download-artifacts/${{ inputs.download-artifact }}/
 
     ###
-    # Only of of the following steps will be run, depending on the value of the 'notification-type' input
+    # Only one of the following steps will be run, depending on the value of the 'notification-type' input
     ###
     - name: Generate MS Teams payload for failed Trivy repo scan
       if: inputs.notification-type == 'trivy-repo-scan-failed'
@@ -54,12 +114,6 @@ runs:
           exit 1
         fi
 
-        # Ensure an app name is provided
-        if [ -z "$APP_NAME" ]; then
-          echo "::error::An app name must be provided using the 'app-name' input."
-          exit 1
-        fi
-
         # Generate the MS Teams notification payload
         python ${{ github.action_path }}/scripts/trivy-repo-scan-failed.py "$INPUT" "$OUTPUT" -t "$TEMPLATE" -n "$APP_NAME" -w "$WORKFLOW_URL"
       env:
@@ -67,6 +121,38 @@ runs:
         OUTPUT: ${{ runner.temp }}/teams-payload.json
         TEMPLATE: ${{ github.action_path }}/templates/trivy-repo-scan-failed.json
         APP_NAME: ${{ inputs.app-name }}
+        WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    - name: Generate MS Teams payload for container image push
+      if: inputs.notification-type == 'image-push'
+      shell: bash
+      run: |
+        # Ensure an image URL is provided
+        if [ -z "$IMAGE_URL" ]; then
+          echo "::error::An image URL must be provided using the 'image-url' input."
+          exit 1
+        fi
+
+        # Ensure a registry is provided
+        if [ -z "$REGISTRY" ]; then
+          echo "::error::A registry must be provided using the 'registry' input."
+          exit 1
+        fi
+
+        # Ensure a status is provided
+        if [ -z "$STATUS" ]; then
+          echo "::error::A status must be provided using the 'status' input."
+          exit 1
+        fi
+
+        # Generate the MS Teams notification payload
+        python ${{ github.action_path }}/scripts/image-push.py "$OUTPUT" -r "$REGISTRY" -s "$STATUS" -t "$TEMPLATE" -n "$APP_NAME" -i "$IMAGE_URL" -w "$WORKFLOW_URL"
+      env:
+        OUTPUT: ${{ runner.temp }}/teams-payload.json
+        APP_NAME: ${{ inputs.app-name }}
+        IMAGE_URL: ${{ inputs.image-url}}
+        REGISTRY: ${{ inputs.registry }}
+        STATUS: ${{ inputs.status }}
+        TEMPLATE: ${{ github.action_path }}/templates/image-push.json
         WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
     ###
