@@ -1,0 +1,86 @@
+{
+    "attachments": [
+        {
+            "contentType": "application/vnd.microsoft.card.adaptive",
+            "content": {
+                "type": "AdaptiveCard",
+                "$schema": "https://adaptivecards.io/schemas/adaptive-card.json",
+                "version": "1.5",
+                "body": [
+                    {
+                        "type": "Container",
+                        "items": [
+                            {
+                                "type": "TextBlock",
+                                "text": "Trivy Repository Scan Failed",
+                                "size": "Large",
+                                "weight": "Bolder",
+                                "style": "heading",
+                                "wrap": true,
+                                "color": "attention"
+                            }
+                        ]
+                    },
+                    {
+                        "type": "Container",
+                        "spacing": "Large",
+                        "separator": true,
+                        "items": [
+                            {
+                                "type": "TextBlock",
+                                "id": "app-name",
+                                "text": "Application: ${name}\n",
+                                "weight": "Bolder",
+                                "wrap": true,
+                                "isSubtle": true
+                            },
+                            {
+                                "type": "Table",
+                                "id": "cve-table",
+                                "firstRowAsHeader": true,
+                                "columns": [
+                                    {
+                                        "type": "TableColumnDefinition",
+                                        "width": 1
+                                    },
+                                    {
+                                        "type": "TableColumnDefinition",
+                                        "width": 1
+                                    },
+                                    {
+                                        "type": "TableColumnDefinition",
+                                        "width": 1
+                                    },
+                                    {
+                                        "type": "TableColumnDefinition",
+                                        "width": 1
+                                    },
+                                    {
+                                        "type": "TableColumnDefinition",
+                                        "width": 1
+                                    }
+                                ],
+                                "rows": ["${rows}"]
+                            },
+                            {
+                                "type": "ActionSet",
+                                "actions": [
+                                    {
+                                        "type": "Action.OpenUrl",
+                                        "id": "open-workflow-action",
+                                        "title": "GitHlub Workflow",
+                                        "style": "positive",
+                                        "url": "${workflow_url}"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "msteams": {
+                    "width": "full"
+                }
+            }
+        }
+    ]
+}
