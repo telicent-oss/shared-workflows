@@ -290,8 +290,8 @@ runs:
         tags: ${{ steps.meta.outputs.tags }}
         target: ${{ inputs.target }}
         secrets: |
-          ${{ inputs.package-pat }} && npmTokenId=${{ inputs.package-pat }}
-          ${{ inputs.font-awesome-key }} && fontAwesomeTokenId=${{ inputs.font-awesome-key }}
+          ${{ inputs.package-pat && inputs.package-pat || '' }}
+          ${{ inputs.font-awesome-key && inputs.font-awesome-key || '' }}
         build-args: |
           ${{ inputs.build-args }}
 
@@ -314,8 +314,8 @@ runs:
         tags: ${{ steps.meta.outputs.tags }}
         target: ${{ inputs.target }}
         secrets: |
-          ${{ inputs.package-pat }} && npmTokenId=${{ inputs.package-pat }}
-          ${{ inputs.font-awesome-key }} && fontAwesomeTokenId=${{ inputs.font-awesome-key }}
+          ${{ inputs.package-pat && inputs.package-pat || '' }}
+          ${{ inputs.font-awesome-key && inputs.font-awesome-key || '' }}
         build-args: |
           ${{ inputs.build-args }}
         outputs: type=docker,dest=/tmp/${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}.tar

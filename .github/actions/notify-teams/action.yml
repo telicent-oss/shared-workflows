@@ -7,20 +7,6 @@ inputs:
   # notification type.
   ###
 
-  # The following inputs are required by the 'trivy-repo-scan-failed' notification type.
-  download-artifact:
-    required: false
-    description: |
-      Name of the artifact to download.
-      Artifact contents will be extracted to \$\{\{ runner.temp \}\}/download-artifacts/\$\{\{ inputs.download-artifact \}\}.
-      Required by the 'trivy-repo-scan-failed' notification type.
-  trivy-report-file:
-    required: false
-    description: |
-      Path to the Trivy scan report file within the download artifact.
-      Required by the 'trivy-repo-scan-failed' notification type.
-    default: repo-scan-trivy-report.json
-
   # The following inputs are required by the 'image-push' notification type.
   image-url:
     required: false
@@ -37,6 +23,20 @@ inputs:
     description: |
       Status of the image push action, either 'success' or 'failure'.
       Required by the 'image-push' notification type
+
+  # The following inputs are required by the 'trivy-repo-scan-failed' notification type.
+  download-artifact:
+    required: false
+    description: |
+      Name of the artifact to download.
+      Artifact contents will be extracted to \$\{\{ runner.temp \}\}/download-artifacts/\$\{\{ inputs.download-artifact \}\}.
+      Required by the 'trivy-repo-scan-failed' notification type.
+  trivy-report-file:
+    required: false
+    description: |
+      Path to the Trivy scan report file within the download artifact.
+      Required by the 'trivy-repo-scan-failed' notification type.
+    default: repo-scan-trivy-report.json
 
   ###
   # The following inputs are required for all notification types.
@@ -62,7 +62,6 @@ runs:
     # Validate required inputs
     ###
     - name: Generate MS Teams payload for failed Trivy repo scan
-      if: inputs.notification-type == 'trivy-repo-scan-failed'
       shell: bash
       run: |
         # Ensure an app name is provided
@@ -103,25 +102,6 @@ runs:
     ###
     # Only one of the following steps will be run, depending on the value of the 'notification-type' input
     ###
-    - name: Generate MS Teams payload for failed Trivy repo scan
-      if: inputs.notification-type == 'trivy-repo-scan-failed'
-      shell: bash
-      run: |
-        # Ensure the input file exists
-        if [ ! -f "$INPUT" ]; then
-          echo "::error::Input file $INPUT does not exist."
-          echo "For reference, the contents of artifact '${{ inputs.download-artifact }}' can be found at '${{ runner.temp }}/download-artifacts/${{ inputs.download-artifact }}/'."
-          exit 1
-        fi
-
-        # Generate the MS Teams notification payload
-        python ${{ github.action_path }}/scripts/trivy-repo-scan-failed.py "$INPUT" "$OUTPUT" -t "$TEMPLATE" -n "$APP_NAME" -w "$WORKFLOW_URL"
-      env:
-        INPUT: ${{ runner.temp }}/download-artifacts/${{ inputs.download-artifact }}/${{ inputs.trivy-report-file }}
-        OUTPUT: ${{ runner.temp }}/teams-payload.json
-        TEMPLATE: ${{ github.action_path }}/templates/trivy-repo-scan-failed.json
-        APP_NAME: ${{ inputs.app-name }}
-        WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     - name: Generate MS Teams payload for container image push
       if: inputs.notification-type == 'image-push'
       shell: bash
@@ -153,6 +133,25 @@ runs:
         REGISTRY: ${{ inputs.registry }}
         STATUS: ${{ inputs.status }}
         TEMPLATE: ${{ github.action_path }}/templates/image-push.json
+        WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    - name: Generate MS Teams payload for failed Trivy repo scan
+      if: inputs.notification-type == 'trivy-repo-scan-failed'
+      shell: bash
+      run: |
+        # Ensure the input file exists
+        if [ ! -f "$INPUT" ]; then
+          echo "::error::Input file $INPUT does not exist."
+          echo "For reference, the contents of artifact '${{ inputs.download-artifact }}' can be found at '${{ runner.temp }}/download-artifacts/${{ inputs.download-artifact }}/'."
+          exit 1
+        fi
+
+        # Generate the MS Teams notification payload
+        python ${{ github.action_path }}/scripts/trivy-repo-scan-failed.py "$INPUT" "$OUTPUT" -t "$TEMPLATE" -n "$APP_NAME" -w "$WORKFLOW_URL"
+      env:
+        INPUT: ${{ runner.temp }}/download-artifacts/${{ inputs.download-artifact }}/${{ inputs.trivy-report-file }}
+        OUTPUT: ${{ runner.temp }}/teams-payload.json
+        TEMPLATE: ${{ github.action_path }}/templates/trivy-repo-scan-failed.json
+        APP_NAME: ${{ inputs.app-name }}
         WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
     ###
