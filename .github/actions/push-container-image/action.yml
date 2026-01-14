@@ -290,8 +290,8 @@ runs:
         tags: ${{ steps.meta.outputs.tags }}
         target: ${{ inputs.target }}
         secrets: |
-          npmTokenId=${{ inputs.package-pat }}
-          fontAwesomeTokenId=${{ inputs.font-awesome-key }}
+          ${{ inputs.package-pat }} && npmTokenId=${{ inputs.package-pat }}
+          ${{ inputs.font-awesome-key }} && fontAwesomeTokenId=${{ inputs.font-awesome-key }}
         build-args: |
           ${{ inputs.build-args }}
 
@@ -314,8 +314,8 @@ runs:
         tags: ${{ steps.meta.outputs.tags }}
         target: ${{ inputs.target }}
         secrets: |
-          npmTokenId=${{ inputs.package-pat }}
-          fontAwesomeTokenId=${{ inputs.font-awesome-key }}
+          ${{ inputs.package-pat }} && npmTokenId=${{ inputs.package-pat }}
+          ${{ inputs.font-awesome-key }} && fontAwesomeTokenId=${{ inputs.font-awesome-key }}
         build-args: |
           ${{ inputs.build-args }}
         outputs: type=docker,dest=/tmp/${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}.tar
@@ -383,7 +383,7 @@ runs:
         remote-vex: ${{ inputs.remote-vex }}
 
     - name: Notify MS Teams of image push
-      if: always() && inputs.dry-run == 'false'
+      if: always() && steps.build-images.outcome == 'failure' && inputs.dry-run == 'false'
       uses: telicent-oss/shared-workflows/.github/actions/notify-teams@TELDEVOPS-983-add-image-push-action
       with:
         app-name: ${{ inputs.app-name}}
@@ -391,4 +391,4 @@ runs:
         teams-webhook-url: ${{ inputs.teams-webhook-url }}
         image-url: ${{ steps.capture-tags.outputs.image }}
         registry: ${{ inputs.registry == 'quay' && 'Quay.io' || inputs.registry == 'aws' && 'ECR' || '' }}
-        status: ${{ steps.build-images.result }}
+        status: ${{ steps.build-images.outcome }}
