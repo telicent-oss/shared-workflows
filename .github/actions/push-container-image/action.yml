@@ -383,7 +383,8 @@ runs:
         remote-vex: ${{ inputs.remote-vex }}
 
     - name: Notify MS Teams of image push
-      if: always() && steps.build-images.outcome == 'failure' && inputs.dry-run == 'false'
+      # if: failure() && steps.build-images.outcome == 'failure' && inputs.dry-run == 'false'
+      if: always() && inputs.dry-run == 'false'
       uses: telicent-oss/shared-workflows/.github/actions/notify-teams@TELDEVOPS-983-add-image-push-action
       with:
         app-name: ${{ inputs.app-name}}
