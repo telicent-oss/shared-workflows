@@ -31,6 +31,7 @@ inputs:
       Name of the artifact to download.
       Artifact contents will be extracted to \$\{\{ runner.temp \}\}/download-artifacts/\$\{\{ inputs.download-artifact \}\}.
       Required by the 'trivy-repo-scan-failed' notification type.
+    default: repo-scan-trivy-report
   trivy-report-file:
     required: false
     description: |
@@ -81,9 +82,6 @@ runs:
           echo "::error::A Teams webhook or workflow URL must be provided using the 'teams-webhook-url' input."
           exit 1
         fi
-
-        # Generate the MS Teams notification payload
-        python ${{ github.action_path }}/scripts/trivy-repo-scan-failed.py "$INPUT" "$OUTPUT" -t "$TEMPLATE" -n "$APP_NAME" -w "$WORKFLOW_URL"
       env:
         APP_NAME: ${{ inputs.app-name }}
         NOTIFICATION_TYPE: ${{ inputs.notification-type }}
