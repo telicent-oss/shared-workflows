@@ -384,7 +384,7 @@ runs:
 
     - name: Notify MS Teams of image push
       # Only runs if the workflow failed due to a failure of the 'build-image' step
-      if: failure() && steps.build-images.outcome == 'failure'
+      if: failure() && steps.build-images.outcome == 'failure' && inputs.teams-webhook-url != ''
       uses: telicent-oss/shared-workflows/.github/actions/notify-teams@TELDEVOPS-983-add-image-push-action
       with:
         app-name: ${{ inputs.app-name}}
