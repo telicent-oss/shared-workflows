@@ -90,7 +90,7 @@ inputs:
     required: false
     description: The build target within the Dockerfile to build the image from.
   version:
-    required: true
+    required: false
     description: The version for the image, used in tagging the image.
   version-suffix:
     required: false
