@@ -275,8 +275,8 @@ runs:
           type=ref,event=tag
           type=sha,format=long,prefix=,enable=${{ inputs.allow-sha-tag == 'true' }}
           type=raw,value=${{ inputs.version }}${{ inputs.version-suffix }},enable=${{ inputs.allow-version-tag == 'true' }}
-          type=raw,value=latest,enable=$TAG_LATEST
-          type=raw,value=development,enable=$TAG_DEVELOPMENT
+          type=raw,value=latest,enable=${{ env.TAG_LATEST }}
+          type=raw,value=development,enable=${{ env.TAG_DEVELOPMENT }}
       env:
         AWS_REGISTRY: ${{ inputs.registry == 'aws' && steps.login-ecr.outputs.registry || '' }}
         QUAY_REGISTRY: ${{ inputs.registry == 'quay' && 'quay.io/telicent' || '' }}
