@@ -35,11 +35,6 @@ inputs:
       Whether the version of the helm chart being packaged and pushed is a pre-release version.
       If set to `true`, the chart version and app version will be updated to `version`.
 
-outputs:
-  sha-tag:
-    description: The SAH tag applied to the build container image, if applicable.
-    value: ${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
-
 runs:
   using: composite
   steps:

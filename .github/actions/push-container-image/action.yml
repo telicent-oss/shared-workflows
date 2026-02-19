@@ -141,7 +141,6 @@ inputs:
       Note that telicent-oss/telicent-base-images is always included by default so this is only needed if the image
       being built relies on other images/libraries for which VEX statements are required.
 
-
   # Build secrets
   font-awesome-key:
     required: false
@@ -153,6 +152,9 @@ outputs:
   image:
     description: The versioned container image tag that was created and published.
     value: ${{ steps.capture-tags.outputs.image }}
+  revision:
+    description: The git revision (SAH) applied as a tag to the container image, if applicable.
+    value: ${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
 
 runs:
   using: composite
