@@ -79,6 +79,13 @@ inputs:
   build-args:
     required: false
     description: Additional build arguments to pass to the Docker --build-arg flag.
+  sha-tag-format:
+    required: false
+    default: long
+    description: |
+      The format to use when tagging the image with the git SHA.
+      Must be one of `long` (default, 40 character SHA) or `short` (7 character SHA).
+      The environment variable `DOCKER_METADATA_SHORT_SHA_LENGTH` can be used to change the short SHA length.
   build-artifact:
     required: false
     description: Artifact used as part of the Docker build.
@@ -275,7 +282,7 @@ runs:
           latest=false
         tags: |
           type=ref,event=tag
-          type=sha,format=long,prefix=,enable=${{ inputs.allow-sha-tag == 'true' }}
+          type=sha,format=long,prefix=,format=${{ inputs.sha-tag-format }},enable=${{ inputs.allow-sha-tag == 'true' }}
           type=raw,value=${{ inputs.version }}${{ inputs.version-suffix }},enable=${{ inputs.allow-version-tag == 'true' }}
           type=raw,value=latest,enable=${{ env.TAG_LATEST }}
           type=raw,value=development,enable=${{ env.TAG_DEVELOPMENT }}
