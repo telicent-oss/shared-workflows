@@ -294,12 +294,12 @@ runs:
         TAG_LATEST: ${{ inputs.allow-latest-tag == 'true' || (inputs.allow-mutable-tags == 'true' && github.ref_name == inputs.main-branch) }}
 
     - name: Output SHA image tag
-      id: output_sha_image_tag
+      id: output-sha-image-tag
       shell: bash
       run: |
-        echo $DOCKER_METADATA | jq '.'
-        sha_image_tag=$(echo "$DOCKER_METADATA" | jq -r '."tag-names"[] | select(. | test("[a-f0-9]{7,40}"))')
-        echo "sha-image-tag=$sha_image_tag" >> $GITHUB_OUTPUT && echo $sha_image_tag
+        jq '.' <<< "$DOCKER_METADATA"
+        SHA_IMAGE_TAG=$(echo "$DOCKER_METADATA" | jq -r '."tag-names"[] | select(. | test("[a-f0-9]{7,40}"))')
+        echo "sha-image-tag=$SHA_IMAGE_TAG" >> $GITHUB_OUTPUT && echo "SHA_IMAGE_TAG=$SHA_IMAGE_TAG"
       env:
         DOCKER_METADATA: ${{ steps.meta.outputs.json}}
 
