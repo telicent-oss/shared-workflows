@@ -1,0 +1,134 @@
+name: Package and Push Helm Chart
+description: |
+  Package and push a Helm chart to the selected Helm repository.
+  Optionally update the chart version and app version prior to packaging.
+author: Telicent
+
+inputs:
+  chart:
+    required: true
+    description: Path to the Helm chart to package and push, relative to the repository root.
+  dry-run:
+    required: false
+    default: 'false'
+    description: Whether to test the build and scan without pushing to the registry.
+
+  # Container registry options
+  registry:
+    required: true
+    description: The container registry to push the image to. Supported values are 'aws' (Amazon ECR) or 'quay' (Quay.io).
+  quay-username:
+    required: false
+    description: Quay username. Required if registry is set to 'quay'.
+  quay-token:
+    required: false
+    description: Quay token. Required if registry is set to 'quay'.
+
+  # Container build and tag options
+  version:
+    required: true
+    description: The version for the image, used in tagging the image.
+  is-pre-release:
+    required: false
+    default: 'true'
+    description: |
+      Whether the version of the helm chart being packaged and pushed is a pre-release version.
+      If set to `true`, the chart version and app version will be updated to `version`.
+
+outputs:
+  sha-tag:
+    description: The SAH tag applied to the build container image, if applicable.
+    value: ${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
+
+runs:
+  using: composite
+  steps:
+    - name: Validate registry inputs
+      uses: telicent-oss/shared-workflows/.github/actions/validate-registry-inputs@main
+      with:
+        registry: "${{ inputs.registry }}"
+        quay-username: "${{ inputs.quay-username }}"
+        quay-token: "${{ inputs.quay-token }}"
+    - name: Install Helm
+      uses: azure/setup-helm@v4
+      with:
+        version: "latest"
+    - name: Package Helm chart
+      shell: bash
+      run: |
+        echo "Packaging $chart"
+        if [[ "$IS_PRE_RELEASE" == 'true' ]]; then
+          echo "  🔄 Updating chart version and app version to $VERSION"
+          helm package "$chart" --destination "$DESTINATION" --version "$VERSION" --app-version "$VERSION"
+        else
+          helm package "$chart" --destination "$DESTINATION"
+        fi
+      env:
+        DESTINATION: ${{ runner.temp }}/packaged-chart/
+        IS_PRE_RELEASE: ${{ inputs.is-pre-release }}
+        VERSION: ${{ inputs.version }}
+
+    ###
+    # Steps if action is a dry run, i.e. the Helm chart should not be pushed
+    ###
+    - name: Upload container image tarball artefact
+      # Only run if dry run is set to anything other than 'false', indicating that this is a dry run
+      id: upload-image-artefact
+      uses: actions/upload-artifact@v4
+      if: ${{ inputs.dry-run != 'false' }}
+      with:
+        name: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}.tar
+        path: /tmp/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}.tar
+
+    ###
+    # Steps if action is not a dry run, i.e. the Helm chart should actually be pushed
+    ###
+    - name: Configure AWS credentials from main account
+      # Only run if dry run is explicitly set to 'false'
+      # Dependabot triggered PRs don't have credentials to push Helm charts, so no need to run in this case either
+      if: ${{ inputs.registry == 'aws' && inputs.dry-run == 'false' && github.actor != 'dependabot[bot]' }}
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::098669589541:role/GitHubDeploymentRole
+        aws-region: eu-west-2
+        mask-aws-account-id: false
+    - name: Docker Login to Amazon ECR
+      # Only run if dry run is explicitly set to 'false'
+      # Dependabot triggered PRs don't have credentials to push Helm charts, so no need to run in this case either
+      if: ${{ inputs.registry == 'aws' && inputs.dry-run == 'false' && github.actor != 'dependabot[bot]' }}
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+      with:
+        mask-password: true
+    - name: Log in to Quay.io (Helm)
+      # Only run if dry run is explicitly set to 'false'
+      # Dependabot triggered PRs don't have credentials to push Helm charts, so no need to run in this case either
+      if: ${{ inputs.registry == 'quay' && inputs.dry-run == 'false' && github.actor != 'dependabot[bot]' }}
+      shell: bash
+      run: |
+        echo "$QUAY_TOKEN" | helm registry login quay.io --username "$QUAY_USERNAME" --password-stdin
+      env:
+        QUAY_USERNAME: ${{ inputs.quay-username }}
+        QUAY_TOKEN: ${{ inputs.quay-token }}
+    - name: Checkout Helm chart
+      uses: actions/checkout@v6
+      with:
+        sparse-checkout: ${{ inputs.chart}}
+        sparse-checkout-cone-mode: false
+    - name: Push Helm chart
+      # Only run if dry run is explicitly set to 'false'
+      if: ${{ inputs.dry-run != 'false' }}
+      shell: bash
+      run: |
+        if [[ $PACKAGED_CHART =~ ${VERSION}.tgz$ ]]; then
+          echo "Pushing Helm chart "$chart" to ${{ env.AWS_REGISTRY }}${{ env.QUAY_REGISTRY }}"
+          helm push "$chart" ${{ env.AWS_REGISTRY }}${{ env.QUAY_REGISTRY }}
+          echo "  ✅ Helm chart pushed successfully"
+        else
+          echo "  ⏭️ Skipping Helm chart "$chart" (version mismatch)"
+        fi
+      env:
+        PACKAGED_CHART: "${{ runner.temp }}/packaged-chart/*.tgz"
+        AWS_REGISTRY: ${{ inputs.registry == 'aws' && format('oci://{0}' ,steps.login-ecr.outputs.registry) || '' }}
+        QUAY_REGISTRY: ${{ inputs.registry == 'quay' && 'oci://quay.io/telicent/charts' || '' }}
+        VERSION: ${{ inputs.version }}

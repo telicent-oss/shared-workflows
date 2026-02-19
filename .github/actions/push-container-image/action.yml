@@ -52,10 +52,22 @@ inputs:
     description: Quay token.
 
   # Container build and tag options
+  allow-latest-tags:
+    required: false
+    default: 'true'
+    description: |
+      Set to `false` to avoid explicitly adding the `latest` tag.
+      The tag may still be added implicitly if `allow-mutable-tags` is set to `true` and the reference branch is the branch specified as `main-branch`.
+  allow-development-tags:
+    required: false
+    default: 'true'
+    description: |
+      Set to `false` to avoid explicitly adding the `development` tag.
+      The tag may still be added implicitly if `allow-mutable-tags` is set to `true` and the reference branch is differs from the branch specified as `main-branch`.
   allow-mutable-tags:
     required: false
     default: 'true'
-    description: Set to `false` to avoid adding mutable tags like `latest` and `development`.
+    description: Set to `false` to avoid adding mutable tags like `latest` and `development` based on the branch specified as `main-branch`.
   allow-sha-tag:
     required: false
     default: 'true'
@@ -262,14 +274,15 @@ runs:
         tags: |
           type=ref,event=tag
           type=sha,format=long,prefix=,enable=${{ inputs.allow-sha-tag == 'true' }}
-          type=semver,pattern={{{{version}}}},enable=${{ inputs.allow-version-tag == 'true' }}
           type=raw,value=${{ inputs.version }}${{ inputs.version-suffix }},enable=${{ inputs.allow-version-tag == 'true' }}
-          type=raw,value=latest,enable=${{ inputs.allow-mutable-tags == 'true' && github.ref_name == inputs.main-branch }}
-          type=raw,value=development,enable=${{ inputs.allow-mutable-tags == 'true' && github.ref_name != inputs.main-branch}}
+          type=raw,value=latest,enable=$TAG_LATEST
+          type=raw,value=development,enable=$TAG_DEVELOPMENT
       env:
         AWS_REGISTRY: ${{ inputs.registry == 'aws' && steps.login-ecr.outputs.registry || '' }}
         QUAY_REGISTRY: ${{ inputs.registry == 'quay' && 'quay.io/telicent' || '' }}
         IMAGE_NAME: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}
+        TAG_DEVELOPMENT: ${{ inputs.allow-development-tag == 'true' || (inputs.allow-mutable-tags == 'true' && github.ref_name != inputs.main-branch) }}
+        TAG_LATEST: ${{ inputs.allow-latest-tag == 'true' || (inputs.allow-mutable-tags == 'true' && github.ref_name == inputs.main-branch) }}
 
     - name: Build, tag, and push container image
       # Only run if dry run is explicitly set to 'false'
