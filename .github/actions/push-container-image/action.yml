@@ -52,13 +52,13 @@ inputs:
     description: Quay token.
 
   # Container build and tag options
-  allow-latest-tags:
+  allow-latest-tag:
     required: false
     default: 'true'
     description: |
       Set to `false` to avoid explicitly adding the `latest` tag.
       The tag may still be added implicitly if `allow-mutable-tags` is set to `true` and the reference branch is the branch specified as `main-branch`.
-  allow-development-tags:
+  allow-development-tag:
     required: false
     default: 'true'
     description: |
