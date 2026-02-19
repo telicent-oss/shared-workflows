@@ -159,9 +159,9 @@ outputs:
   image:
     description: The versioned container image tag that was created and published.
     value: ${{ steps.capture-tags.outputs.image }}
-  revision:
+  image-tag-sha:
     description: The git revision (SAH) applied as a tag to the container image, if applicable.
-    value: ${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
+    value: ${{ steps.output-sha-image-tag.outputs.image-tag-sha }}
 
 runs:
   using: composite
@@ -292,6 +292,20 @@ runs:
         IMAGE_NAME: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}
         TAG_DEVELOPMENT: ${{ inputs.allow-development-tag == 'true' || (inputs.allow-mutable-tags == 'true' && github.ref_name != inputs.main-branch) }}
         TAG_LATEST: ${{ inputs.allow-latest-tag == 'true' || (inputs.allow-mutable-tags == 'true' && github.ref_name == inputs.main-branch) }}
+
+    - name: Output SHA image tag
+      id: output_sha_image_tag
+      shell: bash
+      run: |
+        # pretty print the metadata
+        echo $DOCKER_METADATA | jq '.'
+        image_tag=$(echo "$DOCKER_METADATA" | jq -r '.tags[] | select(. | test("sha-"))')
+        echo $image_tag
+        image_tag_sha=$(echo "$image_tag" | grep -o 'sha-[a-f0-9]\+')
+        echo $image_tag_sha
+        echo "image-tag-sha=$image_tag_sha" >> $GITHUB_OUTPUT
+      env:
+        DOCKER_METADATA: ${{ steps.docker_meta.outputs.json}}
 
     - name: Build, tag, and push container image
       # Only run if dry run is explicitly set to 'false'
