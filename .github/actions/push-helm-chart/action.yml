@@ -113,7 +113,7 @@ runs:
         sparse-checkout-cone-mode: false
     - name: Push Helm chart
       # Only run if dry run is explicitly set to 'false'
-      if: ${{ inputs.dry-run != 'false' }}
+      if: ${{ inputs.dry-run == 'false' }}
       shell: bash
       run: |
         if [[ $PACKAGED_CHART =~ ${VERSION}.tgz$ ]]; then
@@ -125,6 +125,6 @@ runs:
         fi
       env:
         PACKAGED_CHART: "${{ runner.temp }}/packaged-chart/*.tgz"
-        AWS_REGISTRY: ${{ inputs.registry == 'aws' && format('oci://{0}' ,steps.login-ecr.outputs.registry) || '' }}
+        AWS_REGISTRY: ${{ inputs.registry == 'aws' && format('oci://{0}/charts' ,steps.login-ecr.outputs.registry) || '' }}
         QUAY_REGISTRY: ${{ inputs.registry == 'quay' && 'oci://quay.io/telicent/charts' || '' }}
         VERSION: ${{ inputs.version }}
