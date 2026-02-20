@@ -116,15 +116,10 @@ runs:
       if: ${{ inputs.dry-run == 'false' }}
       shell: bash
       run: |
-        if [[ $PACKAGED_CHART =~ ${VERSION}.tgz$ ]]; then
           echo "Pushing Helm chart "$chart" to ${{ env.AWS_REGISTRY }}${{ env.QUAY_REGISTRY }}"
-          helm push "$chart" ${{ env.AWS_REGISTRY }}${{ env.QUAY_REGISTRY }}
+          helm push "$PACKAGED_CHART" ${{ env.AWS_REGISTRY }}${{ env.QUAY_REGISTRY }}
           echo "  ✅ Helm chart pushed successfully"
-        else
-          echo "  ⏭️ Skipping Helm chart "$chart" (version mismatch)"
-        fi
       env:
-        PACKAGED_CHART: "${{ runner.temp }}/packaged-chart/*.tgz"
+        PACKAGED_CHART: "${{ runner.temp }}/packaged-chart/${{ inputs.version }}.tgz"
         AWS_REGISTRY: ${{ inputs.registry == 'aws' && format('oci://{0}/charts' ,steps.login-ecr.outputs.registry) || '' }}
         QUAY_REGISTRY: ${{ inputs.registry == 'quay' && 'oci://quay.io/telicent/charts' || '' }}
-        VERSION: ${{ inputs.version }}
