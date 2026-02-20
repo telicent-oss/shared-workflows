@@ -58,18 +58,13 @@ runs:
     - name: Package Helm chart
       shell: bash
       run: |
-        echo "Packaging $CHART"
-        if [[ "$IS_PRE_RELEASE" == 'true' ]]; then
-          echo "  🔄 Updating chart version and app version to $VERSION"
-          helm package "$CHART" --destination "$DESTINATION" --version "$VERSION" --app-version "$VERSION"
+        echo "Packaging ${{ inputs.chart }}"
+        if [[ "${{ inputs.replace-chart-version }}" == 'true' ]]; then
+          echo "  🔄 Updating chart version and app version to ${{ inputs.version }}"
+          helm package "${{ inputs.chart }}" --destination "${{ runner.temp }}/packaged-chart/" --version "${{ inputs.version }}" --app-version "${{ inputs.version }}"
         else
-          helm package "$CHART" --destination "$DESTINATION"
+          helm package "${{ inputs.chart }}" --destination "${{ runner.temp }}/packaged-chart/"
         fi
-      env:
-        CHART: ${{ inputs.chart }}
-        DESTINATION: ${{ runner.temp }}/packaged-chart/
-        IS_PRE_RELEASE: ${{ inputs.is-pre-release }}
-        VERSION: ${{ inputs.version }}
 
     ###
     # Steps if action is a dry run, i.e. the Helm chart should not be pushed
