@@ -39,7 +39,7 @@ inputs:
     required: false
     description: |
       The app version to apply to the Chart.yaml when packaging the Helm chart.
-      Ignored if `replace-chart-version` is not `true`.
+      Ignored if `replace-chart-versions` is not `true`.
   replace-chart-versions:
     required: false
     default: 'false'
@@ -62,7 +62,7 @@ runs:
       shell: bash
       run: |
         echo "Packaging ${{ inputs.chart }}"
-        if [[ "${{ inputs.replace-chart-version }}" == 'true' ]]; then
+        if [[ "${{ inputs.replace-chart-versions }}" == 'true' ]]; then
           echo "  🔄 Updating chart version and app version to ${{ inputs.version }}"
           helm package "${{ inputs.chart }}" --destination "${{ runner.temp }}/packaged-chart/" \
             --version "${{ inputs.version }}" \
@@ -123,7 +123,7 @@ runs:
       if: ${{ inputs.dry-run == 'false' }}
       shell: bash
       run: |
-          echo "Pushing Helm chart "$chart" to ${{ env.AWS_REGISTRY }}${{ env.QUAY_REGISTRY }}"
+          echo "Pushing Helm chart "$PACKAGED_CHART" to ${{ env.AWS_REGISTRY }}${{ env.QUAY_REGISTRY }}"
           helm push "$PACKAGED_CHART" ${{ env.AWS_REGISTRY }}${{ env.QUAY_REGISTRY }}
           echo "  ✅ Helm chart pushed successfully"
       env:
