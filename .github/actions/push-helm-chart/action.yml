@@ -34,13 +34,16 @@ inputs:
   # Chart packaging options
   version:
     required: true
-    description: The version for the chart.
-  replace-chart-version:
+    description: The version of the chart.
+  appVersion:
+    required: false
+    description: |
+      The app version to apply to the Chart.yaml when packaging the Helm chart.
+      Ignored if `replace-chart-version` is not `true`.
+  replace-chart-versions:
     required: false
     default: 'false'
-    description: |
-      Whether the version of the helm chart being packaged and pushed should be replaced by the incoming `version`.
-      If set to `true`, the chart version and app version will be updated to `version`.
+    description: Whether the `version`` and `appVersion` values should be used to update Chart.yaml when packaging the Helm chart.
 
 runs:
   using: composite
@@ -61,7 +64,9 @@ runs:
         echo "Packaging ${{ inputs.chart }}"
         if [[ "${{ inputs.replace-chart-version }}" == 'true' ]]; then
           echo "  🔄 Updating chart version and app version to ${{ inputs.version }}"
-          helm package "${{ inputs.chart }}" --destination "${{ runner.temp }}/packaged-chart/" --version "${{ inputs.version }}" --app-version "${{ inputs.version }}"
+          helm package "${{ inputs.chart }}" --destination "${{ runner.temp }}/packaged-chart/" \
+            --version "${{ inputs.version }}" \
+            --app-version "${{ inputs.appVersion != '' && inputs.appVersion || inputs.version }}"
         else
           helm package "${{ inputs.chart }}" --destination "${{ runner.temp }}/packaged-chart/"
         fi
