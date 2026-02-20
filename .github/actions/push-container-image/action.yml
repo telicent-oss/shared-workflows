@@ -5,11 +5,11 @@ author: Telicent
 inputs:
   app-name:
     required: true
-    description: The name for the application used as the main portion of the image name.
+    description: The name for the application, used as the main portion of the image name.
   app-name-prefix:
     required: false
     default: telicent-
-    description: The prefix for the image name, defaults to 'telicent-'.
+    description: The prefix for the image name. Defaults to `telicent-`.
   dry-run:
     required: false
     default: 'false'
@@ -43,13 +43,13 @@ inputs:
   # Container registry options
   registry:
     required: true
-    description: The container registry to push the image to. Supported values are 'aws' (Amazon ECR) or 'quay' (Quay.io).
+    description: The container registry to push the image to. Supported values are `aws` (Amazon ECR) or `quay` (Quay.io).
   quay-username:
     required: false
-    description: Quay username.
+    description: Quay username. Required if registry is set to `quay`.
   quay-token:
     required: false
-    description: Quay token.
+    description: Quay token. Required if registry is set to `quay`.
 
   # Container build and tag options
   allow-latest-tag:
@@ -71,11 +71,11 @@ inputs:
   allow-sha-tag:
     required: false
     default: 'true'
-    description: Set to 'false' to avoid adding the image SHA as a tag.
+    description: Set to `false` to avoid adding the image SHA as a tag.
   allow-version-tag:
     required: false
     default: 'true'
-    description: Set to 'false' to avoid adding a version tag.
+    description: Set to `false` to avoid adding a version tag.
   build-args:
     required: false
     description: Additional build arguments to pass to the Docker --build-arg flag.

@@ -5,6 +5,13 @@ description: |
 author: Telicent
 
 inputs:
+  app-name:
+    required: true
+    description: The name for the application, used as the main portion of the Helm chart name.
+  app-name-prefix:
+    required: false
+    default: telicent-
+    description: The prefix for the Helm chart name. Defaults to `telicent-`.
   chart:
     required: true
     description: Path to the Helm chart to package and push, relative to the repository root.
@@ -16,23 +23,23 @@ inputs:
   # Container registry options
   registry:
     required: true
-    description: The container registry to push the image to. Supported values are 'aws' (Amazon ECR) or 'quay' (Quay.io).
+    description: The container registry to push the image to. Supported values are `aws` (Amazon ECR) or `quay` (Quay.io).
   quay-username:
     required: false
-    description: Quay username. Required if registry is set to 'quay'.
+    description: Quay username. Required if registry is set to `quay`.
   quay-token:
     required: false
-    description: Quay token. Required if registry is set to 'quay'.
+    description: Quay token. Required if registry is set to `quay`.
 
-  # Container build and tag options
+  # Chart packaging options
   version:
     required: true
-    description: The version for the image, used in tagging the image.
-  is-pre-release:
+    description: The version for the chart.
+  replace-chart-version:
     required: false
-    default: 'true'
+    default: 'false'
     description: |
-      Whether the version of the helm chart being packaged and pushed is a pre-release version.
+      Whether the version of the helm chart being packaged and pushed should be replaced by the incoming `version`.
       If set to `true`, the chart version and app version will be updated to `version`.
 
 runs:
@@ -120,6 +127,6 @@ runs:
           helm push "$PACKAGED_CHART" ${{ env.AWS_REGISTRY }}${{ env.QUAY_REGISTRY }}
           echo "  ✅ Helm chart pushed successfully"
       env:
-        PACKAGED_CHART: "${{ runner.temp }}/packaged-chart/${{ inputs.version }}.tgz"
+        PACKAGED_CHART: "${{ runner.temp }}/packaged-chart/${{ inputs.app-name-prefix }}${{ inputs.app-name }}-${{ inputs.version }}.tgz"
         AWS_REGISTRY: ${{ inputs.registry == 'aws' && format('oci://{0}/charts' ,steps.login-ecr.outputs.registry) || '' }}
         QUAY_REGISTRY: ${{ inputs.registry == 'quay' && 'oci://quay.io/telicent/charts' || '' }}
