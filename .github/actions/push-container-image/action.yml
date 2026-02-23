@@ -240,7 +240,7 @@ runs:
       with:
         role-to-assume: arn:aws:iam::098669589541:role/GitHubDeploymentRole
         aws-region: eu-west-2
-        mask-aws-account-id: false
+        mask-aws-account-id: true
 
     - name: Docker Login to Amazon ECR
       # Only run if dry run is explicitly set to 'false'
