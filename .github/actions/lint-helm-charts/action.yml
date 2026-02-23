@@ -1,0 +1,27 @@
+name: Lint Helm Charts
+description: |
+  Lint a Helm chart, and any sub-charts, in the given path using `helm lint`.
+  This action is intended to be used in a workflow that runs on pull requests to
+  validate that any changes to Helm charts are valid and follow best practices.
+author: Telicent
+
+inputs:
+  chart:
+    required: true
+    description: Path to the Helm chart to lint, relative to the repository root.
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout Helm chart
+      uses: actions/checkout@v6
+      with:
+        sparse-checkout: ${{ inputs.chart }}
+        sparse-checkout-cone-mode: false
+    - name: Install Helm
+      uses: azure/setup-helm@v4
+      with:
+        version: "latest"
+    - name: Lint Helm charts
+      shell: bash
+      run: helm lint ${{ inputs.chart }}

@@ -69,7 +69,7 @@ runs:
       with:
         role-to-assume: arn:aws:iam::098669589541:role/GitHubDeploymentRole
         aws-region: eu-west-2
-        mask-aws-account-id: false
+        mask-aws-account-id: true
 
     - name: Login to Amazon ECR
       if: ${{ inputs.registry == 'aws' && inputs.image-from-artefact == 'false' }}
