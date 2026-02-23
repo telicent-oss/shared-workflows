@@ -26,6 +26,9 @@ runs:
     - name: Lint Helm charts
       shell: bash
       run: |
+        # Continue running even if a chart fails linting, to report all issues in one run
+        set +e
+
         for chart in ${{ inputs.charts }}; do
           helm lint "$chart"
           EXIT_CODE=$?
