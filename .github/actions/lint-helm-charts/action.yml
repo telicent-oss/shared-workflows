@@ -1,0 +1,38 @@
+name: Lint Helm Charts
+description: |
+  Lint Helm charts in the given path using `helm lint`.
+  This action is intended to be used in a workflow that runs on pull requests to
+  validate that any changes to Helm charts are valid and follow best practices.
+author: Telicent
+
+inputs:
+  charts:
+    required: false
+    default: charts/*/
+    description: Path to the Helm charts to lint, relative to the repository root.
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout Helm charts
+      uses: actions/checkout@v6
+      with:
+        sparse-checkout: ${{ inputs.charts }}
+        sparse-checkout-cone-mode: false
+    - name: Install Helm
+      uses: azure/setup-helm@v4
+      with:
+        version: "latest"
+    - name: Lint Helm charts
+      shell: bash
+      run: |
+        for chart in ${{ inputs.charts }}; do
+          helm lint "$chart"
+          EXIT_CODE=$?
+          if [[ "$EXIT_CODE" == "0" ]]; then
+            echo "  ✅ Helm chart linting succeeded"
+          else
+            echo "  ❌ Helm chart linting failed"
+          fi
+          echo "<== Linting complete for $chart"
+        done
