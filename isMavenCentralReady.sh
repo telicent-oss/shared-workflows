@@ -160,6 +160,9 @@ for POM in $(find . -name pom.xml); do
   # Check for Distribution Management
   hasMavenConfiguration "${POM}" "//project[last()]/distributionManagement/snapshotRepository/url" "<distributionManagement> section" "https://central.sonatype.com/repository/maven-snapshots/"
 
+  # Check for Central Publishing Plugin
+  hasMavenConfiguration "${POM}" "(//plugin[artifactId='central-publishing-maven-plugin'])[1]/configuration/publishingServerId" "<plugin> for Central Publishing" "central"
+
   # Check nothing is pointing at AWS CodeArtifact
   grep -F "telicent-098669589541.d.codeartifact" "${POM}" >/dev/null 2>&1
   if [ $? -eq 0 ]; then
