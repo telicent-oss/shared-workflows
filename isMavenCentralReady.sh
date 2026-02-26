@@ -31,8 +31,16 @@ function verified() {
     echo "  PASS: $*"
 }
 
+function value() {
+    echo "        $*"
+}
+
+function processing() {
+    echo $(date -u +"%Y-%m-%dT%H:%M:%SZ") "$*"
+}
+
 DIRECTORY=$1
-pushd "${DIRECTORY}" || hardAbort "Invalid directory (${DIRECTORY}) supplied"
+pushd "${DIRECTORY}" >/dev/null 2>&1 || hardAbort "Invalid directory (${DIRECTORY}) supplied"
 
 if [ ! -f pom.xml ]; then
   hardAbort "Not a Maven project, no top level pom.xml in ${DIRECTORY}"
@@ -73,7 +81,7 @@ function hasMavenProperty() {
     fi
 
     verified "Verified POM file ${POM} has required Maven Property ${PROPERTY} set as:"
-    verified "${VALUE}"
+    value "${VALUE}"
 }
 
 function hasMavenConfiguration() {
@@ -112,29 +120,28 @@ function hasMavenArtifact() {
     fi
 }
 
-echo "Quick Building the Maven Project..."
+processing "Quick Building the Maven Project..."
 mvn clean install -DskipTests >/tmp/maven.log 2>&1
 if [ $? -ne 0 ]; then
   cat /tmp/maven.log
   hardAbort "Maven Build Failed"
 fi
-echo "Maven Build completed"
+processing "Maven Build completed"
 echo "---"
 echo
 
 for POM in $(find . -name pom.xml); do
-  echo "Testing POM file ${POM}..."
-  pwd
+  processing "Testing POM file ${POM}..."
 
   # Check for Basic Metadata
-  echo "Basic Metadata Checks..."
+  processing "Basic Metadata Checks..."
   hasMavenProperty "${POM}" "project.version"
   hasMavenProperty "${POM}" "project.name"
   hasMavenProperty "${POM}" "project.description"
   hasMavenProperty "${POM}" "project.url"
 
-  echo "Advanced Metadata Checks..."
-  rm /tmp/pom.xml
+  processing "Advanced Metadata Checks..."
+  rm -f /tmp/pom.xml
   mvn -f "${POM}" help:effective-pom -Doutput=/tmp/pom.xml >/dev/null 2>&1
   if [ $? -ne 0 ]; then
     abort "POM file ${POM} could not have an effective POM file generated for it"
@@ -151,7 +158,10 @@ for POM in $(find . -name pom.xml); do
   hasMavenConfiguration "${POM}" "//project[last()]/scm/url" "<scm> section"
 
   # Check for Distribution Management
-  hasMavenConfiguration "${POM}" "//project[last()]/distributionManagement/repository/url" "<distributionManagement> section" "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
+  hasMavenConfiguration "${POM}" "//project[last()]/distributionManagement/snapshotRepository/url" "<distributionManagement> section" "https://central.sonatype.com/repository/maven-snapshots/"
+
+  # Check for Central Publishing Plugin
+  hasMavenConfiguration "${POM}" "(//plugin[artifactId='central-publishing-maven-plugin'])[1]/configuration/publishingServerId" "<plugin> for Central Publishing" "central"
 
   # Check nothing is pointing at AWS CodeArtifact
   grep -F "telicent-098669589541.d.codeartifact" "${POM}" >/dev/null 2>&1
@@ -170,12 +180,12 @@ for POM in $(find . -name pom.xml); do
   fi
 
   # Check aritifacts
-  echo "Artifact Checks..."
+  processing "Artifact Checks..."
   PACKAGING=$(getMavenProperty "${POM}" "project.packaging")
   ARTIFACT_ID=$(getMavenProperty "${POM}" "project.artifactId")
   VERSION=$(getMavenProperty "${POM}" "project.version")
   FINAL_NAME=$(getMavenProperty "${POM}" "project.build.finalName")
-  echo "POM file ${POM} has packaging type ${PACKAGING}"
+  processing "POM file ${POM} has packaging type ${PACKAGING}"
 
   if [ "${PACKAGING}" != "pom" ]; then
     hasMavenArtifact "${POM}" "${FINAL_NAME}.jar" "JAR File"
@@ -186,7 +196,7 @@ for POM in $(find . -name pom.xml); do
   hasMavenArtifact "${POM}" "${ARTIFACT_ID}-${VERSION}-bom.xml" "XML SBOM"
 
   # Verifying Signatures are present
-  echo "Signature Checks..."
+  processing "Signature Checks..."
   for ARTIFACT in $(find "$(dirname ${POM})/target" -type f -not -name "*.asc" -d 1); do
     EXTENSION=${ARTIFACT##*.}
     case ${EXTENSION} in
