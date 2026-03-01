@@ -1,0 +1,55 @@
+name: Prepare Python Application
+description: Checkout code and install pip dependencies for a python project.
+
+inputs:
+  version:
+    required: true
+    description: The python version to test and build against.
+  code-artefact-role:
+    required: false
+    description: The ARN of the AWS IAM role to assume for accessing CodeArtifact.
+  pyproject-toml-path:
+    required: false
+    default: pyproject.toml
+    description: |
+      Path to the pyproject.toml file, relative to the repository root.
+      Defaults to `pyproject.toml`.
+  extra-args:
+    required: false
+    description: Any extra dependencies to be included in SBOM scan.
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+    - name: Set up Python ${{ inputs.version }}
+      uses: actions/setup-python@v5.6.0
+      with:
+        python-version: ${{ inputs.version }}
+    - name: Prepare pip and and pip-tools
+      shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
+      run: |
+        python -m pip install --upgrade "pip<25.3"
+        python -m pip install pip-tools
+    - name: Configure CodeArtifact AWS credentials
+      if: inputs.code-artefact-role != ''
+      id: creds
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ inputs.code-artefact-role }}
+        aws-region: eu-west-2
+        mask-aws-account-id: true
+    - name: CodeArtifact login
+      if: inputs.code-artefact-role != ''
+      uses: Telicent-io/aws-codeartifact-login-action@v1
+      with:
+        domain: telicent
+        owner: ${{ steps.creds.outputs.aws-account-id }}
+    - name: Generate requirements
+      shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
+      run: |
+        python -m piptools compile ${{ inputs.extra-args }} -o requirements.txt ${{ inputs.pyproject-toml-path }}
+        pip install -r requirements.txt
+      env:
+        PIP_EXTRA_INDEX_URL: ${{ env.AWS_CODEARTIFACT_TOKEN != '' && format('https://aws:{0}@telicent-{1}.d.codeartifact.eu-west-2.amazonaws.com/pypi/telicent-code-artifacts/simple/', env.AWS_CODEARTIFACT_TOKEN, steps.creds.outputs.aws-account-id) || '' }}
