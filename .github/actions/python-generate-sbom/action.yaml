@@ -32,7 +32,6 @@ runs:
       uses: telicent-oss/shared-workflows/.github/actions/python-prepare@TELICENT-1005-lddf-ontology-deployment
       with:
         code-artefact-role: ${{ inputs.code-artefact-role}}
-        scan-name: ${{ inputs.scan-name }}
         version: ${{ inputs.version }}
     - name: Generate SBOM
       shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
