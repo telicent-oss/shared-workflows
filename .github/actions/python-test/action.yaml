@@ -10,9 +10,9 @@ inputs:
   version:
     required: true
     description: The python version to test and build against.
-  code-artefact-role:
+  extra-args:
     required: false
-    description: The ARN of the AWS IAM role to assume for accessing CodeArtifact.
+    description: Any extra arguments to pass to the pip-compile tool when generating a requirements file.
   pyproject-toml-path:
     required: false
     default: pyproject.toml
@@ -27,9 +27,6 @@ inputs:
     required: false
     default: "python -m unittest discover --verbose"
     description: The command to run when executing tests.
-  extra-args:
-    required: false
-    description: Any extra dependencies to be included in SBOM scan.
 
 runs:
   using: composite
@@ -37,7 +34,9 @@ runs:
     - name: Prepare Python
       uses: telicent-oss/shared-workflows/.github/actions/python-prepare@TELICENT-1005-lddf-ontology-deployment
       with:
-        code-artefact-role: ${{ inputs.code-artefact-role}}
+        extra-args: ${{ inputs.extra-args }}
+        install-requirements: true
+        pyproject-toml-path: ${{ inputs.pyproject-toml-path }}
         version: ${{ inputs.version }}       
     - name: Static type checking - mypy
       shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}

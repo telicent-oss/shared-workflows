@@ -8,18 +8,15 @@ inputs:
   version:
     required: true
     description: The python version to test and build against.
-  code-artefact-role:
+  extra-args:
     required: false
-    description: The ARN of the AWS IAM role to assume for accessing CodeArtifact.
+    description: Any extra arguments to pass to the pip-compile tool when generating a requirements file.
   pyproject-toml-path:
     required: false
     default: pyproject.toml
     description: |
       Path to the pyproject.toml file, relative to the repository root.
       Defaults to `pyproject.toml`.
-  extra-args:
-    required: false
-    description: Any extra dependencies to be included in SBOM scan.
 outputs:
   artifact-name:
     description: The name of the GitHub artifact containing the SBOM.
@@ -31,8 +28,12 @@ runs:
     - name: Prepare Python
       uses: telicent-oss/shared-workflows/.github/actions/python-prepare@TELICENT-1005-lddf-ontology-deployment
       with:
-        code-artefact-role: ${{ inputs.code-artefact-role}}
+        extra-args: ${{ inputs.extra-args }}
+        pyproject-toml-path: ${{ inputs.pyproject-toml-path }}
         version: ${{ inputs.version }}
+    - name: Install test tool - cyclonedx
+      shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
+      run: pip install cyclonedx-bom==4.4.3
     - name: Generate SBOM
       shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
       run: |
