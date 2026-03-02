@@ -1,0 +1,65 @@
+name: Generate SBOM for Python application and scan it
+description: Generate an SBOM for a python application and scan it.
+
+inputs:
+  scan-name:
+    required: true
+    description: The name of the scan to download the artifact of to scan.
+  version:
+    required: true
+    description: The python version to test and build against.
+  code-artefact-role:
+    required: false
+    description: The ARN of the AWS IAM role to assume for accessing CodeArtifact.
+  extra-args:
+    required: false
+    description: Any extra arguments to pass to the pip-compile tool when generating a requirements file.
+  pyproject-toml-path:
+    required: false
+    default: pyproject.toml
+    description: |
+      Path to the pyproject.toml file, relative to the repository root.
+      Defaults to `pyproject.toml`.
+outputs:
+  artifact-name:
+    description: The name of the GitHub artifact containing the SBOM.
+    value: ${{ steps.generate-application-sbom.outputs.artifact-name }}
+
+runs:
+  using: composite
+  steps:
+    - name: Prepare Python
+      uses: telicent-oss/shared-workflows/.github/actions/python-prepare@TELICENT-1005-lddf-ontology-deployment
+      with:
+        code-artefact-role: ${{ inputs.code-artefact-role}}
+        extra-args: ${{ inputs.extra-args }}
+        pyproject-toml-path: ${{ inputs.pyproject-toml-path }}
+        version: ${{ inputs.version }}
+    - name: Install test tool - cyclonedx
+      shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
+      run: pip install cyclonedx-bom==4.4.3
+    - name: Generate SBOM
+      shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
+      run: |
+        python -m cyclonedx_py requirements > ${{ inputs.scan-name }}-cyclonedx.sbom.json
+    - name: Store the SBOM
+      uses: actions/upload-artifact@v4.4.3
+      with:
+        name: ${{ inputs.scan-name}}
+        path: ${{ inputs.scan-name }}-cyclonedx.sbom.json
+    - name: Trivy Vulnerability Scan
+      id: trivy-scan
+      uses: telicent-oss/trivy-action@v1
+      with:
+        scan-type: sbom
+        scan-name: ${{ inputs.scan-name }}
+        scan-ref: ${{ inputs.scan-name }}-cyclonedx.sbom.json
+        allow-unfixed: true
+    - name: Grype Vulnerability Scan
+      id: grype-scan
+      uses: telicent-oss/grype-action@v1
+      with:
+        scan-type: sbom
+        scan-name: ${{ inputs.scan-name }}
+        scan-ref: ${{ inputs.scan-name }}-cyclonedx.sbom.json
+        allow-unfixed: true
