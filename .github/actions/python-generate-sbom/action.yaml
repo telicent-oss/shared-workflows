@@ -8,6 +8,9 @@ inputs:
   version:
     required: true
     description: The python version to test and build against.
+  code-artefact-role:
+    required: false
+    description: The ARN of the AWS IAM role to assume for accessing CodeArtifact.
   extra-args:
     required: false
     description: Any extra arguments to pass to the pip-compile tool when generating a requirements file.
@@ -28,6 +31,7 @@ runs:
     - name: Prepare Python
       uses: telicent-oss/shared-workflows/.github/actions/python-prepare@TELICENT-1005-lddf-ontology-deployment
       with:
+        code-artefact-role: ${{ inputs.code-artefact-role}}
         extra-args: ${{ inputs.extra-args }}
         pyproject-toml-path: ${{ inputs.pyproject-toml-path }}
         version: ${{ inputs.version }}
