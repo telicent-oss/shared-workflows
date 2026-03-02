@@ -35,7 +35,7 @@ runs:
   using: composite
   steps:
     - name: Prepare Python
-      uses: telicent-oss/shared-workflows/.github/actions/python-prepare@TELICENT-1005-lddf-ontology-deployment
+      uses: telicent-oss/shared-workflows/.github/actions/python-prepare@main
       with:
         code-artefact-role: ${{ inputs.code-artefact-role}}
         extra-args: ${{ inputs.extra-args }}
