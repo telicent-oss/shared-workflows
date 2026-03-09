@@ -39,12 +39,6 @@ jobs:
       contents: read
     runs-on: ${{ inputs.OS }}
     steps:
-      - name: Install Github (Windows only)
-        if: ${{ contains(inputs.OS, 'windows-') }}
-        run: choco install gh
-      - run: gh version
-        if: ${{ contains(inputs.OS, 'windows-') }}
-
       - uses: actions/checkout@v4.2.2
 
       - name: Set up Python ${{ inputs.PYTHON_VERSION }}
