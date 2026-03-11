@@ -58,6 +58,11 @@ runs:
       uses: azure/setup-helm@v4
       with:
         version: "latest"
+    - name: Checkout Helm chart
+      uses: actions/checkout@v6
+      with:
+        sparse-checkout: ${{ inputs.chart }}
+        sparse-checkout-cone-mode: false
     - name: Package Helm chart
       shell: bash
       run: |
@@ -113,11 +118,6 @@ runs:
       env:
         QUAY_USERNAME: ${{ inputs.quay-username }}
         QUAY_TOKEN: ${{ inputs.quay-token }}
-    - name: Checkout Helm chart
-      uses: actions/checkout@v6
-      with:
-        sparse-checkout: ${{ inputs.chart}}
-        sparse-checkout-cone-mode: false
     - name: Push Helm chart
       # Only run if dry run is explicitly set to 'false'
       if: ${{ inputs.dry-run == 'false' }}
