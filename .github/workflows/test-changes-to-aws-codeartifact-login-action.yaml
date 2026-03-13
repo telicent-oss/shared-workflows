@@ -22,25 +22,25 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_DEPLOY_CODE_ARTIFACT }}
           aws-region: eu-west-2
       - name: "CodeArtifact Login"
-        id: codeartifact-login-basic
+        id: code-artifact-login-basic
         uses: telicent-oss/shared-workflows/.github/actions/aws-codeartifact-login@TELDEVOPS-1047-codeartifact-login
         with:
           domain: telicent
-          owner: ${{ secrets.AWS_ACCOUNT_ID }}
+          owner: "${{ secrets.AWS_ACCOUNT_ID }}"
       - name: "Fail if user unavailable"
-        if: ${{ ! steps.codeartifact-login-basic.outputs.user }}
+        if: ${{ ! steps.code-artifact-login-basic.outputs.user }}
         run: |
           echo "Failed to find AWS CodeArtifact user in outputs"
           exit 1
       - name: "Fail if token unavailable"
-        if: ${{ ! steps.codeartifact-login-basic.outputs.token }}
+        if: ${{ ! steps.code-artifact-login-basic.outputs.token }}
         run: |
           echo "Failed to find AWS CodeArtifact token in outputs"
           exit 1
       - name: "Pass if user and token found"
         run: |
-          echo "AWS CodeArtifact user is ${{ steps.codeartifact-login-basic.outputs.user }}"
-          echo "AWS CodeArtifact token is ${{ steps.codeartifact-login-basic.outputs.token }}"
+          echo "AWS CodeArtifact user is ${{ steps.code-artifact-login-basic.outputs.user }}"
+          echo "AWS CodeArtifact token is ${{ steps.code-artifact-login-basic.outputs.token }}"
           echo "The above token SHOULD be masked, if not please report a bug!"
 
   advanced-test:
@@ -59,24 +59,24 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_DEPLOY_CODE_ARTIFACT }}
           aws-region: eu-west-2
       - name: "CodeArtifact Login"
-        id: codeartifact-login-advanced
+        id: code-artifact-login-advanced
         uses: telicent-oss/shared-workflows/.github/actions/aws-codeartifact-login@TELDEVOPS-1047-codeartifact-login
         with:
           domain: telicent
-          owner: ${{ secrets.AWS_ACCOUNT_ID }}
+          owner: "${{ secrets.AWS_ACCOUNT_ID }}"
           token-lifetime: "1200"
       - name: "Fail if user unavailable"
-        if: ${{ ! steps.codeartifact-login-advanced.outputs.user }}
+        if: ${{ ! steps.code-artifact-login-advanced.outputs.user }}
         run: |
           echo "Failed to find AWS CodeArtifact user in outputs"
           exit 1
       - name: "Fail if token unavailable"
-        if: ${{ ! steps.codeartifact-login-advanced.outputs.token }}
+        if: ${{ ! steps.code-artifact-login-advanced.outputs.token }}
         run: |
           echo "Failed to find AWS CodeArtifact token in outputs"
           exit 1
       - name: "Pass if user and token found"
         run: |
-          echo "AWS CodeArtifact user is ${{ steps.codeartifact-login-advanced.outputs.user }}"
-          echo "AWS CodeArtifact token is ${{ steps.codeartifact-login-advanced.outputs.token }}"
+          echo "AWS CodeArtifact user is ${{ steps.code-artifact-login-advanced.outputs.user }}"
+          echo "AWS CodeArtifact token is ${{ steps.code-artifact-login-advanced.outputs.token }}"
           echo "The above token SHOULD be masked, if not please report a bug!"

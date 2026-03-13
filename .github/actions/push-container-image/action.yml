@@ -260,10 +260,10 @@ runs:
     # Only run if an ARN is passed to 'code-artefact-role'
     - name: CodeArtifact Login
       if: inputs.code-artefact-role != ''
-      uses: Telicent-io/aws-codeartifact-login-action@v1
+      uses: telicent-oss/shared-workflows/.github/actions/aws-codeartifact-login@main
       with:
         domain: telicent
-        owner: ${{ steps.aws-login.outputs.aws-account-id }}
+        owner: "${{ steps.aws-login.outputs.aws-account-id }}"
 
     - name: Docker Login to Quay
       # Only run if dry run is explicitly set to 'false'
