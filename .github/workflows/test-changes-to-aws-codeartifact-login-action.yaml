@@ -1,8 +1,8 @@
-name: Action Test
+name: Test AWS CodeArtifact Login Action
 on: 
   push:
-    paths:
-      - .github/actions/aws-codeartifact-login/**
+    # paths:
+    #   - .github/actions/aws-codeartifact-login/**
   workflow_dispatch:
 
 jobs:
