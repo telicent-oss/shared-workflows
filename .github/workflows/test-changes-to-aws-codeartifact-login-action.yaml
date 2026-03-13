@@ -1,0 +1,83 @@
+name: Test AWS CodeArtifact Login Action
+on: 
+  push:
+    paths:
+      - .github/actions/aws-codeartifact-login/**
+      - .github/workflows/test-changes-to-aws-codeartifact-login-action.yaml
+  workflow_dispatch:
+
+jobs:
+  basic-test:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_DEPLOY_CODE_ARTIFACT }}
+          aws-region: eu-west-2
+      - name: "CodeArtifact Login"
+        id: code-artifact-login-basic
+        uses: telicent-oss/shared-workflows/.github/actions/aws-codeartifact-login@main
+        with:
+          domain: telicent
+          owner: "${{ secrets.AWS_ACCOUNT_ID }}"
+      - name: "Fail if user unavailable"
+        if: ${{ ! steps.code-artifact-login-basic.outputs.user }}
+        run: |
+          echo "Failed to find AWS CodeArtifact user in outputs"
+          exit 1
+      - name: "Fail if token unavailable"
+        if: ${{ ! steps.code-artifact-login-basic.outputs.token }}
+        run: |
+          echo "Failed to find AWS CodeArtifact token in outputs"
+          exit 1
+      - name: "Pass if user and token found"
+        run: |
+          echo "AWS CodeArtifact user is ${{ steps.code-artifact-login-basic.outputs.user }}"
+          echo "AWS CodeArtifact token is ${{ steps.code-artifact-login-basic.outputs.token }}"
+          echo "The above token SHOULD be masked, if not please report a bug!"
+
+  advanced-test:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_DEPLOY_CODE_ARTIFACT }}
+          aws-region: eu-west-2
+      - name: "CodeArtifact Login"
+        id: code-artifact-login-advanced
+        uses: telicent-oss/shared-workflows/.github/actions/aws-codeartifact-login@main
+        with:
+          domain: telicent
+          owner: "${{ secrets.AWS_ACCOUNT_ID }}"
+          token-lifetime: "1200"
+      - name: "Fail if user unavailable"
+        if: ${{ ! steps.code-artifact-login-advanced.outputs.user }}
+        run: |
+          echo "Failed to find AWS CodeArtifact user in outputs"
+          exit 1
+      - name: "Fail if token unavailable"
+        if: ${{ ! steps.code-artifact-login-advanced.outputs.token }}
+        run: |
+          echo "Failed to find AWS CodeArtifact token in outputs"
+          exit 1
+      - name: "Pass if user and token found"
+        run: |
+          echo "AWS CodeArtifact user is ${{ steps.code-artifact-login-advanced.outputs.user }}"
+          echo "AWS CodeArtifact token is ${{ steps.code-artifact-login-advanced.outputs.token }}"
+          echo "The above token SHOULD be masked, if not please report a bug!"

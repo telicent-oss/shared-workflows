@@ -45,16 +45,17 @@ runs:
         aws-region: eu-west-2
         mask-aws-account-id: true
     - name: CodeArtifact login
+      id: code-artifact-login
       if: inputs.code-artefact-role != ''
-      uses: Telicent-io/aws-codeartifact-login-action@v1
+      uses: telicent-oss/shared-workflows/.github/actions/aws-codeartifact-login@main
       with:
         domain: telicent
-        owner: ${{ steps.creds.outputs.aws-account-id }}
+        owner: "${{ steps.creds.outputs.aws-account-id }}"
     - name: Generate requirements
       shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
       run: python -m piptools compile ${{ inputs.extra-args }} -o requirements.txt ${{ inputs.pyproject-toml-path }}
       env:
-        PIP_EXTRA_INDEX_URL: ${{ env.AWS_CODEARTIFACT_TOKEN != '' && format('https://aws:{0}@telicent-{1}.d.codeartifact.eu-west-2.amazonaws.com/pypi/telicent-code-artifacts/simple/', env.AWS_CODEARTIFACT_TOKEN, steps.creds.outputs.aws-account-id) || '' }}
+        PIP_EXTRA_INDEX_URL: ${{ steps.code-artifact-login.outputs.token != '' && format('https://aws:{0}@telicent-{1}.d.codeartifact.eu-west-2.amazonaws.com/pypi/telicent-code-artifacts/simple/', steps.code-artifact-login.outputs.token, steps.creds.outputs.aws-account-id) || '' }}
     - name: Install requirements
       if: inputs.install-requirements == 'true'
       shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
