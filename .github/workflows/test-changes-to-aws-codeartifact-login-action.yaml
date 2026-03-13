@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - .github/actions/aws-codeartifact-login/**
+      - .github/workflows/test-changes-to-aws-codeartifact-login-action.yaml
   workflow_dispatch:
 
 jobs:
@@ -23,7 +24,7 @@ jobs:
           aws-region: eu-west-2
       - name: "CodeArtifact Login"
         id: code-artifact-login-basic
-        uses: telicent-oss/shared-workflows/.github/actions/aws-codeartifact-login@TELDEVOPS-1047-codeartifact-login
+        uses: telicent-oss/shared-workflows/.github/actions/aws-codeartifact-login@main
         with:
           domain: telicent
           owner: "${{ secrets.AWS_ACCOUNT_ID }}"
@@ -60,7 +61,7 @@ jobs:
           aws-region: eu-west-2
       - name: "CodeArtifact Login"
         id: code-artifact-login-advanced
-        uses: telicent-oss/shared-workflows/.github/actions/aws-codeartifact-login@TELDEVOPS-1047-codeartifact-login
+        uses: telicent-oss/shared-workflows/.github/actions/aws-codeartifact-login@main
         with:
           domain: telicent
           owner: "${{ secrets.AWS_ACCOUNT_ID }}"
