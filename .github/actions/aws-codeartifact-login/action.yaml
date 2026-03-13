@@ -1,0 +1,53 @@
+name: AWS Code Artifact Login
+description: |
+  This action allows for obtaining an AWS Code Artifact token which is stored as an 
+  environment variable for use by subsequent steps.
+author: Telicent
+branding:
+  icon: 'log-in'
+  color: 'orange'
+
+inputs:
+  domain:
+    required: true
+    description: |
+      Specifies the AWS CodeArtifact domain.
+  owner:
+    required: true
+    description: |
+      Specifies the AWS CodeArtifact owner.
+  token-lifetime:
+    required: false
+    default: "900"
+    description: |
+      Specifies the lifetime of the token in seconds.
+      Defaults to 900 seconds (15 minutes).
+      CodeArtifact allows tokens to be issued with a lifetime of between 900 and 43200 (12 hours).
+outputs:
+  user:
+    description: The AWS CodeArtifact user.
+    value: aws
+  token:
+    description: The value of the AWS CodeArtifact token.
+    value: ${{ steps.token-non-windows.outputs.token }}${{ steps.token-windows.outputs.token }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Retrieve AWS CodeArtifact Token
+      id: token-non-windows
+      if: ${{ runner.os != 'Windows' }}
+      shell: bash
+      run: |
+        TOKEN=$(aws codeartifact get-authorization-token --domain ${{ inputs.domain }} --domain-owner ${{ inputs.owner }} --query authorizationToken --duration-seconds ${{ inputs.token-lifetime }} --output text)
+        echo "::add-mask::$TOKEN"
+        echo "token=$TOKEN" >> $GITHUB_OUTPUT
+    - name: Retrieve AWS CodeArtifact Token (Windows)
+      id: token-windows
+      if: ${{ runner.os == 'Windows' }}
+      shell: powershell
+      run: |
+        aws codeartifact get-authorization-token --domain ${{ inputs.domain }} --domain-owner ${{ inputs.owner }} --query authorizationToken --duration-seconds ${{ inputs.token-lifetime }} --output text > temp.token
+        Write-Output -InputObject ("::add-mask::" + (Get-Content -Path temp.token -Raw))
+        Write-Output -InputObject ("token=" + (Get-Content -Path temp.token -Raw)) | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+        Remove-Item -Path temp.token

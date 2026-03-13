@@ -1,0 +1,70 @@
+name: Action Test
+on: 
+  push:
+    paths:
+      - .github/actions/aws-codeartifact-login/**
+  workflow_dispatch:
+
+jobs:
+  basic-test:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1-node16
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_DEPLOY_CODE_ARTIFACT }}
+          aws-region: eu-west-2
+      - name: "CodeArtifact Login"
+        uses: Telicent-io/aws-codeartifact-login-action@v1
+        with:
+          domain: telicent
+          owner: ${{ secrets.AWS_ACCOUNT_ID }}
+      - name: "Fail if token unavailable"
+        if: ${{ ! env.AWS_CODEARTIFACT_TOKEN }}
+        run: |
+          echo "Failed to find AWS CodeArtifact token in environment"
+          exit 1
+      - name: "Pass if token found"
+        run: |
+          echo "AWS CodeArtifact token is ${AWS_CODEARTIFACT_TOKEN}"
+          echo "The above token SHOULD be masked, if not please report a bug!"
+
+  advanced-test:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1-node16
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_DEPLOY_CODE_ARTIFACT }}
+          aws-region: eu-west-2
+      - name: "CodeArtifact Login"
+        uses: Telicent-io/aws-codeartifact-login-action@v1
+        with:
+          domain: telicent
+          owner: ${{ secrets.AWS_ACCOUNT_ID }}
+          user-variable: "CUSTOM_USER"
+          token-variable: "CUSTOM_TOKEN"
+          token-lifetime: "1200"
+      - name: "Fail if token unavailable"
+        if: ${{ ! env.CUSTOM_TOKEN }}
+        run: |
+          echo "Failed to find AWS CodeArtifact token in environment"
+          exit 1
+      - name: "Pass if token found"
+        run: |
+          echo "AWS CodeArtifact token is ${CUSTOM_TOKEN}"
+          echo "The above token SHOULD be masked, if not please report a bug!"
