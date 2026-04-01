@@ -350,6 +350,7 @@ jobs:
           scan-name: maven
           scan-ref: .
           remote-vex: |
+            telicent-oss/telicent-base-images
             ${{ inputs.REMOTE_VEX }}
 
       - name: Detect Maven version
