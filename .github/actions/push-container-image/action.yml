@@ -12,20 +12,16 @@ inputs:
     description: The prefix for the image name. Defaults to `telicent-`.
   dry-run:
     required: false
-    default: 'false'
+    default: "false"
     description: Whether to test the build and scan without pushing to the registry.
   github-token:
     required: true
     description: GitHub token to allow the action to interact with the repository.
 
   # Application build options
-  enable-buildkit-cache:
-    required: false
-    default: 'false'
-    description: Whether the docker buildkit cache is required.
   java-version:
     required: false
-    default: '21'
+    default: "21"
     description: Specifies the JDK version to install and build with.  Defaults to 21.
   jdk:
     required: false
@@ -34,16 +30,18 @@ inputs:
   package-directory:
     required: false
     default: .
-    description: If release has multiple package that are SBOM targets, then set this to disambiguate SBOMs.
+    description: If release has multiple package that are SBOM targets, then set
+      this to disambiguate SBOMs.
   uses-maven:
     required: false
-    default: 'false'
+    default: "false"
     description: Whether your build requires the JDK and Maven to be present.
 
   # Container registry options
   registry:
     required: true
-    description: The container registry to push the image to. Supported values are `aws` (Amazon ECR) or `quay` (Quay.io).
+    description: The container registry to push the image to. Supported values are
+      `aws` (Amazon ECR) or `quay` (Quay.io).
   quay-username:
     required: false
     description: Quay username. Required if registry is set to `quay`.
@@ -54,27 +52,28 @@ inputs:
   # Container build and tag options
   allow-latest-tag:
     required: false
-    default: 'false'
+    default: "false"
     description: |
       Set to `true` to explicitly add the `latest` tag.
       The tag may still be added implicitly if `allow-mutable-tags` is set to `true` and the reference branch is the branch specified as `main-branch`.
   allow-development-tag:
     required: false
-    default: 'false'
+    default: "false"
     description: |
       Set to `true` to explicitly add the `development` tag.
       The tag may still be added implicitly if `allow-mutable-tags` is set to `true` and the reference branch is differs from the branch specified as `main-branch`.
   allow-mutable-tags:
     required: false
-    default: 'true'
-    description: Set to `false` to avoid adding mutable tags like `latest` and `development` based on the branch specified as `main-branch`.
+    default: "true"
+    description: Set to `false` to avoid adding mutable tags like `latest` and
+      `development` based on the branch specified as `main-branch`.
   allow-sha-tag:
     required: false
-    default: 'true'
+    default: "true"
     description: Set to `false` to avoid adding the image SHA as a tag.
   allow-version-tag:
     required: false
-    default: 'true'
+    default: "true"
     description: Set to `false` to avoid adding a version tag.
   build-args:
     required: false
@@ -103,7 +102,8 @@ inputs:
       branch then the latest tag will be added to the image, if the build is on another branch then the development
       tag will be added to the image (only with `ALLOW_MUTABLE_TAGS` for both).
   path:
-    description: The path in which the Dockerfile is located. For current path leave empty. Otherwise eg. ./frontend
+    description: The path in which the Dockerfile is located. For current path leave
+      empty. Otherwise eg. ./frontend
     default: .
   target:
     required: false
@@ -123,22 +123,23 @@ inputs:
   # Trivy/Grype scanning options
   grype-scan-image:
     required: false
-    default: 'true'
+    default: "true"
     description: Whether to run a Grype scan on the built image.
   trivy-ignores:
     required: false
-    description: Name of trivy ignore file. Only allowed for BUILD image, MUST NOT be used with DEPLOY images.
+    description: Name of trivy ignore file. Only allowed for BUILD image, MUST NOT
+      be used with DEPLOY images.
   trivy-scan-dockerfile:
     required: false
-    default: 'true'
+    default: "true"
     description: Whether to run a Trivy scan on the Dockerfile used to build the image.
   trivy-scan-image:
     required: false
-    default: 'true'
+    default: "true"
     description: Whether to run a Trivy scan on the built image.
   fail-on-unfixed:
     required: false
-    default: 'false'
+    default: "false"
     description: Whether to fail the scan if unfixed vulnerabilities are found.
   remote-vex:
     required: false
@@ -160,7 +161,8 @@ outputs:
     description: The versioned container image tag that was created and published.
     value: ${{ steps.capture-tags.outputs.image }}
   sha-image-tag:
-    description: The git revision (SAH) applied as a tag to the container image, if applicable.
+    description: The git revision (SAH) applied as a tag to the container image, if
+      applicable.
     value: ${{ steps.output-sha-image-tag.outputs.sha-image-tag }}
 
 runs:
@@ -180,7 +182,8 @@ runs:
       run: ${{ github.action_path }}/globals.sh
       shell: bash
       env:
-        BOM_ARTIFACT_NAME: "${{ github.run_number }}${{ inputs.package-directory != '.' && format('-{0}', inputs.package-directory) || '' }}.sbom.json"
+        BOM_ARTIFACT_NAME: "${{ github.run_number }}${{ inputs.package-directory != '.'
+          && format('-{0}', inputs.package-directory) || '' }}.sbom.json"
 
     - name: Checkout
       uses: actions/checkout@v5
@@ -212,31 +215,15 @@ runs:
       # Allow to continue even if SBOM is not found
       continue-on-error: true
       with:
-        name: ${{ steps.global.outputs.bom-artifact-name }}
+        name: ${{ steps.globals.outputs.bom-artifact-name }}
         path: ${{ inputs.PATH }}
-
-    - name: Enable buildkit cache
-      uses: actions/cache@v4.2.0
-      if: inputs.enable-buildkit-cache == 'true'
-      with:
-        path: /tmp/buildkit-cache/buildkit-state.tar
-        key: ${{ runner.os }}-buildkit-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-buildkit-
-
-    - name: Load buildkit state from cache
-      uses: dashevo/gh-action-cache-buildkit-state@v1
-      if: inputs.enable-buildkit-cache == 'true'
-      with:
-        builder: buildx_buildkit_${{ steps.buildx.outputs.name }}0
-        cache-path: /tmp/buildkit-cache
-        cache-max-size: 3g
 
     - name: Configure AWS credentials from main account
       id: aws-login
       # Only run if dry run is explicitly set to 'false'
       # Dependabot triggered PRs don't have credentials to push images, so no need to run in this case either
-      if: inputs.registry == 'aws' && inputs.dry-run == 'false' && github.actor != 'dependabot[bot]'
+      if: inputs.registry == 'aws' && inputs.dry-run == 'false' && github.actor !=
+        'dependabot[bot]'
       uses: aws-actions/configure-aws-credentials@v4
       with:
         role-to-assume: arn:aws:iam::098669589541:role/GitHubDeploymentRole
@@ -246,7 +233,8 @@ runs:
     - name: Docker Login to Amazon ECR
       # Only run if dry run is explicitly set to 'false'
       # Dependabot triggered PRs don't have credentials to push images, so no need to run in this case either
-      if: inputs.registry == 'aws' && inputs.dry-run == 'false' && github.actor != 'dependabot[bot]'
+      if: inputs.registry == 'aws' && inputs.dry-run == 'false' && github.actor !=
+        'dependabot[bot]'
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
       with:
@@ -255,7 +243,8 @@ runs:
     - name: Docker Login to Quay
       # Only run if dry run is explicitly set to 'false'
       # Dependabot triggered PRs don't have credentials to push images, so no need to run in this case either
-      if: inputs.registry == 'quay' && inputs.dry-run == 'false' && github.actor != 'dependabot[bot]'
+      if: inputs.registry == 'quay' && inputs.dry-run == 'false' && github.actor !=
+        'dependabot[bot]'
       uses: docker/login-action@v3
       with:
         registry: quay.io
@@ -288,11 +277,16 @@ runs:
           type=raw,value=latest,enable=${{ env.TAG_LATEST }}
           type=raw,value=development,enable=${{ env.TAG_DEVELOPMENT }}
       env:
-        AWS_REGISTRY: ${{ inputs.registry == 'aws' && steps.login-ecr.outputs.registry || '' }}
+        AWS_REGISTRY: ${{ inputs.registry == 'aws' && steps.login-ecr.outputs.registry
+          || '' }}
         QUAY_REGISTRY: ${{ inputs.registry == 'quay' && 'quay.io/telicent' || '' }}
-        IMAGE_NAME: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}
-        TAG_DEVELOPMENT: ${{ inputs.allow-development-tag == 'true' || (inputs.allow-mutable-tags == 'true' && github.ref_name != inputs.main-branch) }}
-        TAG_LATEST: ${{ inputs.allow-latest-tag == 'true' || (inputs.allow-mutable-tags == 'true' && github.ref_name == inputs.main-branch) }}
+        IMAGE_NAME: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{
+          inputs.image-suffix }}
+        TAG_DEVELOPMENT: ${{ inputs.allow-development-tag == 'true' ||
+          (inputs.allow-mutable-tags == 'true' && github.ref_name !=
+          inputs.main-branch) }}
+        TAG_LATEST: ${{ inputs.allow-latest-tag == 'true' || (inputs.allow-mutable-tags
+          == 'true' && github.ref_name == inputs.main-branch) }}
 
     - name: Output SHA image tag
       id: output-sha-image-tag
@@ -316,8 +310,12 @@ runs:
         platforms: linux/amd64,linux/arm64
         # Dependabot triggered PRs don't have credentials to push images
         push: ${{ github.actor != 'dependabot[bot]' }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        cache-from: |
+          type=gha,scope=${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-amd64
+          type=gha,scope=${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-arm64
+        cache-to: |
+          type=gha,mode=max,scope=${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-amd64
+          type=gha,mode=max,scope=${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-arm64
         context: ${{ inputs.path }}
         file: ${{ inputs.path }}/${{ inputs.dockerfile }}
         tags: ${{ steps.meta.outputs.tags }}
@@ -340,8 +338,10 @@ runs:
         # Because of this, the dry run excludes the 'platforms' input.
         builder: ${{ steps.buildx.outputs.name }}
         push: false
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+        cache-from: type=gha,scope=${{ inputs.app-name-prefix }}${{ inputs.app-name
+          }}${{ inputs.image-suffix }}-amd64
+        cache-to: type=gha,mode=max,scope=${{ inputs.app-name-prefix }}${{
+          inputs.app-name }}${{ inputs.image-suffix }}-amd64
         context: ${{ inputs.path }}
         file: ${{ inputs.path }}/${{ inputs.dockerfile }}
         tags: ${{ steps.meta.outputs.tags }}
@@ -351,7 +351,8 @@ runs:
           ${{ inputs.font-awesome-key && inputs.font-awesome-key || '' }}
         build-args: |
           ${{ inputs.build-args }}
-        outputs: type=docker,dest=/tmp/${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}.tar
+        outputs: type=docker,dest=/tmp/${{ inputs.app-name-prefix }}${{ inputs.app-name
+          }}${{ inputs.image-suffix }}.tar
 
     - name: Upload container image tarball artefact
       # Only run if dry run is set to anything other than 'false', indicating that this is a dry run
@@ -359,8 +360,10 @@ runs:
       uses: actions/upload-artifact@v4
       if: inputs.dry-run != 'false'
       with:
-        name: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}.tar
-        path: /tmp/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}.tar
+        name: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX
+          }}.tar
+        path: /tmp/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{
+          inputs.IMAGE_SUFFIX }}.tar
 
     - name: Capture built container image tags
       id: capture-tags
@@ -370,7 +373,8 @@ runs:
         REGISTRY: "${{ inputs.registry }}"
         AWS_REGISTRY_URL: "${{ steps.login-ecr.outputs.registry}}"
         QUAY_REGISTRY_URL: "quay.io/telicent"
-        IMAGE_NAME: "${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}"
+        IMAGE_NAME: "${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{
+          inputs.image-suffix }}"
         IMAGE_VERSION: "${{ steps.meta.outputs.version }}"
 
     - name: Trivy dockerfile scan
@@ -380,11 +384,13 @@ runs:
       with:
         dockerfile: ${{ inputs.path }}/${{ inputs.dockerfile }}
         github-token: ${{ inputs.github-token }}
-        scan-name: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-${{ inputs.dockerfile }}
+        scan-name: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{
+          inputs.image-suffix }}-${{ inputs.dockerfile }}
 
     - name: Trivy image scan
       # Only run if Trivy image scan is explicitly set to 'true' AND (is a dry run OR (is not a dry run AND user is not dependabot))
-      if: inputs.trivy-scan-image == 'true' && (inputs.dry-run != 'false' || (inputs.dry-run == 'false' && github.actor != 'dependabot[bot]'))
+      if: inputs.trivy-scan-image == 'true' && (inputs.dry-run != 'false' ||
+        (inputs.dry-run == 'false' && github.actor != 'dependabot[bot]'))
       uses: telicent-oss/shared-workflows/.github/actions/trivy-image-scan@main
       with:
         github-token: ${{ inputs.github-token }}
@@ -394,14 +400,17 @@ runs:
         registry: ${{ inputs.registry }}
         quay-username: ${{ inputs.quay-username }}
         quay-token: ${{ inputs.quay-token }}
-        scan-name: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-${{ inputs.dockerfile }}
+        scan-name: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{
+          inputs.image-suffix }}-${{ inputs.dockerfile }}
         fail-on-unfixed: ${{ inputs.fail-on-unfixed }}
         remote-vex: ${{ inputs.remote-vex }}
-        trivy-ignores: ${{ inputs.trivy-ignores != '' && format('{0}/{1}', inputs.package-directory, inputs.trivy-ignores) || '' }}
+        trivy-ignores: ${{ inputs.trivy-ignores != '' && format('{0}/{1}',
+          inputs.package-directory, inputs.trivy-ignores) || '' }}
 
     - name: Grype image scan
       # Only run if Grype image scan is explicitly set to 'true' AND (is a dry run OR (is not a dry run AND user is not dependabot))
-      if: inputs.grype-scan-image == 'true' && (inputs.dry-run != 'false' || (inputs.dry-run == 'false' && github.actor != 'dependabot[bot]'))
+      if: inputs.grype-scan-image == 'true' && (inputs.dry-run != 'false' ||
+        (inputs.dry-run == 'false' && github.actor != 'dependabot[bot]'))
       uses: telicent-oss/shared-workflows/.github/actions/grype-image-scan@main
       with:
         github-token: ${{ inputs.github-token }}
@@ -411,18 +420,21 @@ runs:
         registry: ${{ inputs.registry }}
         quay-username: ${{ inputs.quay-username }}
         quay-token: ${{ inputs.quay-token }}
-        scan-name: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-${{ inputs.dockerfile }}
+        scan-name: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{
+          inputs.image-suffix }}-${{ inputs.dockerfile }}
         fail-on-unfixed: ${{ inputs.fail-on-unfixed }}
         remote-vex: ${{ inputs.remote-vex }}
 
     - name: Notify MS Teams of image push
       # Only runs if the workflow failed due to a failure of the 'build-image' step
-      if: failure() && steps.build-images.outcome == 'failure' && inputs.teams-webhook-url != ''
+      if: failure() && steps.build-images.outcome == 'failure' &&
+        inputs.teams-webhook-url != ''
       uses: telicent-oss/shared-workflows/.github/actions/notify-teams@main
       with:
         app-name: ${{ inputs.app-name}}
         notification-type: image-push
         teams-webhook-url: ${{ inputs.teams-webhook-url }}
         image-url: ${{ steps.capture-tags.outputs.image }}
-        registry: ${{ inputs.registry == 'quay' && 'Quay.io' || inputs.registry == 'aws' && 'ECR' || '' }}
+        registry: ${{ inputs.registry == 'quay' && 'Quay.io' || inputs.registry == 'aws'
+          && 'ECR' || '' }}
         status: ${{ steps.build-images.outcome }}
