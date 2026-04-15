@@ -18,10 +18,10 @@ inputs:
     required: false
     default: "false"
     description: Whether to test the build and scan without pushing to the registry.
-  fresh-checkout:
+  sparse-checkout:
     required: false
-    default: "true"
-    description: Use existing checkout (false), or checkout within the action (true) Useful if you need to modify the checkout config ie - non sparse
+    default: "${{ inputs.chart }}"
+    description: "Specify files to include in sparse-checkout, defaults to just the chart name"
 
   # Container registry options
   registry:
@@ -62,10 +62,9 @@ runs:
       with:
         version: "latest"
     - name: Checkout Helm chart
-      if: ${{ inputs.fresh-checkout == 'true' }}
       uses: actions/checkout@v6
       with:
-        sparse-checkout: ${{ inputs.chart }}
+        sparse-checkout: ${{ inputs.sparse-checkout }}
         sparse-checkout-cone-mode: false
     - name: Package Helm chart
       shell: bash
