@@ -3,7 +3,6 @@ description: |
   Package and push a Helm chart to the selected Helm repository.
   Optionally update the chart version and app version prior to packaging.
 author: Telicent
-
 inputs:
   app-name:
     required: true
@@ -17,8 +16,12 @@ inputs:
     description: Path to the Helm chart to package and push, relative to the repository root.
   dry-run:
     required: false
-    default: 'false'
+    default: "false"
     description: Whether to test the build and scan without pushing to the registry.
+  sparse-checkout:
+    required: false
+    default: ""
+    description: "Specify files to include in sparse-checkout, defaults to just the chart name"
 
   # Container registry options
   registry:
@@ -42,7 +45,7 @@ inputs:
       Ignored if `replace-chart-versions` is not `true`.
   replace-chart-versions:
     required: false
-    default: 'false'
+    default: "false"
     description: Whether the `version`` and `appVersion` values should be used to update Chart.yaml when packaging the Helm chart.
 
 runs:
@@ -61,7 +64,7 @@ runs:
     - name: Checkout Helm chart
       uses: actions/checkout@v6
       with:
-        sparse-checkout: ${{ inputs.chart }}
+        sparse-checkout: ${{ inputs.sparse-checkout != '' && inputs.sparse-checkout || inputs.chart }}
         sparse-checkout-cone-mode: false
     - name: Package Helm chart
       shell: bash
@@ -123,9 +126,9 @@ runs:
       if: ${{ inputs.dry-run == 'false' }}
       shell: bash
       run: |
-          echo "Pushing Helm chart "$PACKAGED_CHART" to ${{ env.AWS_REGISTRY }}${{ env.QUAY_REGISTRY }}"
-          helm push "$PACKAGED_CHART" ${{ env.AWS_REGISTRY }}${{ env.QUAY_REGISTRY }}
-          echo "  ✅ Helm chart pushed successfully"
+        echo "Pushing Helm chart "$PACKAGED_CHART" to ${{ env.AWS_REGISTRY }}${{ env.QUAY_REGISTRY }}"
+        helm push "$PACKAGED_CHART" ${{ env.AWS_REGISTRY }}${{ env.QUAY_REGISTRY }}
+        echo "  ✅ Helm chart pushed successfully"
       env:
         PACKAGED_CHART: "${{ runner.temp }}/packaged-chart/${{ inputs.app-name-prefix }}${{ inputs.app-name }}-${{ inputs.version }}.tgz"
         AWS_REGISTRY: ${{ inputs.registry == 'aws' && format('oci://{0}/charts' ,steps.login-ecr.outputs.registry) || '' }}
