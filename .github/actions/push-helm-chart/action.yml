@@ -20,7 +20,7 @@ inputs:
     description: Whether to test the build and scan without pushing to the registry.
   sparse-checkout:
     required: false
-    default: "${{ inputs.chart }}"
+    default: ""
     description: "Specify files to include in sparse-checkout, defaults to just the chart name"
 
   # Container registry options
@@ -64,7 +64,7 @@ runs:
     - name: Checkout Helm chart
       uses: actions/checkout@v6
       with:
-        sparse-checkout: ${{ inputs.sparse-checkout }}
+        sparse-checkout: ${{ inputs.sparse-checkout != '' && inputs.sparse-checkout || inputs.chart }}
         sparse-checkout-cone-mode: false
     - name: Package Helm chart
       shell: bash
