@@ -1,0 +1,99 @@
+name: Helm Chart Upversion PR
+
+on:
+  workflow_call:
+    inputs:
+      chart-version:
+        required: true
+        type: string
+        description: New chart version to set in all matching applicationSets
+      chart-name:
+        required: true
+        type: string
+        description: >
+          Chart identifier to search for in applicationSet.yaml files
+          (e.g. charts/telicent-canonicals-event-document-mapper).
+          All applicationSets referencing this chart are updated in a single PR.
+      k8s-manifests-repo:
+        required: false
+        type: string
+        default: telicent-io/k8s-manifests
+        description: GitHub repository (owner/repo) for k8s-manifests
+      create-pr:
+        required: false
+        type: boolean
+        default: false
+        description: Set to true to actually raise a pull request; false performs a dry run (commits locally but does not push or open a PR)
+    secrets:
+      token:
+        required: true
+        description: GitHub PAT with contents:write and pull-requests:write on k8s-manifests-repo
+
+jobs:
+  upversion-pr:
+    name: Upversion ${{ inputs.chart-name }} to ${{ inputs.chart-version }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout k8s-manifests
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.k8s-manifests-repo }}
+          token: ${{ secrets.token }}
+
+      - name: Find and update applicationSets
+        id: update
+        env:
+          CHART_NAME: ${{ inputs.chart-name }}
+          NEW_VERSION: ${{ inputs.chart-version }}
+        run: |
+          mapfile -t FILES < <(grep -rl "chart: ${CHART_NAME}" --include="applicationSet.yaml" .)
+          if [[ ${#FILES[@]} -eq 0 ]]; then
+            echo "::error::No applicationSet.yaml found referencing chart '${CHART_NAME}'"
+            exit 1
+          fi
+          echo "Found ${#FILES[@]} applicationSet(s): ${FILES[*]}"
+          for f in "${FILES[@]}"; do
+            sed -i "s/chartVersion: .*/chartVersion: ${NEW_VERSION}/" "${f}"
+          done
+
+      - name: Create branch and push
+        id: push
+        env:
+          CHART_NAME: ${{ inputs.chart-name }}
+          NEW_VERSION: ${{ inputs.chart-version }}
+          CREATE_PR: ${{ inputs.create-pr }}
+        run: |
+          SHORT_NAME=$(basename "${CHART_NAME}")
+          BRANCH="chore/upversion-${SHORT_NAME}-${NEW_VERSION}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${BRANCH}"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Already at ${NEW_VERSION}, nothing to commit"
+            exit 0
+          fi
+          git commit -m "chore: upversion ${SHORT_NAME} to ${NEW_VERSION}"
+          if [[ "${CREATE_PR}" != "true" ]]; then
+            echo "create-pr is false — skipping push"
+            exit 0
+          fi
+          git push origin "${BRANCH}"
+          echo "branch=${BRANCH}" >> "${GITHUB_OUTPUT}"
+          echo "short-name=${SHORT_NAME}" >> "${GITHUB_OUTPUT}"
+
+      - name: Create pull request
+        if: inputs.create-pr && steps.push.outputs.branch != ''
+        env:
+          GH_TOKEN: ${{ secrets.token }}
+          REPO: ${{ inputs.k8s-manifests-repo }}
+          BRANCH: ${{ steps.push.outputs.branch }}
+          SHORT_NAME: ${{ steps.push.outputs.short-name }}
+          NEW_VERSION: ${{ inputs.chart-version }}
+        run: |
+          gh pr create \
+            --repo "${REPO}" \
+            --title "chore: upversion ${SHORT_NAME} to ${NEW_VERSION}" \
+            --body "Automated upversion of \`${SHORT_NAME}\` Helm chart to \`${NEW_VERSION}\`." \
+            --base main \
+            --head "${BRANCH}"
