@@ -11,9 +11,7 @@ on:
         required: true
         type: string
         description: >
-          Chart identifier to search for in applicationSet.yaml files
-          (e.g. charts/telicent-canonicals-event-document-mapper).
-          All applicationSets referencing this chart are updated in a single PR.
+          Chart identifier to search for in applicationSet.yaml files (e.g. charts/telicent-canonicals-event-document-mapper). All applicationSets referencing this chart are updated in a single PR.
       k8s-manifests-repo:
         required: false
         type: string
@@ -39,6 +37,7 @@ jobs:
         with:
           repository: ${{ inputs.k8s-manifests-repo }}
           token: ${{ secrets.token }}
+          persist-credentials: false
 
       - name: Find and update applicationSets
         id: update
