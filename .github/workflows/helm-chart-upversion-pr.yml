@@ -62,12 +62,15 @@ jobs:
           CHART_NAME: ${{ inputs.chart-name }}
           NEW_VERSION: ${{ inputs.chart-version }}
           CREATE_PR: ${{ inputs.create-pr }}
+          GH_TOKEN: ${{ secrets.token }}
+          REPO: ${{ inputs.k8s-manifests-repo }}
         run: |
           SHORT_NAME=$(basename "${CHART_NAME}")
           # Stable branch name (no version) so a new release updates the existing PR
           BRANCH="chore/upversion-${SHORT_NAME}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
           git checkout -b "${BRANCH}"
           git add -A
           if git diff --cached --quiet; then
