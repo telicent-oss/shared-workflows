@@ -64,7 +64,8 @@ jobs:
           CREATE_PR: ${{ inputs.create-pr }}
         run: |
           SHORT_NAME=$(basename "${CHART_NAME}")
-          BRANCH="chore/upversion-${SHORT_NAME}-${NEW_VERSION}"
+          # Stable branch name (no version) so a new release updates the existing PR
+          BRANCH="chore/upversion-${SHORT_NAME}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "${BRANCH}"
@@ -78,11 +79,11 @@ jobs:
             echo "create-pr is false — skipping push"
             exit 0
           fi
-          git push origin "${BRANCH}"
+          git push --force origin "${BRANCH}"
           echo "branch=${BRANCH}" >> "${GITHUB_OUTPUT}"
           echo "short-name=${SHORT_NAME}" >> "${GITHUB_OUTPUT}"
 
-      - name: Create pull request
+      - name: Create or update pull request
         if: inputs.create-pr && steps.push.outputs.branch != ''
         env:
           GH_TOKEN: ${{ secrets.token }}
@@ -91,9 +92,17 @@ jobs:
           SHORT_NAME: ${{ steps.push.outputs.short-name }}
           NEW_VERSION: ${{ inputs.chart-version }}
         run: |
-          gh pr create \
-            --repo "${REPO}" \
-            --title "chore: upversion ${SHORT_NAME} to ${NEW_VERSION}" \
-            --body "Automated upversion of \`${SHORT_NAME}\` Helm chart to \`${NEW_VERSION}\`." \
-            --base main \
-            --head "${BRANCH}"
+          TITLE="chore: upversion ${SHORT_NAME} to ${NEW_VERSION}"
+          BODY="Automated upversion of \`${SHORT_NAME}\` Helm chart to \`${NEW_VERSION}\`."
+          EXISTING_PR=$(gh pr list --repo "${REPO}" --head "${BRANCH}" --state open --json number --jq '.[0].number')
+          if [[ -n "${EXISTING_PR}" ]]; then
+            gh pr edit "${EXISTING_PR}" --repo "${REPO}" --title "${TITLE}" --body "${BODY}"
+            echo "Updated PR #${EXISTING_PR}"
+          else
+            gh pr create \
+              --repo "${REPO}" \
+              --title "${TITLE}" \
+              --body "${BODY}" \
+              --base main \
+              --head "${BRANCH}"
+          fi
