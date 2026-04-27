@@ -46,9 +46,9 @@ runs:
       id: metadata-updater
       shell: python
       run: |
-        include = ${{ inputs.include-charts != '' && format('"--include {0}"', inputs.include-charts) || '""' }}
-        exclude = ${{ inputs.exclude-charts != '' && format('"--exclude {0}"', inputs.exclude-charts) || '""' }}
-        python "${{ github.action_path }}/metadata-updater.py" --ci include exclude
+        # include = ${{ inputs.include-charts != '' && format('"--include {0}"', inputs.include-charts) || '""' }}
+        # exclude = ${{ inputs.exclude-charts != '' && format('"--exclude {0}"', inputs.exclude-charts) || '""' }}
+        python "${{ github.action_path }}/metadata-updater.py" --ci
     - name: Check for uncommitted changes
       shell: bash
       run: |
