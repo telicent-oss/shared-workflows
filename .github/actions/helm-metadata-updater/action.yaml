@@ -7,9 +7,11 @@ description: |
 author: Telicent
 
 inputs:
-  sparse-checkout:
+  charts-path:
     required: false
-    description: A list of paths to include in the sparse checkout.
+    description: |
+      The path to the Helm charts to run the metadata updater against.
+      The path should be relative to the root of the repository.
     default: /charts
   include-charts:
     required: false
@@ -31,7 +33,7 @@ runs:
     - name: Checkout
       uses: actions/checkout@v6
       with:
-        sparse-checkout: ${{ inputs.sparse-checkout }}
+        sparse-checkout: ${{ inputs.charts-path }}
         sparse-checkout-cone-mode: false
     - name: Setup Node.js
       uses: actions/setup-node@v4
@@ -41,11 +43,9 @@ runs:
       id: metadata-updater
       shell: bash
       run: |
-        echo $PWD
-        ls charts/*
         INCLUDE=${{ inputs.include-charts != '' && format('"--include {0}"', inputs.include-charts) || '""' }}
         EXCLUDE=${{ inputs.exclude-charts != '' && format('"--exclude {0}"', inputs.exclude-charts) || '""' }}
-        python "${{ github.action_path }}/metadata-updater.py" --ci $INCLUDE $EXCLUDE
+        python "${{ github.action_path }}/metadata-updater.py" --ci --path ${{ inputs.charts-path }} $INCLUDE $EXCLUDE
     - name: Check for uncommitted changes
       shell: bash
       run: |

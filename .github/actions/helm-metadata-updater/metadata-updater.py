@@ -26,11 +26,11 @@ class ArgsFactory:
             'omitted.'))
     parser.add_argument('--include', '-i', nargs='*', metavar='chart',
         help=('A space separated list of charts to include. Paths should be '
-            'relative from the root of the repository. Takes precedence '
+            'relative to the root of the repository. Takes precedence '
             'over `--exclude`.'), default=[])
     parser.add_argument('--exclude', '-e', nargs='*', metavar='chart',
         help=('A space separated list of charts to exclude. Paths should be '
-            'relative from the root of the repository. Ignored if `--include` '
+            'relative to the root of the repository. Ignored if `--include` '
             'is specified.'), default=[])
 
     @staticmethod
@@ -42,9 +42,9 @@ class ArgsFactory:
         Example
         -------
         >>> ArgsFactory.parse(['--ci', '--exclude', 'charts/test-chart'])
-        Namespace(ci=True, include=[], exclude=['charts/test-chart'])
-        >>> ArgsFactory.parse(['--ci', '--include', 'charts/test-chart'])
-        Namespace(ci=True, include=['charts/test-chart'], exclude=[])
+        Namespace(ci=True, path='./charts', include=[], exclude=['charts/test-chart'])
+        >>> ArgsFactory.parse(['--ci', '--path', './different-path', '--include', 'charts/test-chart'])
+        Namespace(ci=True, path='./different-path', include=['charts/test-chart'], exclude=[])
         >>> ArgsFactory.parse(['--help'])
         Traceback (most recent call last):
         SystemExit: 0
@@ -186,17 +186,17 @@ class ChartProcessor:
 
         @param path: The path to where Helm charts are located.
         @param include: A list of charts to include. Takes precedence `exclude`.
-            Paths should be relative from the root of the repository.
+            Paths should be relative to the root of the repository.
         @param exclude: A list of charts to exclude. Paths should be relative
-            from the root of the repository.
+            to the root of the repository.
 
         Example
         -------
-        >>> test_charts = ChartProcessor.get_charts()
+        >>> test_charts = ChartProcessor.get_charts('./charts')
         '''
 
         charts = {}
-        for path in Path('charts').glob('**/Chart.yaml'):
+        for path in Path(path).glob('**/Chart.yaml'):
             chart_obj = path.parent
             chart = str(chart_obj)
 
@@ -226,7 +226,7 @@ class ChartProcessor:
         Example
         -------
         >>> readme_generator_cmd = '.dev/readme-generator-for-helm'
-        >>> test_charts = ChartProcessor.get_charts()
+        >>> test_charts = ChartProcessor.get_charts('./charts')
         >>> test_chart = next(iter(test_charts))
         >>> ChartProcessor.process_chart('test-fake-chart', 'charts/does-not-exist', readme_generator_cmd)
         Traceback (most recent call last):
