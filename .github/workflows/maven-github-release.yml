@@ -102,7 +102,7 @@ jobs:
       MAVEN_PASSWORD: ${{ secrets.MVN_USER_PWD }}
     steps:
       - name: Check out Git repository
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v6
 
       - name: Install Java and Maven
         uses: actions/setup-java@v5.2.0
