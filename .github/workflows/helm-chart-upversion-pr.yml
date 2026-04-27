@@ -29,6 +29,9 @@ on:
 
 jobs:
   upversion-pr:
+    permissions:
+      contents: write
+
     name: Upversion ${{ inputs.chart-name }} to ${{ inputs.chart-version }}
     runs-on: ubuntu-latest
     steps:
