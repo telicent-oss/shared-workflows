@@ -67,9 +67,9 @@ jobs:
           SHORT_NAME=$(basename "${CHART_NAME}")
           # Stable branch name (no version) so a new release updates the existing PR
           BRANCH="chore/upversion-${SHORT_NAME}"
+          gh auth setup-git
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
           git checkout -b "${BRANCH}"
           git add -A
           if git diff --cached --quiet; then
