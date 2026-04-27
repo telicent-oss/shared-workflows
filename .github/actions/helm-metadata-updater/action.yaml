@@ -46,6 +46,8 @@ runs:
       id: metadata-updater
       shell: bash
       run: |
+        echo $PWD
+        ls -lart
         INCLUDE=${{ inputs.include-charts != '' && format('"--include {0}"', inputs.include-charts) || '""' }}
         EXCLUDE=${{ inputs.exclude-charts != '' && format('"--exclude {0}"', inputs.exclude-charts) || '""' }}
         python "${{ github.action_path }}/metadata-updater.py" --ci $INCLUDE $EXCLUDE

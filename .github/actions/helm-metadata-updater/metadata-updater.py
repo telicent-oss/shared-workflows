@@ -21,6 +21,9 @@ class ArgsFactory:
         help='Show this help message and exit.')
     parser.add_argument('--ci', '-c', action='store_true', default=False,
         help='Indicate execution is happening in a CI environment.')
+    parser.add_argument('--path', '-p', default='./charts',
+        help=('The path to the Helm charts to inspect. Assumes ./charts if '
+            'omitted.'))
     parser.add_argument('--include', '-i', nargs='*', metavar='chart',
         help=('A space separated list of charts to include. Paths should be '
             'relative from the root of the repository. Takes precedence '
@@ -177,10 +180,11 @@ class ChartProcessor:
     }
 
     @classmethod
-    def get_charts(cls, include: list[str]=[], exclude: list[str]=[]) -> dict[str, str]:
+    def get_charts(cls, path: str, include: list[str]=[], exclude: list[str]=[]) -> dict[str, str]:
         '''Returns a dictionary of all chart name -> chart path for all charts
         in the charts directory, excluding those in the `exclude` list.
 
+        @param path: The path to where Helm charts are located.
         @param include: A list of charts to include. Takes precedence `exclude`.
             Paths should be relative from the root of the repository.
         @param exclude: A list of charts to exclude. Paths should be relative
@@ -410,7 +414,7 @@ if __name__ == '__main__':
     Console.info('-' * 39)
 
     # Get charts, process them and print a summary of the results.
-    charts = ChartProcessor.get_charts(args.include, args.exclude)
+    charts = ChartProcessor.get_charts(args.path, args.include, args.exclude)
     results = [(chart_name, ChartProcessor.process_chart(chart_name, chart_path, readme_generator_cmd))
             for chart_name, chart_path in sorted(charts.items())]
     ChartProcessor.print_summary(results)
