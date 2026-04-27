@@ -12,7 +12,7 @@ inputs:
     description: |
       The path to the Helm charts to run the metadata updater against.
       The path should be relative to the root of the repository.
-    default: /charts
+    default: charts
   include-charts:
     required: false
     description: |
