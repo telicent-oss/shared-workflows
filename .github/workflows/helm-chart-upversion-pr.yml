@@ -81,7 +81,7 @@ jobs:
             echo "create-pr is false — skipping push"
             exit 0
           fi
-          git push --force origin "${BRANCH}"
+          git push --set-upstream origin "${BRANCH}"
           echo "branch=${BRANCH}" >> "${GITHUB_OUTPUT}"
           echo "short-name=${SHORT_NAME}" >> "${GITHUB_OUTPUT}"
 
