@@ -10,11 +10,7 @@ inputs:
   sparse-checkout:
     required: false
     description: A list of paths to include in the sparse checkout.
-    default: |
-      /charts/**/readme.config
-      /charts/**/README.md
-      /charts/**/values.schema.json
-      /charts/**/values.yaml
+    default: /charts
   include-charts:
     required: false
     description: |
@@ -46,7 +42,6 @@ runs:
       shell: bash
       run: |
         echo $PWD
-        ls .dev -lart
         ls charts/*
         INCLUDE=${{ inputs.include-charts != '' && format('"--include {0}"', inputs.include-charts) || '""' }}
         EXCLUDE=${{ inputs.exclude-charts != '' && format('"--exclude {0}"', inputs.exclude-charts) || '""' }}
