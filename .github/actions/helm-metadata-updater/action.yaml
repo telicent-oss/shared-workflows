@@ -35,7 +35,8 @@ runs:
     - name: Checkout
       uses: actions/checkout@v6
       with:
-        filter: /charts
+        sparse-checkout: ${{ inputs.sparse-checkout }}
+        sparse-checkout-cone-mode: false
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
