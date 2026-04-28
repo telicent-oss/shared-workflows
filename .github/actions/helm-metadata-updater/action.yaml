@@ -1,0 +1,58 @@
+name: Metadata Updater
+description: |
+  A GitHub Action that checks if the README file and JSON schema for a Helm
+  chart are up to date with the values.yaml file. If they are not, the action
+  will fail and print a report. This action is intended to be used in a workflow
+  that pushes a Helm chart to a an artifact repository.
+author: Telicent
+
+inputs:
+  charts-path:
+    required: false
+    description: |
+      The path to the Helm charts to run the metadata updater against.
+      The path should be relative to the root of the repository.
+    default: charts
+  include-charts:
+    required: false
+    description: |
+      A space separated list of charts to include in the check.
+      Paths should be relative to the root of the repository.
+      If not provided, all charts will be included.
+  exclude-charts:
+    required: false
+    description: |
+      A space separated list of charts to exclude from the check.
+      Paths should be relative to the root of the repository.
+      If not provided, no charts will be excluded.
+      Ignored if `include-charts` is provided.
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        sparse-checkout: ${{ inputs.charts-path }}
+        sparse-checkout-cone-mode: false
+    - name: Setup Node.js
+      uses: actions/setup-node@v6
+    - name: Run metadata updater
+      id: metadata-updater
+      shell: bash
+      run: |
+        INCLUDE=${{ inputs.include-charts != '' && format('"--include {0}"', inputs.include-charts) || '""' }}
+        EXCLUDE=${{ inputs.exclude-charts != '' && format('"--exclude {0}"', inputs.exclude-charts) || '""' }}
+        python "${{ github.action_path }}/metadata-updater.py" --ci --path ${{ inputs.charts-path }} $INCLUDE $EXCLUDE
+    - name: Check for uncommitted changes
+      shell: bash
+      run: |
+        has_diff=$(git diff || true)
+        if [[ -z "$has_diff" ]]; then
+          echo "✓ All documentation is up to date"
+        else
+          echo "[ERROR]✗ README files and schemas are out of sync with values.yaml"
+          echo "[ERROR]Please run '.dev/metadata-updater.sh' locally and commit the changes"
+          git diff
+          exit 1
+        fi
