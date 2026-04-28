@@ -52,13 +52,14 @@ runs:
       with: 
         node-version: ${{ inputs.node-version }}
         cache: 'yarn'
-    - name: Prepare cache
-      id: prepare
-      run: |
-        echo "node-version=$(node -v)" >> $GITHUB_OUTPUT
-        echo "yarn-cache-dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
-      shell: bash
-    # not sure if we need this, after adding cache: 'yarn' to Setup node
+    # Deprecated - caching now handled by the Setup node task.
+    # - name: Prepare cache
+    #   id: prepare
+    #   run: |
+    #     echo "node-version=$(node -v)" >> $GITHUB_OUTPUT
+    #     echo "yarn-cache-dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
+    #   shell: bash
+    # Deprecated - caching now handled by the Setup node task.
     # - name: Cache node_modules
     #   id: node_modules
     #   uses: actions/cache@v4
