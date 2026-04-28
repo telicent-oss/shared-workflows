@@ -58,7 +58,7 @@ runs:
         quay-username: "${{ inputs.quay-username }}"
         quay-token: "${{ inputs.quay-token }}"
     - name: Install Helm
-      uses: azure/setup-helm@v4
+      uses: azure/setup-helm@v5
       with:
         version: "latest"
     - name: Checkout Helm chart

@@ -36,9 +36,7 @@ runs:
         sparse-checkout: ${{ inputs.charts-path }}
         sparse-checkout-cone-mode: false
     - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: "24"
+      uses: actions/setup-node@v6
     - name: Run metadata updater
       id: metadata-updater
       shell: bash
