@@ -85,7 +85,7 @@ runs:
     - name: Upload container image tarball artefact
       # Only run if dry run is set to anything other than 'false', indicating that this is a dry run
       id: upload-image-artefact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: ${{ inputs.dry-run != 'false' }}
       with:
         name: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}.tar
