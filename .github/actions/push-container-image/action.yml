@@ -354,12 +354,12 @@ runs:
         outputs: type=docker,dest=/tmp/${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}.tar
 
     - name: Install CoSign
-      # Only run if dry run is explicitly set to 'false'
-      if: inputs.dry-run == 'false'
+      # Only run if dry run is explicitly set to 'false' and the image is being pushed to 'quay'.
+      if: inputs.dry-run == 'false' && inputs.registry == 'quay'
       uses: sigstore/cosign-installer@v3
     - name: Sign charts on Quay.io
-      # Only run if dry run is explicitly set to 'false'
-      if: inputs.dry-run == 'false'
+      # Only run if dry run is explicitly set to 'false' and the image is being pushed to 'quay'.
+      if: inputs.dry-run == 'false' && inputs.registry == 'quay'
       shell: bash
       env:
         DIGEST: ${{ steps.build-images.outputs.digest }}

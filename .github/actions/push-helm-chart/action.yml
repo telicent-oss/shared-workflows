@@ -146,12 +146,12 @@ runs:
         AWS_REGISTRY: ${{ inputs.registry == 'aws' && format('oci://{0}/charts' ,steps.login-ecr.outputs.registry) || '' }}
         QUAY_REGISTRY: ${{ inputs.registry == 'quay' && 'oci://quay.io/telicent/charts' || '' }}
     - name: Install CoSign
-      # Only run if dry run is explicitly set to 'false'
-      if: inputs.dry-run == 'false'
+      # Only run if dry run is explicitly set to 'false' and the image is being pushed to 'quay'.
+      if: inputs.dry-run == 'false' && inputs.registry == 'quay'
       uses: sigstore/cosign-installer@v3
     - name: Sign charts on Quay.io
-      # Only run if dry run is explicitly set to 'false'
-      if: inputs.dry-run == 'false'
+      # Only run if dry run is explicitly set to 'false' and the image is being pushed to 'quay'.
+      if: inputs.dry-run == 'false' && inputs.registry == 'quay'
       shell: bash
       run: |
         REFS_FILE="$RUNNER_TEMP/quay-chart-refs.txt"
