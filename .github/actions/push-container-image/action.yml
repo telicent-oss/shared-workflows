@@ -426,3 +426,22 @@ runs:
         image-url: ${{ steps.capture-tags.outputs.image }}
         registry: ${{ inputs.registry == 'quay' && 'Quay.io' || inputs.registry == 'aws' && 'ECR' || '' }}
         status: ${{ steps.build-images.outcome }}
+
+
+    - name: Install CoSign
+      # Only run if dry run is explicitly set to 'false'
+      if: ${{ inputs.dry-run == 'false' }}
+      uses: sigstore/cosign-installer@v3
+    - name: Sign charts on Quay.io
+      # Only run if dry run is explicitly set to 'false'
+      if: ${{ inputs.dry-run == 'false' }}
+      shell: bash
+      run: |
+          images=""
+          for tag in ${TAGS}; do
+            images+="${tag}@${DIGEST} "
+          done
+          cosign sign --yes ${images}
+      env:
+        DIGEST: ${{ steps.build-images.outputs.digest }}
+        TAGS: ${{ steps.meta.outputs.tags }}
