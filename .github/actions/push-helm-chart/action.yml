@@ -138,9 +138,9 @@ runs:
         echo "  ✅ Helm chart pushed successfully"
 
         # Capture the digest of the image that was pushed to enable signing.
-        pushed=$(echo "$output" | grep "^Pushed:" | awk '{print $2}')
-        digest=$(echo "$output" | grep "^Digest:" | awk '{print $2}')
-        printf "%s@%s\n" "$pushed" "$digest" >> "$refs_file"
+        PUSHED=$(echo "$OUTPUT" | grep "^Pushed:" | awk '{print $2}')
+        DIGEST=$(echo "$OUTPUT" | grep "^Digest:" | awk '{print $2}')
+        printf "%s@%s\n" "$PUSHED" "$DIGEST" >> "$refs_file"
       env:
         PACKAGED_CHART: "${{ runner.temp }}/packaged-chart/${{ inputs.app-name-prefix }}${{ inputs.app-name }}-${{ inputs.version }}.tgz"
         AWS_REGISTRY: ${{ inputs.registry == 'aws' && format('oci://{0}/charts' ,steps.login-ecr.outputs.registry) || '' }}
