@@ -130,7 +130,8 @@ runs:
         # Push the Helm chart.
         echo "Pushing Helm chart "$PACKAGED_CHART" to ${{ env.AWS_REGISTRY }}${{ env.QUAY_REGISTRY }}"
         OUTPUT=$(helm push "$PACKAGED_CHART" ${{ env.AWS_REGISTRY }}${{ env.QUAY_REGISTRY }} 2>&1)
-        echo "## Helm Push summary\\n$OUTPUT" >> $GITHUB_STEP_SUMMARY
+        echo "## Helm Push summary" >> $GITHUB_STEP_SUMMARY
+        echo "$OUTPUT" >> $GITHUB_STEP_SUMMARY
         echo "  ✅ Helm chart pushed successfully"
 
         # Capture the digest of the image that was pushed to enable signing.
