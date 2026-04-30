@@ -1,0 +1,239 @@
+# Copyright (C) 2026 Telicent Limited
+# Telicent *Graph UI* stand-alone chart
+
+#
+# @section Global Parameters
+#
+# @descStart
+# Contains global parameters; these parameters are mirrored within the Telicent core umbrella chart.
+# Note: Only global parameters used within this chart will be listed below.
+# @descEnd
+global:
+  ## Current available global image parameters: imageRegistry and imagePullSecrets
+  ## Please, note that this will override the image parameters
+  # @key global.imageRegistry Global image registry
+  imageRegistry: ""
+  # E.g.
+  # imagePullSecrets:
+  #   - myRegistryKeySecretName
+  # @key global.imagePullSecrets Global registry secret names as an array
+  imagePullSecrets: []
+
+  # @key global.enterprise Enable enterprise mode, adding additional features and configurations
+  enterprise: false
+
+  # @key global.appHostDomain Domain associated with Telicent application/ui services. This value cannot be changed after it is set
+  appHostDomain: ""
+  # @key global.apiHostDomain Domain associated with Telicent Api services. This value cannot be changed after it is set
+  apiHostDomain: ""
+  # @key global.authHostDomain Domain associated with Telicent authentication services, including OIDC providers. This value cannot be changed after it is set
+  authHostDomain: ""
+
+#
+# @section Application Parameters - UI and Secret
+#
+# @descStart
+# Contains parameters specific to the Graph User Interface.
+# Map functionality requires tokens and configuration defined within a secret.
+# It is recommended to store sensitive information including tokens/passwords in a Kubernetes secret and not in Helm values.
+# For Quick Start purposes, a secret named `tc-auth-gen-mapjs-graph-ui` will be created if one is not set.
+# @descEnd
+ui:
+  # @key ui.searchUiDeployed If set to true, *Search UI* links will be available within *Graph UI*
+  searchUiDeployed: true
+  # @key ui.userPortalUiDeployed If set to true, *User Portal UI* links will be available within *Graph UI*
+  userPortalUiDeployed: true
+  # @key ui.dataCatalogUiDeployed If set to true, *Data Catalog UI* links will be available within *Graph UI*
+  dataCatalogUiDeployed: true
+
+  # @key ui.maptilerToken The MapTiler token for the *Graph UI*
+  maptilerToken: "your.maptiler.token.here"
+  # @key ui.mapboxStyleSpecUrl The Mapbox style spec URL for the *Graph UI* can be specified if using Mapbox styles
+  # For examples of the map configuration, see: _mapjs.tpl
+  mapboxStyleSpecUrl: ""
+  # @key ui.arcgisToken The ArcGIS token for the *Graph UI* can be specified if using ArcGIS styles
+  arcgisToken: ""
+  # @key ui.existingMapConfigSecret The name of an existing secret containing map configuration. See: '_mapjs.tpl' & 'secret-mapjs.yaml'
+  # Note: Left unset, it will create a secret named: tc-auth-gen-mapjs-graph-ui
+  existingMapConfigSecret: ""
+
+  # @key ui.mapV2Enabled Whether to enable the new map implementation. MapV2 will eventually become the default and only map implementation
+  mapV2Enabled: false
+
+#
+# @section Application Parameters - OAuth
+#
+oauth:
+  # @key oauth.clientId The OAuth client id to be used by *Graph UI*
+  clientId: "telicent-graph-ui"
+  # @key oauth.scopes List of OAuth scopes to be used by *Graph UI*
+  scopes: "openid profile offline_access"
+
+#
+# @section ConfigMap Parameters
+#
+configMap:
+  # @key configMap.existingConfigMap The name of an existing config map containing env-config.js
+  # Note: When it's set, it will disable configmap creation
+  existingConfigMap: ""
+
+#
+# @section Common Parameters
+#
+# @key nameOverride String to partially override fullname (will maintain the release name)
+nameOverride: ""
+# @key fullnameOverride String to fully override the generated release name
+fullnameOverride: ""
+# @key namespaceOverride String to fully override all deployed resources namespace
+namespaceOverride: ""
+# @key commonLabels Add labels to all the deployed resources
+commonLabels: {}
+
+#
+# @section Deployment Parameters
+#
+# @key replicas Number of *Graph UI* replicas to deploy
+replicas: 1
+# @key revisionHistoryLimit Number of controller revisions to keep
+revisionHistoryLimit: 5
+
+# @key annotations Add extra annotations to the deployment object
+annotations: {}
+# @key podLabels Add extra labels to the *Graph UI* pod
+podLabels: {}
+# @key podAnnotations Add extra annotations to the *Graph UI* pod
+podAnnotations: {}
+# @key extraEnvVars Array with extra environment variables to add to *Graph UI* pod
+# Example:
+# extraEnvVars:
+# - name: FOO
+#   value: instance
+extraEnvVars: []
+# @key extraVolumes Optionally specify extra list of additional volumes
+extraVolumes: []
+# @key extraVolumeMounts Optionally specify extra list of additional volumeMounts
+extraVolumeMounts: []
+# @key initContainers Add init containers to the pod
+initContainers: []
+# Example:
+# sidecars:
+# - name: your-image-name
+#   image: your-image
+#   ports:
+#   - name: portname
+#     containerPort: 1234
+# @key sidecars Add sidecars to the pod
+sidecars: []
+
+#
+# @section Deployment Image Parameters
+#
+image:
+  # @key image.registry *Graph UI* image registry
+  registry: quay.io
+  # @key image.repository *Graph UI* image name
+  repository: telicent/telicent-graph
+  # @key image.tag *Graph UI* image tag. If not set, a tag is generated using the appVersion
+  tag: ""
+  # @key image.pullPolicy *Graph UI* image pull policy
+  pullPolicy: IfNotPresent
+  # @key image.pullSecrets Specify registry secret names as an array
+  pullSecrets: []
+
+#
+# @section Deployment Resources Parameters - Requests and Limits
+#
+# @key resources Resources for *Graph UI* containers
+resources: {}
+#  requests:
+#    # @key resources.requests.cpu Set containers' CPU request
+#    cpu: "250m"
+#    # @key resources.requests.memory Set containers' memory request
+#    memory: "512Mi"
+#  limits:
+#    # @key resources.limits.cpu Set containers' CPU limit
+#    cpu: "375m"
+#    # @key resources.limits.memory Set containers' memory limit
+#    memory: "768Mi"
+
+#
+# @section Deployment Security Context Parameters - Default Security Context
+#
+podSecurityContext:
+  # @key podSecurityContext.runAsUser Set the provisioning pod's Security Context runAsUser User ID
+  runAsUser: 185
+  # @key podSecurityContext.runAsGroup Set the provisioning pod's Security Context runAsGroup Group ID
+  runAsGroup: 185
+  # @key podSecurityContext.runAsNonRoot Set the provisioning pod's Security Context runAsNonRoot
+  runAsNonRoot: true
+  # @key podSecurityContext.fsGroup Set the provisioning pod's Group ID for the mounted volumes' filesystem
+  fsGroup: 185
+  seccompProfile:
+    # @key podSecurityContext.seccompProfile.type Set the provisioning pod's Security Context seccomp profile
+    type: RuntimeDefault
+containerSecurityContext:
+  # @key containerSecurityContext.runAsUser Set containers' Security Context runAsUser User ID
+  runAsUser: 185
+  # @key containerSecurityContext.runAsGroup Set containers' Security Context runAsGroup Group ID
+  runAsGroup: 185
+  # @key containerSecurityContext.runAsNonRoot Set container's Security Context runAsNonRoot
+  runAsNonRoot: true
+  # @key containerSecurityContext.allowPrivilegeEscalation Set container's Security Context allowPrivilegeEscalation
+  allowPrivilegeEscalation: false
+  capabilities:
+    # @key containerSecurityContext.capabilities.drop List of capabilities to be dropped
+    drop:
+      - ALL
+  seccompProfile:
+    # @key containerSecurityContext.seccompProfile.type Set container's Security Context seccomp profile
+    type: RuntimeDefault
+
+#
+# @section Deployment Affinity Parameters
+#
+# @key affinity Affinity for pod assignment
+# Ref: https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#affinity-and-anti-affinity
+affinity: {}
+# @key nodeSelector Node labels for pod assignment
+# Ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/
+nodeSelector: {}
+# @key tolerations Tolerations for pod assignment
+# Ref: https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+tolerations: []
+
+#
+# @section Service Account Parameters
+#
+serviceAccount:
+  # @key serviceAccount.create Specifies whether a service account should be created
+  create: true
+  # @key serviceAccount.name Name of the ServiceAccount to use. If not set, a name is generated using the fullname
+  name: ""
+  # @key serviceAccount.annotations Additional custom annotations for the ServiceAccount
+  annotations: {}
+  # @key serviceAccount.automount Automatically mount a ServiceAccount's API credentials
+  automount: true
+
+#
+# @section Traffic Exposure Parameters
+#
+service:
+  # @key service.name *Graph UI* service name. If not set, a name is generated using the fullname
+  name: ""
+  # @key service.port *Graph UI* service port
+  port: 8080
+  # @key service.type *Graph UI* service type
+  type: ClusterIP
+
+#
+# @section Host(s) Parameters - Contains host information for applications deployed via *telicent-core* chart.
+#
+# @descStart
+# *Graph UI* interacts directly with other Telicent Applications using their default service/serviceAccount and port.
+# If either of those details changes, you can use this section to correctly refer to those applications.
+# @descEnd
+hosts:
+  # @key hosts.enableAutoCorrect Allow for the release name to be automatically pre-fixed to each host value when required (default behavior when installing through the parent chart). Alternatively, the host value will be used as it is, without any modification
+  enableAutoCorrect: true
+  # @key hosts.traefikProxy Traefik Proxy application default host value, as defined by 'service/serviceAccount:port'
+  traefikProxy: "traefik-proxy:8080"
