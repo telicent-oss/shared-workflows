@@ -1,0 +1,13 @@
+# Copyright (C) 2026 Telicent Limited
+# Telicent *Graph UI* stand-alone chart
+
+#
+# @section Global Parameters
+#
+# @descStart
+# Contains global parameters; these parameters are mirrored within the Telicent core umbrella chart.
+# Note: Only global parameters used within this chart will be listed below.
+# @descEnd
+global:
+  # @key global.imageRegistry Global image registry
+  imageRegistry: ""

@@ -2,6 +2,7 @@ from collections import OrderedDict
 from pathlib import Path
 import argparse
 import doctest
+import os
 import re
 import shlex
 import subprocess
@@ -192,12 +193,12 @@ class ChartProcessor:
 
         Example
         -------
-        >>> test_charts = ChartProcessor.get_charts('./charts')
+        >>> test_charts = ChartProcessor.get_charts('charts')
         '''
 
         charts = {}
-        for path in Path(path).glob('**/Chart.yaml'):
-            chart_obj = path.parent
+        for p in Path(path).glob('**/Chart.yaml'):
+            chart_obj = p.parent
             chart = str(chart_obj)
 
             include_chart = ((include and chart in include)
@@ -206,7 +207,7 @@ class ChartProcessor:
             if include_chart:
                 charts[chart_obj.name] = chart
 
-        missing_charts = {Path(path).name: path for path in set(include) - set(charts.values())}
+        missing_charts = {Path(p).name: p for p in set(include) - set(charts.values())}
         cls.errors['chart_does_not_exist'] = missing_charts
 
         return charts
@@ -225,17 +226,18 @@ class ChartProcessor:
 
         Example
         -------
-        >>> readme_generator_cmd = '.dev/readme-generator-for-helm'
-        >>> test_charts = ChartProcessor.get_charts('./charts')
+        >>> readme_generator_cmd = '.github/actions/helm-metadata-updater/readme-generator-for-helm'
+        >>> test_charts = ChartProcessor.get_charts('.github/actions/helm-metadata-updater/files/charts')
         >>> test_chart = next(iter(test_charts))
+        >>> test_chart_path = (next(iter(test_charts.values())))
         >>> ChartProcessor.process_chart('test-fake-chart', 'charts/does-not-exist', readme_generator_cmd)
         Traceback (most recent call last):
         FileNotFoundError
-        >>> ChartProcessor.process_chart(test_chart, 'charts/demo-prereqs', readme_generator_cmd)
+        >>> ChartProcessor.process_chart(test_chart, test_chart_path, readme_generator_cmd)
         --ignore--
         True
         >>> readme_generator_cmd = 'npx @bitnami/readme-generator-for-helm'
-        >>> ChartProcessor.process_chart(test_chart, 'charts/demo-prereqs', readme_generator_cmd)
+        >>> ChartProcessor.process_chart(test_chart, test_chart_path, readme_generator_cmd)
         --ignore--
         True
         '''
@@ -407,8 +409,11 @@ if __name__ == '__main__':
 
     # Test to see if the script is being run in CI mode, which will allow the
     # readme generator command to be set accordingly.
-    readme_generator_cmd = ('npx @bitnami/readme-generator-for-helm'
-        if args.ci else '.dev/readme-generator-for-helm')
+    if args.ci:
+        readme_generator_cmd = 'npx @bitnami/readme-generator-for-helm'
+    else:
+        script_path = Path(os.path.realpath(__file__)).parent
+        readme_generator_cmd = f'{script_path}/readme-generator-for-helm'
 
     Console.info('\nStarting metadata update for all charts')
     Console.info('-' * 39)
