@@ -129,23 +129,20 @@ runs:
 
         # Push the Helm chart.
         echo "Pushing Helm chart "$PACKAGED_CHART" to ${{ env.AWS_REGISTRY }}${{ env.QUAY_REGISTRY }}"
-        OUTPUT=$(helm push "$PACKAGED_CHART" ${{ env.AWS_REGISTRY }}${{ env.QUAY_REGISTRY }})
+        OUTPUT=$(helm push "$PACKAGED_CHART" ${{ env.AWS_REGISTRY }}${{ env.QUAY_REGISTRY }} 2>&1)
         echo $OUTPUT
         echo "  ✅ Helm chart pushed successfully"
 
         # Capture the digest of the image that was pushed to enable signing.
-        echo "echo \"$OUTPUT\" | grep \"^Pushed:\" | awk '{print $2}'"
         PUSHED=$(echo "$OUTPUT" | grep "^Pushed:" | awk '{print $2}')
-        echo "echo \"$OUTPUT\" | grep \"^Digest:\" | awk '{print $2}'"
         DIGEST=$(echo "$OUTPUT" | grep "^Digest:" | awk '{print $2}')
-        REFS_FILE="$RUNNER_TEMP/quay-chart-refs.txt"
-        :> "$REFS_FILE"
-        echo "\"%s@%s\n\" \"$PUSHED\" \"$DIGEST\" >> \"$REFS_FILE\""
-        printf "%s@%s\n" "$PUSHED" "$DIGEST" >> "$REFS_FILE"
+        :> "${{ env.REFS_FILE }}"
+        printf "%s@%s\n" "$PUSHED" "$DIGEST" >> "${{ env.REFS_FILE }}"
       env:
         PACKAGED_CHART: "${{ runner.temp }}/packaged-chart/${{ inputs.app-name-prefix }}${{ inputs.app-name }}-${{ inputs.version }}.tgz"
         AWS_REGISTRY: ${{ inputs.registry == 'aws' && format('oci://{0}/charts' ,steps.login-ecr.outputs.registry) || '' }}
         QUAY_REGISTRY: ${{ inputs.registry == 'quay' && 'oci://quay.io/telicent/charts' || '' }}
+        REFS_FILE: "${{ runner.temp }}/quay-chart-refs.txt"
     - name: Install CoSign
       # Only run if dry run is explicitly set to 'false' and the image is being pushed to 'quay'.
       if: inputs.dry-run == 'false' && inputs.registry == 'quay'
@@ -155,8 +152,7 @@ runs:
       if: inputs.dry-run == 'false' && inputs.registry == 'quay'
       shell: bash
       run: |
-        REFS_FILE="$RUNNER_TEMP/quay-chart-refs.txt"
-        if [[ ! -s "$REFS_FILE" ]]; then
+        if [[ ! -s "${{ env.REFS_FILE }}" ]]; then
           echo "No pushed chart references found to sign"
           exit 1
         fi
@@ -164,4 +160,6 @@ runs:
           [[ -n "$ref" ]] || continue
           echo "signing $ref"
           cosign sign --yes "$ref"
-        done < "$REFS_FILE"
+        done < "${{ env.REFS_FILE }}"
+      env:
+        REFS_FILE: "${{ runner.temp }}/quay-chart-refs.txt"

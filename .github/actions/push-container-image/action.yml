@@ -320,8 +320,10 @@ runs:
         cache-to: type=gha,mode=max
         context: ${{ inputs.path }}
         file: ${{ inputs.path }}/${{ inputs.dockerfile }}
+        provenance: mode=max
         tags: ${{ steps.meta.outputs.tags }}
         target: ${{ inputs.target }}
+        sbom: true
         secrets: |
           ${{ inputs.package-pat && inputs.package-pat || '' }}
           ${{ inputs.font-awesome-key && inputs.font-awesome-key || '' }}
