@@ -90,7 +90,8 @@ inputs:
     required: false
     description: Artifact used as part of the Docker build.
   dockerfile:
-    required: true
+    required: false
+    default: Dockerfile
     description: The name of the Dockerfile to build the image from.
   image-suffix:
     required: false
@@ -193,7 +194,7 @@ runs:
         distribution: ${{ inputs.jdk }}
         cache: maven
 
-    # NB - Assumption here is that this workflow has been called after the Maven workflow has been called so the
+    # NB - Assumption here is that this action has been called after the Maven workflow has been called so the
     #      Maven Cache already has all our dependencies present in it and tests have already passed
     - name: Quick Maven Build
       if: inputs.uses-maven == 'true'
@@ -281,9 +282,10 @@ runs:
         # Manually handling latest below so disabling automatic latest handling
         flavor: |
           latest=false
+        # Why use `prefix=sha` with the `sha` tag? Because of a semver edge case. See 'SHA Tag Prefix' in the README for details.
         tags: |
           type=ref,event=tag
-          type=sha,format=long,prefix=,format=${{ inputs.sha-tag-format }},enable=${{ inputs.allow-sha-tag == 'true' }}
+          type=sha,prefix=sha,format=${{ inputs.sha-tag-format }},enable=${{ inputs.allow-sha-tag == 'true' }}
           type=raw,value=${{ inputs.version }}${{ inputs.version-suffix }},enable=${{ inputs.allow-version-tag == 'true' }}
           type=raw,value=latest,enable=${{ env.TAG_LATEST }}
           type=raw,value=development,enable=${{ env.TAG_DEVELOPMENT }}
