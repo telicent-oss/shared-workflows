@@ -22,6 +22,16 @@ on:
         type: boolean
         default: false
         description: Set to true to actually raise a pull request; false performs a dry run (commits locally but does not push or open a PR)
+      auto-merge:
+        required: false
+        type: boolean
+        default: false
+        description: Enable auto-merge on the PR once all required checks pass
+      clusters:
+        required: true
+        type: string
+        description: >
+          Comma-separated list of cluster names to upversion (e.g. "devops,system-integration,system-release").
     secrets:
       token:
         required: true
@@ -47,6 +57,7 @@ jobs:
         env:
           CHART_NAME: ${{ inputs.chart-name }}
           NEW_VERSION: ${{ inputs.chart-version }}
+          CLUSTERS: ${{ inputs.clusters }}
         run: |
           mapfile -t FILES < <(grep -rl "chart: ${CHART_NAME}" --include="applicationSet.yaml" .)
           if [[ ${#FILES[@]} -eq 0 ]]; then
@@ -54,8 +65,12 @@ jobs:
             exit 1
           fi
           echo "Found ${#FILES[@]} applicationSet(s): ${FILES[*]}"
+          IFS=',' read -ra CLUSTER_LIST <<< "${CLUSTERS}"
           for f in "${FILES[@]}"; do
-            sed -i "s/chartVersion: .*/chartVersion: ${NEW_VERSION}/" "${f}"
+            for cluster in "${CLUSTER_LIST[@]}"; do
+              cluster="${cluster// /}"
+              CLUSTER="${cluster}" yq '(.spec.generators[].list.elements[] | select(.cluster == env(CLUSTER)) | .chartVersion) = env(NEW_VERSION)' -i "${f}"
+            done
           done
 
       - name: Create branch and push
@@ -96,18 +111,25 @@ jobs:
           BRANCH: ${{ steps.push.outputs.branch }}
           SHORT_NAME: ${{ steps.push.outputs.short-name }}
           NEW_VERSION: ${{ inputs.chart-version }}
+          AUTO_MERGE: ${{ inputs.auto-merge }}
         run: |
           TITLE="chore: upversion ${SHORT_NAME} to ${NEW_VERSION}"
           BODY="Automated upversion of \`${SHORT_NAME}\` Helm chart to \`${NEW_VERSION}\`."
           EXISTING_PR=$(gh pr list --repo "${REPO}" --head "${BRANCH}" --state open --json number --jq '.[0].number')
           if [[ -n "${EXISTING_PR}" ]]; then
             gh pr edit "${EXISTING_PR}" --repo "${REPO}" --title "${TITLE}" --body "${BODY}"
-            echo "Updated PR #${EXISTING_PR}"
+            PR_NUMBER="${EXISTING_PR}"
+            echo "Updated PR #${PR_NUMBER}"
           else
-            gh pr create \
+            PR_NUMBER=$(gh pr create \
               --repo "${REPO}" \
               --title "${TITLE}" \
               --body "${BODY}" \
               --base main \
-              --head "${BRANCH}"
+              --head "${BRANCH}" \
+              --json number --jq '.number')
+            echo "Created PR #${PR_NUMBER}"
+          fi
+          if [[ "${AUTO_MERGE}" == "true" ]]; then
+            gh pr merge "${PR_NUMBER}" --repo "${REPO}" --auto --squash
           fi
