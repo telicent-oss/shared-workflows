@@ -27,6 +27,11 @@ on:
         type: boolean
         default: false
         description: Enable auto-merge on the PR once all required checks pass
+      clusters:
+        required: true
+        type: string
+        description: >
+          Comma-separated list of cluster names to upversion (e.g. "devops,system-integration,system-release").
     secrets:
       token:
         required: true
@@ -52,6 +57,7 @@ jobs:
         env:
           CHART_NAME: ${{ inputs.chart-name }}
           NEW_VERSION: ${{ inputs.chart-version }}
+          CLUSTERS: ${{ inputs.clusters }}
         run: |
           mapfile -t FILES < <(grep -rl "chart: ${CHART_NAME}" --include="applicationSet.yaml" .)
           if [[ ${#FILES[@]} -eq 0 ]]; then
@@ -59,8 +65,12 @@ jobs:
             exit 1
           fi
           echo "Found ${#FILES[@]} applicationSet(s): ${FILES[*]}"
+          IFS=',' read -ra CLUSTER_LIST <<< "${CLUSTERS}"
           for f in "${FILES[@]}"; do
-            sed -i "s/chartVersion: .*/chartVersion: ${NEW_VERSION}/" "${f}"
+            for cluster in "${CLUSTER_LIST[@]}"; do
+              cluster="${cluster// /}"
+              CLUSTER="${cluster}" yq '(.spec.generators[].list.elements[] | select(.cluster == env(CLUSTER)) | .chartVersion) = env(NEW_VERSION)' -i "${f}"
+            done
           done
 
       - name: Create branch and push
