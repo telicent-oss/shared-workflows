@@ -332,6 +332,21 @@ runs:
         build-args: |
           ${{ inputs.build-args }}
 
+    - name: Write tag-manifest
+      if: inputs.dry-run == 'false' && github.actor != 'dependabot[bot]'
+      shell: bash
+      run: echo "$DOCKER_METADATA" > /tmp/tag-manifest.json
+      env:
+        DOCKER_METADATA: ${{ steps.meta.outputs.json }}
+
+    - name: Upload tag-manifest artifact
+      if: inputs.dry-run == 'false' && github.actor != 'dependabot[bot]'
+      uses: actions/upload-artifact@v7
+      with:
+        name: tag-manifest-${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}
+        path: /tmp/tag-manifest.json
+        retention-days: 7
+
     - name: Build container image tarball (dry run)
       # Only run if dry run is set to anything other than 'false', indicating that this is a dry run
       id: build-images-dry-run
