@@ -213,7 +213,7 @@ runs:
       # Allow to continue even if SBOM is not found
       continue-on-error: true
       with:
-        name: ${{ steps.global.outputs.bom-artifact-name }}
+        name: ${{ steps.globals.outputs.bom-artifact-name }}
         path: ${{ inputs.PATH }}
 
     - name: Enable buildkit cache
