@@ -206,7 +206,7 @@ runs:
       if: inputs.build-artifact
       with:
         name: ${{ inputs.build-artifact }}
-        path: ${{ inputs.path }}/${{ inputs.build-artifact }}/
+        path: ${{ inputs.build-artifact }}/
 
     - name: Get SBOM from artifact
       uses: actions/download-artifact@v4
