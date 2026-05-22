@@ -420,6 +420,7 @@ runs:
         fail-on-unfixed: ${{ inputs.fail-on-unfixed }}
         remote-vex: ${{ inputs.remote-vex }}
         trivy-ignores: ${{ inputs.trivy-ignores != '' && format('{0}/{1}', inputs.package-directory, inputs.trivy-ignores) || '' }}
+        uses-java: ${{ inputs.uses-maven }}
 
     - name: Grype image scan
       # Only run if Grype image scan is explicitly set to 'true' AND (is a dry run OR (is not a dry run AND user is not dependabot))
