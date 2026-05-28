@@ -1,0 +1,146 @@
+name: Promote to Quay
+description: |
+  Promote a container image and/or Helm chart from Amazon ECR to Quay.io and sign with Cosign.
+  At least one of `image` or `chart` must be provided.
+author: Telicent
+
+inputs:
+  image:
+    required: false
+    description: The image name to promote (e.g. smart-cache-graph). Omit to skip image promotion.
+  chart:
+    required: false
+    description: The Helm chart name to promote (e.g. graph). Omit to skip chart promotion.
+  version:
+    required: true
+    description: The version to promote.
+  quay-username:
+    required: true
+    description: Quay.io username.
+  quay-token:
+    required: true
+    description: Quay.io token.
+  quay-organisation:
+    required: false
+    default: telicent
+    description: The Quay.io organisation to push to. Defaults to `telicent`.
+
+outputs:
+  image-digest:
+    description: The digest of the image pushed to Quay.io. Empty if image promotion was skipped.
+    value: ${{ steps.push-image.outputs.digest }}
+  chart-ref:
+    description: The digest-qualified chart reference pushed to Quay.io. Empty if chart promotion was skipped.
+    value: ${{ steps.push-chart.outputs.ref }}
+
+runs:
+  using: composite
+  steps:
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::098669589541:role/GitHubDeploymentRole
+        aws-region: eu-west-2
+        mask-aws-account-id: true
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+      with:
+        mask-password: true
+
+    - name: Login to Quay
+      uses: docker/login-action@v3
+      with:
+        registry: quay.io
+        username: ${{ inputs.quay-username }}
+        password: ${{ inputs.quay-token }}
+
+    # Image promotion steps
+
+    - name: Pull from ECR, retag and push to Quay
+      if: inputs.image != ''
+      id: push-image
+      shell: bash
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        VERSION: ${{ inputs.version }}
+        IMAGE: ${{ inputs.image }}
+        QUAY_ORG: ${{ inputs.quay-organisation }}
+      run: |
+        docker pull "$ECR_REGISTRY/$IMAGE:$VERSION"
+        docker tag "$ECR_REGISTRY/$IMAGE:$VERSION" "quay.io/$QUAY_ORG/$IMAGE:$VERSION"
+        docker push "quay.io/$QUAY_ORG/$IMAGE:$VERSION"
+        DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "quay.io/$QUAY_ORG/$IMAGE:$VERSION" | cut -d'@' -f2)
+        echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+
+    # Chart promotion steps
+
+    - name: Install Helm
+      if: inputs.chart != ''
+      uses: azure/setup-helm@v5
+      with:
+        version: latest
+
+    - name: Login to Quay (Helm)
+      if: inputs.chart != ''
+      shell: bash
+      env:
+        QUAY_USERNAME: ${{ inputs.quay-username }}
+        QUAY_TOKEN: ${{ inputs.quay-token }}
+      run: echo "$QUAY_TOKEN" | helm registry login quay.io --username "$QUAY_USERNAME" --password-stdin
+
+    - name: Pull chart from ECR and push to Quay
+      if: inputs.chart != ''
+      id: push-chart
+      shell: bash
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        VERSION: ${{ inputs.version }}
+        CHART: ${{ inputs.chart }}
+        QUAY_ORG: ${{ inputs.quay-organisation }}
+        REFS_FILE: ${{ runner.temp }}/quay-chart-refs.txt
+      run: |
+        mkdir -p "${{ runner.temp }}/charts/"
+        helm pull "oci://$ECR_REGISTRY/charts/$CHART" --version "$VERSION" --destination "${{ runner.temp }}/charts/"
+        set -o pipefail
+        helm push "${{ runner.temp }}/charts/$CHART-$VERSION.tgz" "oci://quay.io/$QUAY_ORG/charts" 2>&1 | tee /tmp/helm-push-output.txt
+        echo "## Helm Push Summary" >> "$GITHUB_STEP_SUMMARY"
+        echo '```' >> "$GITHUB_STEP_SUMMARY"
+        cat /tmp/helm-push-output.txt >> "$GITHUB_STEP_SUMMARY"
+        echo '```' >> "$GITHUB_STEP_SUMMARY"
+        PUSHED=$(grep "^Pushed:" /tmp/helm-push-output.txt | awk '{print $2}')
+        DIGEST=$(grep "^Digest:" /tmp/helm-push-output.txt | awk '{print $2}')
+        printf "%s@%s\n" "$PUSHED" "$DIGEST" > "$REFS_FILE"
+        echo "ref=$PUSHED@$DIGEST" >> "$GITHUB_OUTPUT"
+
+    # Signing (shared Cosign install, separate sign steps per artefact type)
+
+    - name: Install Cosign
+      uses: sigstore/cosign-installer@v3
+
+    - name: Sign image on Quay
+      if: inputs.image != ''
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        IMAGE: ${{ inputs.image }}
+        QUAY_ORG: ${{ inputs.quay-organisation }}
+        DIGEST: ${{ steps.push-image.outputs.digest }}
+      run: cosign sign --yes "quay.io/$QUAY_ORG/$IMAGE:$VERSION@$DIGEST"
+
+    - name: Sign chart on Quay
+      if: inputs.chart != ''
+      shell: bash
+      env:
+        REFS_FILE: ${{ runner.temp }}/quay-chart-refs.txt
+      run: |
+        if [[ ! -s "$REFS_FILE" ]]; then
+          echo "No pushed chart references found to sign"
+          exit 1
+        fi
+        while IFS= read -r ref; do
+          [[ -n "$ref" ]] || continue
+          echo "Signing $ref"
+          cosign sign --yes "$ref"
+        done < "$REFS_FILE"
