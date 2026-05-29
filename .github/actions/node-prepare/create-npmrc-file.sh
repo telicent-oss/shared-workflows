@@ -1,0 +1,11 @@
+#!/bin/bash
+
+cat > .npmrc << EOF
+registry=https://registry.npmjs.org/
+@telicent-io:registry=https://npm.pkg.github.com/
+//npm.pkg.github.com/:_authToken=$PACKAGE_PAT
+@awesome.me:registry=https://npm.fontawesome.com/
+@fortawesome:registry=https://npm.fontawesome.com/
+//npm.fontawesome.com/:_authToken=$FONT_AWESOME_KEY
+always-auth=true
+EOF
