@@ -8,8 +8,8 @@ author: Telicent
 
 inputs:
   node-version:
-    required: true
-    description: The node version to install.
+    required: false
+    description: The node version to install. Falls back to .nvmrc if not provided.
   frozen-lockfile:
     required: false
     description: Whether to use a frozen/immutable lockfile for install.
@@ -50,9 +50,6 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Checkout repository
-      uses: actions/checkout@v5
-
     - name: Detect package manager
       id: detect-pm
       run: |
@@ -75,7 +72,8 @@ runs:
       if: steps.detect-pm.outputs.pm == 'pnpm'
       uses: actions/setup-node@v6
       with:
-        node-version: ${{ inputs.node-version }}
+        node-version: ${{ inputs.node-version || '' }}
+        node-version-file: ${{ inputs.node-version && '' || '.nvmrc' }}
 
     - name: Get pnpm store path
       if: steps.detect-pm.outputs.pm == 'pnpm'
@@ -94,7 +92,8 @@ runs:
       if: steps.detect-pm.outputs.pm == 'yarn'
       uses: actions/setup-node@v6
       with:
-        node-version: ${{ inputs.node-version }}
+        node-version: ${{ inputs.node-version || '' }}
+        node-version-file: ${{ inputs.node-version && '' || '.nvmrc' }}
         cache: 'yarn'
 
     - name: Create .npmrc file
