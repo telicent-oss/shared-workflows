@@ -6,6 +6,10 @@
 # npmrc at install time. Keeping the tokens in the ephemeral ~/.npmrc means they
 # never land in the checked-out tree.
 {
-  echo "//npm.fontawesome.com/:_authToken=${FONT_AWESOME_KEY}"
+  echo "registry=https://registry.npmjs.org/"
+  echo "@telicent-io:registry=https://npm.pkg.github.com/"
   echo "//npm.pkg.github.com/:_authToken=${PACKAGE_PAT}"
+  echo "@awesome.me:registry=https://npm.fontawesome.com/"
+  echo "@fortawesome:registry=https://npm.fontawesome.com/"
+  echo "//npm.fontawesome.com/:_authToken=${FONT_AWESOME_KEY}"
 } >> ~/.npmrc
