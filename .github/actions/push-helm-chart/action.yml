@@ -121,7 +121,8 @@ runs:
         QUAY_TOKEN: ${{ inputs.quay-token }}
     - name: Push Helm chart
       # Only run if dry run is explicitly set to 'false'
-      if: inputs.dry-run == 'false'
+      # Dependabot triggered PRs don't have access to Quay credentials to push images, so no need to run in this case either
+      if: inputs.dry-run == 'false' && ! (inputs.registry == 'quay' && github.actor == 'dependabot[bot]')
       shell: bash
       run: |
 
