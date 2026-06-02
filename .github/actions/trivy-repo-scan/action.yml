@@ -7,13 +7,22 @@ inputs:
     required: true
     description: The Name of the app being checked
     default: test
+  package-manager:
+    required: false
+    description: |
+      Which package manager to prepare the project with: 'yarn' (default) or
+      'pnpm'. Selects yarn-prepare + cyclonedx-npm, or pnpm-prepare + cdxgen, for
+      generating the SBOM that Trivy scans.
+    default: 'yarn'
   frozen-lockfile:
     required: false
-    description: Whether to apply the --frozen-lockfile argument to the 'yarn install' command.
+    description: Whether to apply the --frozen-lockfile argument to the install command.
     default: 'true'
   node-version:
-    required: true
-    description: The node version to install.
+    required: false
+    description: |
+      The node version to install. Honoured on the yarn branch; on the pnpm
+      branch the version comes from the repo's .nvmrc, so this can be omitted.
   font-awesome-key:
     required: false
     description: NPM Font Awesome token.
@@ -53,7 +62,10 @@ runs:
     # Generate the SBOM
     - name: Checkout repository
       uses: actions/checkout@v5
+
+    # ---- Yarn branch (default) ----
     - name: Prepare Yarn
+      if: ${{ inputs.package-manager == 'yarn' }}
       uses: telicent-oss/shared-workflows/.github/actions/yarn-prepare@main
       with:
         node-version: ${{ inputs.node-version }}
@@ -61,12 +73,36 @@ runs:
         font-awesome-key: ${{ inputs.font-awesome-key }}
         package-pat: ${{ inputs.package-pat }}
     - name: Add CycloneDX tool
+      if: ${{ inputs.package-manager == 'yarn' }}
       run: yarn global add @cyclonedx/cyclonedx-npm
       shell: bash
     # RE: --ignore-npm-errors below: See https://github.com/CycloneDX/cyclonedx-node-npm/issues/810#issuecomment-1594252293
-    - name: Generate SBOM
+    - name: Generate SBOM (yarn)
+      if: ${{ inputs.package-manager == 'yarn' }}
       run: cyclonedx-npm --ignore-npm-errors --output-file ${{ steps.globals.outputs.bom-file-name }}
       shell: bash
+
+    # ---- pnpm branch ----
+    # pnpm-prepare is caller-owns-checkout, so the checkout above satisfies it.
+    - name: Prepare pnpm
+      if: ${{ inputs.package-manager == 'pnpm' }}
+      uses: telicent-oss/shared-workflows/.github/actions/pnpm-prepare@main
+      with:
+        node-version: ${{ inputs.node-version }}
+        frozen-lockfile: ${{ inputs.frozen-lockfile }}
+        font-awesome-key: ${{ inputs.font-awesome-key }}
+        package-pat: ${{ inputs.package-pat }}
+    # cdxgen understands pnpm-lock.yaml (cyclonedx-npm cannot). Pinned for
+    # reproducible, supply-chain-stable scans — bump deliberately. Whole-workspace
+    # SBOM: one root lockfile, so this covers every app/package in the workspace.
+    - name: Generate SBOM (pnpm)
+      if: ${{ inputs.package-manager == 'pnpm' }}
+      run: pnpm dlx @cyclonedx/cdxgen@11.0.0 --type pnpm --recurse --output ${{ steps.globals.outputs.bom-file-name }}
+      shell: bash
+      env:
+        # Don't reach out to registries for license metadata: keeps the scan
+        # hermetic and avoids auth round-trips for private @telicent-io packages.
+        FETCH_LICENSE: 'false'
     - name: Upload SBOM artifact
       uses: actions/upload-artifact@v7
       with:
