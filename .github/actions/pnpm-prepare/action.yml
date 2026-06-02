@@ -1,0 +1,71 @@
+name: Prepare a Runner For pnpm Tests or Build
+description: Setup pnpm + Node, configure private-registry auth, and install dependencies
+author: Telicent
+
+# Caller-owns-checkout: unlike yarn-prepare, this action does NOT run
+# actions/checkout. The calling job must check the repository out first. This
+# keeps fetch-depth / ref under the caller's control and avoids a double
+# checkout when a wrapping action (e.g. trivy-repo-scan) has already done one.
+#
+# Requires permissions -
+# - contents: read
+
+inputs:
+  node-version:
+    required: false
+    description: |
+      Node version to install. Optional fallback for repos without a .nvmrc; when
+      set it takes precedence over .nvmrc. Leave empty to use the repo's .nvmrc.
+  frozen-lockfile:
+    required: false
+    description: Whether to apply the --frozen-lockfile argument to the 'pnpm install' command.
+    default: 'true'
+  additional-args:
+    required: false
+    description: Additional arguments to apply to the 'pnpm install' command.
+  create-npmrc:
+    required: false
+    description: Whether to write private-registry auth tokens to ~/.npmrc before installing.
+    default: 'true'
+
+  # Secrets
+  font-awesome-key:
+    required: false
+    description: NPM Font Awesome token.
+  package-pat:
+    required: false
+    description: NPM package feed token.
+
+runs:
+  using: composite
+  steps:
+    # pnpm must be installed BEFORE setup-node so that `cache: pnpm` can resolve
+    # the store path. The pnpm version is taken from `packageManager:` in the
+    # consumer's package.json (no version pinned here).
+    - name: Install pnpm
+      uses: pnpm/action-setup@v4
+    - name: Setup node
+      uses: actions/setup-node@v6
+      with:
+        # When node-version is empty, fall back to the repo's .nvmrc (single
+        # source of truth). When provided, node-version wins and .nvmrc is
+        # ignored (empty node-version-file is treated as unset by setup-node).
+        node-version: ${{ inputs.node-version }}
+        node-version-file: ${{ inputs.node-version == '' && '.nvmrc' || '' }}
+        cache: 'pnpm'
+    # Append the private-registry auth tokens to the user-level ~/.npmrc. The
+    # committed project .npmrc (scope→registry mappings + engine-strict) is left
+    # untouched; pnpm merges user + project npmrc at install time.
+    - name: Configure private registry auth
+      if: ${{ inputs.create-npmrc == 'true' }}
+      run: ${{ github.action_path }}/create-npmrc-file.sh
+      shell: bash
+      env:
+        FONT_AWESOME_KEY: ${{ inputs.font-awesome-key }}
+        PACKAGE_PAT: ${{ inputs.package-pat }}
+    - name: Install dependencies
+      run: ${{ github.action_path }}/install-dependencies.sh
+      shell: bash
+      env:
+        FROZEN_LOCKFILE: ${{ inputs.frozen-lockfile == 'true' && '--frozen-lockfile' || '' }}
+        ADDITIONAL_ARGS: ${{ inputs.additional-args || '' }}
