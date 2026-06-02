@@ -335,7 +335,7 @@ runs:
     - name: Write tag-manifest
       if: inputs.dry-run == 'false' && github.actor != 'dependabot[bot]'
       shell: bash
-      run: echo "$DOCKER_METADATA" > /tmp/tag-manifest.json
+      run: echo "$DOCKER_METADATA" > ${{ runner.temp }}/tag-manifest.json
       env:
         DOCKER_METADATA: ${{ steps.meta.outputs.json }}
 
@@ -344,7 +344,7 @@ runs:
       uses: actions/upload-artifact@v7
       with:
         name: tag-manifest-${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}
-        path: /tmp/tag-manifest.json
+        path: ${{ runner.temp }}/tag-manifest.json
         retention-days: 7
 
     - name: Build container image tarball (dry run)
