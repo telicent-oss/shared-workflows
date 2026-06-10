@@ -186,7 +186,7 @@ jobs:
       #      if this is the very first build for that version e.g. just after a version bump
       - name: Quick Maven Build
         run: |
-          mvn install -DskipTests -Dgpg.skip -Dcyclonedx.skip -Dmaven.javadoc.skip -q
+          mvn install -DskipTests -Dgpg.skip -Dcyclonedx.skip -Dmaven.javadoc.skip -Dmaven.source.skip -Dlombok.delombok.skip -q
 
       - name: Detect Maven Modules
         id: modules
