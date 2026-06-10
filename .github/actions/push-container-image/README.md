@@ -88,6 +88,7 @@ specified.
 | Name | Default | Required | Description |
 | :--- | :--- | :--- | :--- |
 | `package-directory` | | No | If release has multiple package that are SBOM targets, then set this to disambiguate SBOMs. |
+| `download-sbom` | `'true'` | No | Whether to attempt to download a previously uploaded SBOM artifact for use in the image build. |
 | `grype-scan-image` | `'true'` | No | Whether to run a Grype scan on the built image. |
 | `trivy-ignores` | | No | Name of trivy ignore file. Only allowed for BUILD image, MUST NOT be used with DEPLOY images. |
 | `trivy-scan-dockerfile`| `'true'` | No | Whether to run a Trivy scan on the Dockerfile used to build the image. |

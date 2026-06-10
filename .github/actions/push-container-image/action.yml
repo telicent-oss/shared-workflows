@@ -35,6 +35,10 @@ inputs:
     required: false
     default: .
     description: If release has multiple package that are SBOM targets, then set this to disambiguate SBOMs.
+  download-sbom:
+    required: false
+    default: 'true'
+    description: Whether to attempt to download a previously uploaded SBOM artifact for use in the image build.
   uses-maven:
     required: false
     default: 'false'
@@ -210,6 +214,7 @@ runs:
 
     - name: Get SBOM from artifact
       uses: actions/download-artifact@v4
+      if: inputs.download-sbom == 'true'
       # Allow to continue even if SBOM is not found
       continue-on-error: true
       with:
