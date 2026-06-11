@@ -214,7 +214,7 @@ runs:
 
     - name: Get SBOM from artifact
       uses: actions/download-artifact@v4
-      if: inputs.download-sbom == 'true'
+      if: ${{ inputs.download-sbom == 'true' }}
       # Allow to continue even if SBOM is not found
       continue-on-error: true
       with:
