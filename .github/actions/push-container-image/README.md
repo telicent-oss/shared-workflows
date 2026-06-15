@@ -47,11 +47,12 @@ specified.
 
 ### Container Registry Options
 
-| Name | Default | Required | Description |
-| :--- | :--- | :--- | :--- |
-| `registry` | | Yes | The container registry to push the image to. Supported values are `aws` (Amazon ECR) or `quay` (Quay.io). |
+| Name | Default | Required                           | Description |
+| :--- | :--- |:-----------------------------------| :--- |
+| `registry` | | Yes                                | The container registry to push the image to. Supported values are `aws` (Amazon ECR) or `quay` (Quay.io). |
 | `quay-username` | | Yes (if registry is set to `quay`) | Quay username. |
 | `quay-token` | | Yes (if registry is set to `quay`) | Quay token. |
+| `role-to-assume` | | Yes                                | The AWS IAM role to assume for tasks that require interaction with AWS, such as pushing a container image or Helm chart to ECR. |
 
 ### Container Metadata Options
 
