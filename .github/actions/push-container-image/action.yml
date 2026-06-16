@@ -35,6 +35,10 @@ inputs:
     required: false
     default: .
     description: If release has multiple package that are SBOM targets, then set this to disambiguate SBOMs.
+  download-sbom:
+    required: false
+    default: 'true'
+    description: Whether to attempt to download a previously uploaded SBOM artifact for use in the image build.
   uses-maven:
     required: false
     default: 'false'
@@ -50,6 +54,9 @@ inputs:
   quay-token:
     required: false
     description: Quay token. Required if registry is set to `quay`.
+  role-to-assume:
+    required: true
+    description: The AWS IAM role to assume for tasks that require interaction with AWS, such as pushing a container image or Helm chart to ECR.
 
   # Container build and tag options
   allow-latest-tag:
@@ -210,6 +217,7 @@ runs:
 
     - name: Get SBOM from artifact
       uses: actions/download-artifact@v8
+      if: ${{ inputs.download-sbom == 'true' }}
       # Allow to continue even if SBOM is not found
       continue-on-error: true
       with:
@@ -239,7 +247,7 @@ runs:
       if: inputs.registry == 'aws' && inputs.dry-run == 'false'
       uses: aws-actions/configure-aws-credentials@v6
       with:
-        role-to-assume: arn:aws:iam::098669589541:role/GitHubDeploymentRole
+        role-to-assume: ${{ inputs.role-to-assume != '' && inputs.role-to-assume || 'arn:aws:iam::098669589541:role/GitHubDeploymentRole' }}
         aws-region: eu-west-2
         mask-aws-account-id: true
 

@@ -47,11 +47,12 @@ specified.
 
 ### Container Registry Options
 
-| Name | Default | Required | Description |
-| :--- | :--- | :--- | :--- |
-| `registry` | | Yes | The container registry to push the image to. Supported values are `aws` (Amazon ECR) or `quay` (Quay.io). |
+| Name | Default | Required                           | Description |
+| :--- | :--- |:-----------------------------------| :--- |
+| `registry` | | Yes                                | The container registry to push the image to. Supported values are `aws` (Amazon ECR) or `quay` (Quay.io). |
 | `quay-username` | | Yes (if registry is set to `quay`) | Quay username. |
 | `quay-token` | | Yes (if registry is set to `quay`) | Quay token. |
+| `role-to-assume` | | Yes                                | The AWS IAM role to assume for tasks that require interaction with AWS, such as pushing a container image or Helm chart to ECR. |
 
 ### Container Metadata Options
 
@@ -88,6 +89,7 @@ specified.
 | Name | Default | Required | Description |
 | :--- | :--- | :--- | :--- |
 | `package-directory` | | No | If release has multiple package that are SBOM targets, then set this to disambiguate SBOMs. |
+| `download-sbom` | `'true'` | No | Whether to attempt to download a previously uploaded SBOM artifact for use in the image build. |
 | `grype-scan-image` | `'true'` | No | Whether to run a Grype scan on the built image. |
 | `trivy-ignores` | | No | Name of trivy ignore file. Only allowed for BUILD image, MUST NOT be used with DEPLOY images. |
 | `trivy-scan-dockerfile`| `'true'` | No | Whether to run a Trivy scan on the Dockerfile used to build the image. |

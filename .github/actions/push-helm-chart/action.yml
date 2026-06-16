@@ -33,6 +33,9 @@ inputs:
   quay-token:
     required: false
     description: Quay token. Required if registry is set to `quay`.
+  role-to-assume:
+    required: true
+    description: The AWS IAM role to assume for tasks that require interaction with AWS, such as pushing a container image or Helm chart to ECR.
 
   # Chart packaging options
   version:
@@ -99,7 +102,7 @@ runs:
       if: inputs.registry == 'aws' && inputs.dry-run == 'false'
       uses: aws-actions/configure-aws-credentials@v6
       with:
-        role-to-assume: arn:aws:iam::098669589541:role/GitHubDeploymentRole
+        role-to-assume: ${{ inputs.role-to-assume != '' && inputs.role-to-assume || 'arn:aws:iam::098669589541:role/GitHubDeploymentRole' }}
         aws-region: eu-west-2
         mask-aws-account-id: true
     - name: Docker Login to Amazon ECR
