@@ -66,13 +66,11 @@ on:
       MVN_USER_NAME:
         required: false
         description: |
-          Username for authenticating to a Maven repository to publish `SNAPSHOT`s, only needed if `SNAPSHOT`
-          publishing is enabled.
+          Username for authenticating to a Maven repository to publish releases.
       MVN_USER_PWD:
         required: false
         description: |
-          Password/Token for authenticating to a Maven repository to publish `SNAPSHOT`s, only needed if `SNAPSHOT`
-          publishing is enabled.
+          Password/Token for authenticating to a Maven repository to publish releases.
       GPG_PRIVATE_KEY:
         required: false
         description: |
