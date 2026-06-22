@@ -440,6 +440,7 @@ runs:
         registry: ${{ inputs.registry }}
         quay-username: ${{ inputs.quay-username }}
         quay-token: ${{ inputs.quay-token }}
+        role-to-assume: ${{ inputs.role-to-assume }}
         scan-name: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-${{ inputs.dockerfile }}
         fail-on-unfixed: ${{ inputs.fail-on-unfixed }}
         remote-vex: ${{ inputs.remote-vex }}
