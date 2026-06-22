@@ -3,9 +3,9 @@
 The Maven Shared Workflow definition may be found [here (serial buld)](../.github/workflows/maven.yml) and 
 [here (parallel build)](../.github/workflows/parallel-maven.yml)
 
-These workflows are designed to build Maven based projects and includes automation of `SNAPSHOT` deployment, Maven
-Central releases and GitHub Releases.  See [What this Does](#what-this-workflow-does) for more details on exactly what's
-contained within this workflow.
+These workflows are designed to build Maven based projects and includes automation of Maven Central releases and GitHub
+Releases.  See [What this Does](#what-this-workflow-does) for more details on exactly what's contained within this
+workflow.
 
 ## Requirements
 
@@ -53,9 +53,6 @@ The serial Maven workflow does the following:
     - Scans the project for high/critical severity vulnerabilities attaching reports to the build
    vulnerabilities with `trivy`
     - Adds the detected Maven project version (value of `project.version`) to the job outputs
-    - Optionally deploys `SNAPSHOT`s if the build is a `SNAPSHOT` and it's on the `MAIN_BRANCH`, and `PUBLISH_SNAPSHOTS`
-      is configured appropriately, i.e. `mvn deploy -DskipTests`, tests are skipped as this step only runs if the
-      earlier full build was successful
 4. A `github-release` job that runs only when the built version is not a `SNAPSHOT` and the workflow was triggered from
    a Git tag:
     - Configures Java and Maven
@@ -288,20 +285,20 @@ If this file is present then these will automatically be combined with any manua
 
 The following table provides a complete reference to the available inputs.
 
-| Name                    | Required? | Type       | Default         | Description                                                                                                                                                                                                                                                                |
-|-------------------------|-----------|------------|-----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `CHANGELOG_FILE`        | `false `  | `string `  | `CHANGELOG.md ` | Specifies the Change Log file in the repository from which release notes can be extracted.                                                                                                                                                                                 |
-| `DOCKER_PROFILE`        | `false `  | `string `  | `docker `       | Specifies the name of the profile that enables/disables Docker based tests.                                                                                                                                                                                                |
-| `JAVA_VERSION`          | `false `  | `number `  | `21 `           | Specifies the JDK version to install and build with.  Defaults to 21.                                                                                                                                                                                                      |
-| `JDK`                   | `false `  | `string `  | `temurin `      | Specifies the JDK to use, defaults to `temurin`.                                                                                                                                                                                                                           |
-| `MAIN_BRANCH`           | `false `  | `string `  | `main `         | Specifies the main branch for the repository.  Used in determining whether to publish `SNAPSHOT`s in  conjunction with the `PUBLISH_SNAPSHOTS` parameter.                                                                                                                  |
-| `MAVEN_ARGS`            | `false `  | `string `  |                 | Specifies any additional arguments to pass to the Maven invocations.                                                                                                                                                                                                       |
-| `MAVEN_BUILD_GOALS`     | `false `  | `string `  | `install `      | Specifies the Maven goal(s) to use when building the project.  Defaults to `install`.                                                                                                                                                                                      |
-| `MAVEN_DEBUG_ARGS`      | `false `  | `string `  |                 | Specifies any additional arguments to pass to the Maven invocations when the workflow is run in  debug mode.                                                                                                                                                               |
-| `MAVEN_DEPLOY_GOALS`    | `false `  | `string `  | `deploy `       | Specifies the Maven goal(s) to use when deploying the project, assuming `PUBLISH_SNAPSHOTS` was set to `true` and we're on the configured `MAIN_BRANCH`.  Defaults to `deploy`.                                                                                            |
-| `MAVEN_REPOSITORY_ID`   | `false `  | `string `  | `central ` | Specifies the ID of the repository to which `SNAPSHOT`s and Releases are published, this **MUST** match  the ID of a repository defined in the `pom.xml` for the project in order for credentials to be correctly  configured.                                             |
-| `PUBLISH_SNAPSHOTS`     | `false `  | `boolean ` | `true `         | Specifies whether Maven `SNAPSHOT`s are published from this build.  Note that even when enabled (as is the default) `SNAPSHOT`s are only published when a build occurs on the main branch.  The main branch  can be separately configured via the `MAIN_BRANCH` parameter. |
-| `RELEASE_FILES`         | `false `  | `string `  | `null `         | Specifies the release files that should be attached to the GitHub release.  For example a  downloadable package that is generated from the repository.  Regardless of this value we  will always attach the SBOMs to the release.                                          |
-| `USES_DOCKERHUB_IMAGES` | `false `  | `boolean ` | `false `        | Specifies whether this build needs to pull images from DockerHub.                                                                                                                                                                                                          |
-| `PUBLIC_IMAGES`         | `false `  | `string `  | `null`          | Specifies a new line separated list of public image references that should be pulled and cached on the `MAIN_BRANCH` and restored during builds to avoid pulling images on every build. | 
+| Name                    | Required? | Type       | Default         | Description                                                                                                                                                                                                                       |
+|-------------------------|-----------|------------|-----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `CHANGELOG_FILE`        | `false `  | `string `  | `CHANGELOG.md ` | Specifies the Change Log file in the repository from which release notes can be extracted.                                                                                                                                        |
+| `DOCKER_PROFILE`        | `false `  | `string `  | `docker `       | Specifies the name of the profile that enables/disables Docker based tests.                                                                                                                                                       |
+| `JAVA_VERSION`          | `false `  | `number `  | `21 `           | Specifies the JDK version to install and build with.  Defaults to 21.                                                                                                                                                             |
+| `JDK`                   | `false `  | `string `  | `temurin `      | Specifies the JDK to use, defaults to `temurin`.                                                                                                                                                                                  |
+| `MAIN_BRANCH`           | `false `  | `string `  | `main `         | Specifies the main branch for the repository.  Used in determining whether to publish `SNAPSHOT`s in  conjunction with the `PUBLISH_SNAPSHOTS` parameter.                                                                         |
+| `MAVEN_ARGS`            | `false `  | `string `  |                 | Specifies any additional arguments to pass to the Maven invocations.                                                                                                                                                              |
+| `MAVEN_BUILD_GOALS`     | `false `  | `string `  | `install `      | Specifies the Maven goal(s) to use when building the project.  Defaults to `install`.                                                                                                                                             |
+| `MAVEN_DEBUG_ARGS`      | `false `  | `string `  |                 | Specifies any additional arguments to pass to the Maven invocations when the workflow is run in  debug mode.                                                                                                                      |
+| `MAVEN_DEPLOY_GOALS`    | `false `  | `string `  | `deploy `       | Specifies the Maven goal(s) to use when deploying the project, assuming `PUBLISH_SNAPSHOTS` was set to `true` and we're on the configured `MAIN_BRANCH`.  Defaults to `deploy`.                                                   |
+| `MAVEN_REPOSITORY_ID`   | `false `  | `string `  | `central `      | Specifies the ID of the repository to which `SNAPSHOT`s and Releases are published, this **MUST** match  the ID of a repository defined in the `pom.xml` for the project in order for credentials to be correctly  configured.    |
+| `PUBLISH_SNAPSHOTS`     | `false `  | `boolean ` | `false `        | No longer supported for open source publishing.                                                                                                                                                                                   |
+| `RELEASE_FILES`         | `false `  | `string `  | `null `         | Specifies the release files that should be attached to the GitHub release.  For example a  downloadable package that is generated from the repository.  Regardless of this value we  will always attach the SBOMs to the release. |
+| `USES_DOCKERHUB_IMAGES` | `false `  | `boolean ` | `false `        | Specifies whether this build needs to pull images from DockerHub.                                                                                                                                                                 |
+| `PUBLIC_IMAGES`         | `false `  | `string `  | `null`          | Specifies a new line separated list of public image references that should be pulled and cached on the `MAIN_BRANCH` and restored during builds to avoid pulling images on every build.                                           |
 
