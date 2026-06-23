@@ -100,7 +100,7 @@ runs:
     - name: Configure AWS credentials from main account
       # Only run if dry run is explicitly set to 'false'
       if: inputs.registry == 'aws' && inputs.dry-run == 'false'
-      uses: aws-actions/configure-aws-credentials@v4
+      uses: aws-actions/configure-aws-credentials@v6
       with:
         role-to-assume: ${{ inputs.role-to-assume != '' && inputs.role-to-assume || 'arn:aws:iam::098669589541:role/GitHubDeploymentRole' }}
         aws-region: eu-west-2
@@ -109,7 +109,7 @@ runs:
       # Only run if dry run is explicitly set to 'false'
       if: inputs.registry == 'aws' && inputs.dry-run == 'false'
       id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v1
+      uses: aws-actions/amazon-ecr-login@v2
       with:
         mask-password: true
     - name: Log in to Quay.io (Helm)

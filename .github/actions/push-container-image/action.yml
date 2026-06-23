@@ -191,11 +191,11 @@ runs:
         BOM_ARTIFACT_NAME: "${{ github.run_number }}${{ inputs.package-directory != '.' && format('-{0}', inputs.package-directory) || '' }}.sbom.json"
 
     - name: Checkout
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6.0.2
 
     - name: Install Java and Maven
       if: inputs.uses-maven == 'true'
-      uses: actions/setup-java@v4
+      uses: actions/setup-java@v5.2.0
       with:
         java-version: ${{ inputs.java-version }}
         distribution: ${{ inputs.jdk }}
@@ -209,14 +209,14 @@ runs:
       shell: bash
 
     - name: Download build artifact
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       if: inputs.build-artifact
       with:
         name: ${{ inputs.build-artifact }}
         path: ${{ inputs.build-artifact }}/
 
     - name: Get SBOM from artifact
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       if: ${{ inputs.download-sbom == 'true' }}
       # Allow to continue even if SBOM is not found
       continue-on-error: true
@@ -225,7 +225,7 @@ runs:
         path: ${{ inputs.PATH }}
 
     - name: Enable buildkit cache
-      uses: actions/cache@v4.2.0
+      uses: actions/cache@v5.0.5
       if: inputs.enable-buildkit-cache == 'true'
       with:
         path: /tmp/buildkit-cache/buildkit-state.tar
@@ -234,7 +234,7 @@ runs:
           ${{ runner.os }}-buildkit-
 
     - name: Load buildkit state from cache
-      uses: dashevo/gh-action-cache-buildkit-state@v1
+      uses: dashevo/gh-action-cache-buildkit-state@v1.0.3
       if: inputs.enable-buildkit-cache == 'true'
       with:
         builder: buildx_buildkit_${{ steps.buildx.outputs.name }}0
@@ -245,7 +245,7 @@ runs:
       id: aws-login
       # Only run if dry run is explicitly set to 'false'
       if: inputs.registry == 'aws' && inputs.dry-run == 'false'
-      uses: aws-actions/configure-aws-credentials@v4
+      uses: aws-actions/configure-aws-credentials@v6
       with:
         role-to-assume: ${{ inputs.role-to-assume != '' && inputs.role-to-assume || 'arn:aws:iam::098669589541:role/GitHubDeploymentRole' }}
         aws-region: eu-west-2
@@ -255,7 +255,7 @@ runs:
       # Only run if dry run is explicitly set to 'false'
       if: inputs.registry == 'aws' && inputs.dry-run == 'false'
       id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v1
+      uses: aws-actions/amazon-ecr-login@v2
       with:
         mask-password: true
 
@@ -263,24 +263,24 @@ runs:
       # Only run if dry run is explicitly set to 'false'
       # Dependabot triggered PRs don't have access to Quay credentials to push images, so no need to run in this case either
       if: inputs.registry == 'quay' && inputs.dry-run == 'false' && github.actor != 'dependabot[bot]'
-      uses: docker/login-action@v3
+      uses: docker/login-action@v4.1.0
       with:
         registry: quay.io
         username: ${{ inputs.quay-username }}
         password: ${{ inputs.quay-token }}
 
     - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
+      uses: docker/setup-qemu-action@v4.0.0
       with:
         platforms: all
 
     - name: Set up Docker buildx
       id: buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@v4.0.0
 
     - name: Prepare Docker image names and tags
       id: meta
-      uses: docker/metadata-action@v5
+      uses: docker/metadata-action@v6.0.0
       with:
         # Defines the base image names in repository/name format
         images: |
@@ -315,7 +315,7 @@ runs:
     - name: Build, tag, and push container image
       # Only run if dry run is explicitly set to 'false'
       id: build-images
-      uses: docker/build-push-action@v6
+      uses: docker/build-push-action@v7.1.0
       if: inputs.dry-run == 'false'
       env:
         DOCKER_BUILDKIT: 1
@@ -341,7 +341,7 @@ runs:
     - name: Build container image tarball (dry run)
       # Only run if dry run is set to anything other than 'false', indicating that this is a dry run
       id: build-images-dry-run
-      uses: docker/build-push-action@v6
+      uses: docker/build-push-action@v7.1.0
       if: inputs.dry-run != 'false'
       env:
         DOCKER_BUILDKIT: 1

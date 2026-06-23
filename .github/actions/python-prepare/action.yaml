@@ -39,7 +39,7 @@ runs:
     - name: Configure CodeArtifact AWS credentials
       if: inputs.code-artefact-role != ''
       id: creds
-      uses: aws-actions/configure-aws-credentials@v4
+      uses: aws-actions/configure-aws-credentials@v6
       with:
         role-to-assume: ${{ inputs.code-artefact-role }}
         aws-region: eu-west-2
