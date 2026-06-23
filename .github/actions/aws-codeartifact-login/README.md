@@ -14,7 +14,8 @@ automatically be masked as a secret.
 ### AWS Credentials
 
 This action assumes that your workflow has already obtained AWS credentials via
-the [configure-aws-credentials][2] action or similar. We recommend using the official AWS action for this.
+the [configure-aws-credentials][2] action or similar. We recommend using the 
+official AWS action for this.
 
 The pre-existing credentials available within your workflow job are then used
 to run the `aws codeartifact get-authorization-token` command to perform the
@@ -73,7 +74,7 @@ jobs:
 After our action has been called the CodeArtifact user and token are available
 as outputs in subsequent jobs and/or steps.
 
-For example a Maven user might then use a subsequent step to configure Maven with these credentials.
+For example a Maven user might then use subsequent steps to perform a Maven build with these credentials:
 
 ```yaml
       - name: Install Java and Maven
@@ -83,9 +84,22 @@ For example a Maven user might then use a subsequent step to configure Maven wit
           distribution: temurin
           cache: maven
           server-id: codeartifact
-          server-username: ${{ steps.code-artifact-login.outputs.user }}
-          server-password: ${{ steps.code-artifact-login.outputs.token }}
+          server-username: AWS_CODEARTIFACT_USERNAME
+          server-password: AWS_CODEARTIFACT_PASSWORD
+
+      - name: Maven Build
+        env:
+          AWS_CODEARTIFACT_USERNAME: ${{ steps.code-artifact-login.outputs.user }}
+          AWS_CODEARTIFACT_PASSWORD: ${{ steps.code-artifact-login.outputs.token }}
+        shell: bash
+        run: |
+          mvn install
 ```
+
+**NB** The `actions/setup-java` action uses indirection in creating the Maven settings file in that the username and
+password injected into the `settings.xml` are merely expressions pointing to environment variables.  Therefore any
+steps that actually needs the Maven credentials **MUST** set the environment variables previously specified in the
+inputs of the `actions/setup-java`.
 
 Or a Python user might do the following:
 

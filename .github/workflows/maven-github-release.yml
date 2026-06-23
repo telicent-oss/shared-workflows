@@ -85,6 +85,68 @@ on:
   workflow_dispatch:
 
 jobs:
+  codeartifact-release:
+    runs-on: ubuntu-latest
+    if: ${{ github.ref_type == 'tag' }}
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v7
+
+      - name: Configure AWS credentials from main account
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_DEPLOY_CODE_ARTIFACT }}
+          aws-region: eu-west-2
+          mask-aws-account-id: false
+
+      - name: AWS CodeArtifact Login
+        id: code-artifact-login
+        uses: telicent-oss/shared-workflows/.github/actions/aws-codeartifact-login@main
+        with:
+          domain: telicent 
+          owner: ${{ secrets.AWS_ACCOUNT_ID }}
+
+      - name: Install Java and Maven
+        uses: actions/setup-java@v5.2.0
+        with:
+          java-version: ${{ inputs.JAVA_VERSION }}
+          distribution: ${{ inputs.JDK }}
+          cache: maven
+          # NB - The setup-java action creates a Maven settings file that uses indirection, so the username and password
+          #      here are merely environment variables.  Steps that actually want to perform actions against the AWS
+          #      CodeArtifact repository MUST set these environment variables from the outputs of the 
+          #      code-artifact-login step
+          server-id: codeartifact
+          server-username: AWS_CODEARTIFACT_USERNAME
+          server-password: AWS_CODEARTIFACT_PASSWORD
+
+      - name: Import GPG key
+        uses: crazy-max/ghaction-import-gpg@v7.0.0
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
+      # Note this job only runs after a successful build job so safe to skip tests at this point
+      - name: Deploy Maven Release to AWS CodeArtifact
+        env:
+          # As Maven settings file references credentials via environment variables have to set those for the step that
+          # actually wants to interact with Code Artifact
+          AWS_CODEARTIFACT_USERNAME: ${{ steps.code-artifact-login.outputs.user }}
+          AWS_CODEARTIFACT_PASSWORD: ${{ steps.code-artifact-login.outputs.token }}
+        run: |
+          if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
+            mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} -P-telicent-oss \
+                ${{ inputs.MAVEN_ARGS }} -DskipTests \
+                -DaltReleaseDeploymentRepository=codeartifact::https://telicent-${{ secrets.AWS_ACCOUNT_ID }}.d.codeartifact.eu-west-2.amazonaws.com/maven/telicent-code-artifacts/
+          else
+            mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} -P-telicent-oss \
+                ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }} -DskipTests \
+                -DaltReleaseDeploymentRepository=codeartifact::https://telicent-${{ secrets.AWS_ACCOUNT_ID }}.d.codeartifact.eu-west-2.amazonaws.com/maven/telicent-code-artifacts/
+          fi
+
   github-release:
     runs-on: ubuntu-latest
     if: ${{ github.ref_type == 'tag' }}
@@ -166,7 +228,8 @@ jobs:
         # This could error under a few circumstances:
         # 1 - The Developer is proactive and has already opened the PR from the release branch to main
         # 2 - The build has been restarted due to some transient failure so the PR was previously created
-        # Therefore set continue-on-error to true for this step
+        # 3 - The Developer created the release from a branch not named release/<version>
+        # Therefore set continue-on-error to true for this step so failure here doesn't block the build
         continue-on-error: true
         run: |
           gh pr create \
