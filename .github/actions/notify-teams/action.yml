@@ -92,7 +92,7 @@ runs:
     ###
     - name: Download Trivy repo scan report artifact
       uses: actions/download-artifact@v7
-      if: inputs.download-artifact
+      if: inputs.notification-type == 'trivy-repo-scan-failed'
       with:
         name: ${{ inputs.download-artifact }}
         path: ${{ runner.temp }}/download-artifacts/${{ inputs.download-artifact }}/
