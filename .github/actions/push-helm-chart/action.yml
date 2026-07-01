@@ -122,6 +122,16 @@ runs:
       env:
         QUAY_USERNAME: ${{ inputs.quay-username }}
         QUAY_TOKEN: ${{ inputs.quay-token }}
+    - name: Docker Login to Quay.io (CoSign)
+      # Helm's registry login stores credentials separately from Docker's, so a Docker login is also required.
+      # Only run if dry run is explicitly set to 'false'
+      # Dependabot triggered PRs don't have access to Quay credentials to push images, so no need to run in this case either
+      if: inputs.registry == 'quay' && inputs.dry-run == 'false' && github.actor != 'dependabot[bot]'
+      uses: docker/login-action@v4.1.0
+      with:
+        registry: quay.io
+        username: ${{ inputs.quay-username }}
+        password: ${{ inputs.quay-token }}
     - name: Push Helm chart
       # Only run if dry run is explicitly set to 'false'
       # Dependabot triggered PRs don't have access to Quay credentials to push images, so no need to run in this case either
