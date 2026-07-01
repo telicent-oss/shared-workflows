@@ -94,20 +94,9 @@ runs:
     ###
     # Chart promotion steps
     ###
-    - name: Install Helm
-      if: inputs.chart != ''
-      uses: azure/setup-helm@v5
-      with:
-        version: latest
 
-    - name: Login to Quay (Helm)
-      if: inputs.chart != ''
-      shell: bash
-      env:
-        QUAY_USERNAME: ${{ inputs.quay-username }}
-        QUAY_TOKEN: ${{ inputs.quay-token }}
-      run: echo "$QUAY_TOKEN" | helm registry login quay.io --username "$QUAY_USERNAME" --password-stdin
-
+    # `oras` and `cosign` both of those authenticate via ~/.docker/config.json,
+    # so there is no need to use `helm registry login` here.
     - name: Copy Helm chart from ECR and push to Quay
       if: inputs.chart != ''
       id: push-chart
