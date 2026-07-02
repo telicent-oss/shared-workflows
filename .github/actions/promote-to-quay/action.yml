@@ -74,7 +74,7 @@ runs:
         username: ${{ inputs.quay-username }}
         password: ${{ inputs.quay-token }}
 
-    - name: Pull from ECR, retag and push to Quay
+    - name: Copy container image from ECR to Quay
       if: inputs.image != ''
       id: push-image
       shell: bash
@@ -97,7 +97,7 @@ runs:
 
     # `oras` and `cosign` both of those authenticate via ~/.docker/config.json,
     # so there is no need to use `helm registry login` here.
-    - name: Copy Helm chart from ECR and push to Quay
+    - name: Copy Helm chart from ECR to Quay
       if: inputs.chart != ''
       id: push-chart
       shell: bash
