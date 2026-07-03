@@ -224,23 +224,6 @@ runs:
         name: ${{ steps.globals.outputs.bom-artifact-name }}
         path: ${{ inputs.PATH }}
 
-    - name: Enable buildkit cache
-      uses: actions/cache@v5.0.5
-      if: inputs.enable-buildkit-cache == 'true'
-      with:
-        path: /tmp/buildkit-cache/buildkit-state.tar
-        key: ${{ runner.os }}-buildkit-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-buildkit-
-
-    - name: Load buildkit state from cache
-      uses: dashevo/gh-action-cache-buildkit-state@v1.0.3
-      if: inputs.enable-buildkit-cache == 'true'
-      with:
-        builder: buildx_buildkit_${{ steps.buildx.outputs.name }}0
-        cache-path: /tmp/buildkit-cache
-        cache-max-size: 3g
-
     - name: Configure AWS credentials from main account
       id: aws-login
       # Only run if dry run is explicitly set to 'false'
@@ -278,6 +261,25 @@ runs:
       id: buildx
       uses: docker/setup-buildx-action@v4.0.0
 
+    - name: Enable buildkit cache
+      # Must run after buildx setup: the loader below needs the builder container to exist
+      # and resolves its name from the buildx step's outputs
+      uses: actions/cache@v5.0.5
+      if: inputs.enable-buildkit-cache == 'true'
+      with:
+        path: /tmp/buildkit-cache/buildkit-state.tar
+        key: ${{ runner.os }}-buildkit-${{ github.sha }}
+        restore-keys: |
+          ${{ runner.os }}-buildkit-
+
+    - name: Load buildkit state from cache
+      uses: dashevo/gh-action-cache-buildkit-state@v1.0.3
+      if: inputs.enable-buildkit-cache == 'true'
+      with:
+        builder: buildx_buildkit_${{ steps.buildx.outputs.name }}0
+        cache-path: /tmp/buildkit-cache
+        cache-max-size: 3g
+
     - name: Prepare Docker image names and tags
       id: meta
       uses: docker/metadata-action@v6.0.0
@@ -312,8 +314,127 @@ runs:
       env:
         DOCKER_METADATA: ${{ steps.meta.outputs.json}}
 
-    - name: Build, tag, and push container image
-      # Only run if dry run is explicitly set to 'false'
+    - name: Build container image
+      # Only run if dry run is explicitly set to 'false'.
+      # Builds the multi-platform image WITHOUT pushing it, so that the image scans below can
+      # gate the push. The 'Push container image' step re-runs this build as a pure cache hit
+      # (same builder, same inputs), so nothing is rebuilt when the image is eventually pushed.
+      id: build-image
+      uses: docker/build-push-action@v7.1.0
+      if: inputs.dry-run == 'false'
+      env:
+        DOCKER_BUILDKIT: 1
+      with:
+        builder: ${{ steps.buildx.outputs.name }}
+        platforms: linux/amd64,linux/arm64
+        push: false
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        context: ${{ inputs.path }}
+        file: ${{ inputs.path }}/${{ inputs.dockerfile }}
+        tags: ${{ steps.meta.outputs.tags }}
+        target: ${{ inputs.target }}
+        secrets: |
+          ${{ inputs.package-pat && inputs.package-pat || '' }}
+          ${{ inputs.font-awesome-key && inputs.font-awesome-key || '' }}
+        build-args: |
+          ${{ inputs.build-args }}
+
+    - name: Build container image tarball for scanning
+      # Only run if this is a dry run or at least one image scan is enabled.
+      # The default image store in Docker Engine doesn't support loading multi-platform images,
+      # so a single (native platform) tarball is exported for the local scans. This is a pure
+      # cache hit against the build above.
+      id: build-image-tarball
+      uses: docker/build-push-action@v7.1.0
+      if: inputs.dry-run != 'false' || inputs.trivy-scan-image == 'true' || inputs.grype-scan-image == 'true'
+      env:
+        DOCKER_BUILDKIT: 1
+      with:
+        builder: ${{ steps.buildx.outputs.name }}
+        push: false
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        context: ${{ inputs.path }}
+        file: ${{ inputs.path }}/${{ inputs.dockerfile }}
+        tags: ${{ steps.meta.outputs.tags }}
+        target: ${{ inputs.target }}
+        secrets: |
+          ${{ inputs.package-pat && inputs.package-pat || '' }}
+          ${{ inputs.font-awesome-key && inputs.font-awesome-key || '' }}
+        build-args: |
+          ${{ inputs.build-args }}
+        outputs: type=docker,dest=/tmp/${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-${{ inputs.dockerfile }}.tar
+
+    - name: Upload container image tarball artefact
+      # The artefact name must match '<scan-name>.tar' as the scan actions download it by that name
+      id: upload-image-artefact
+      uses: actions/upload-artifact@v7
+      if: inputs.dry-run != 'false' || inputs.trivy-scan-image == 'true' || inputs.grype-scan-image == 'true'
+      with:
+        name: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-${{ inputs.dockerfile }}.tar
+        path: /tmp/${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-${{ inputs.dockerfile }}.tar
+        if-no-files-found: error
+
+    - name: Capture built container image tags
+      id: capture-tags
+      run: ${{ github.action_path }}/capture-tags.sh
+      shell: bash
+      env:
+        REGISTRY: "${{ inputs.registry }}"
+        AWS_REGISTRY_URL: "${{ steps.login-ecr.outputs.registry}}"
+        QUAY_REGISTRY_URL: "quay.io/telicent"
+        IMAGE_NAME: "${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}"
+        IMAGE_VERSION: "${{ steps.meta.outputs.version }}"
+
+    - name: Trivy dockerfile scan
+      # Only run if Trivy dockerfile scan is explicitly set to 'true'
+      if: inputs.trivy-scan-dockerfile == 'true'
+      uses: telicent-oss/shared-workflows/.github/actions/trivy-dockerfile-scan@main
+      with:
+        dockerfile: ${{ inputs.path }}/${{ inputs.dockerfile }}
+        github-token: ${{ inputs.github-token }}
+        scan-name: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-${{ inputs.dockerfile }}
+
+    - name: Trivy image scan
+      # Only run if Trivy image scan is explicitly set to 'true'
+      if: inputs.trivy-scan-image == 'true'
+      uses: telicent-oss/shared-workflows/.github/actions/trivy-image-scan@main
+      with:
+        github-token: ${{ inputs.github-token }}
+        # The image is always scanned locally from the tarball artefact, before it is pushed
+        image-from-artefact: 'true'
+        image-ref: ${{ steps.capture-tags.outputs.image }}
+        registry: ${{ inputs.registry }}
+        quay-username: ${{ inputs.quay-username }}
+        quay-token: ${{ inputs.quay-token }}
+        scan-name: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-${{ inputs.dockerfile }}
+        fail-on-unfixed: ${{ inputs.fail-on-unfixed }}
+        remote-vex: ${{ inputs.remote-vex }}
+        trivy-ignores: ${{ inputs.trivy-ignores != '' && format('{0}/{1}', inputs.package-directory, inputs.trivy-ignores) || '' }}
+        uses-java: ${{ inputs.uses-maven }}
+
+    - name: Grype image scan
+      # Only run if Grype image scan is explicitly set to 'true'
+      if: inputs.grype-scan-image == 'true'
+      uses: telicent-oss/shared-workflows/.github/actions/grype-image-scan@main
+      with:
+        github-token: ${{ inputs.github-token }}
+        # The image is always scanned locally from the tarball artefact, before it is pushed
+        image-from-artefact: 'true'
+        image-ref: ${{ steps.capture-tags.outputs.image }}
+        registry: ${{ inputs.registry }}
+        quay-username: ${{ inputs.quay-username }}
+        quay-token: ${{ inputs.quay-token }}
+        role-to-assume: ${{ inputs.role-to-assume }}
+        scan-name: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-${{ inputs.dockerfile }}
+        fail-on-unfixed: ${{ inputs.fail-on-unfixed }}
+        remote-vex: ${{ inputs.remote-vex }}
+
+    - name: Push container image
+      # Only run if dry run is explicitly set to 'false', and only once the image scans above
+      # have passed. Re-runs the 'Build container image' build as a pure cache hit, so this
+      # step only generates the provenance/SBOM attestations and pushes the already built image.
       id: build-images
       uses: docker/build-push-action@v7.1.0
       if: inputs.dry-run == 'false'
@@ -338,31 +459,6 @@ runs:
         build-args: |
           ${{ inputs.build-args }}
 
-    - name: Build container image tarball (dry run)
-      # Only run if dry run is set to anything other than 'false', indicating that this is a dry run
-      id: build-images-dry-run
-      uses: docker/build-push-action@v7.1.0
-      if: inputs.dry-run != 'false'
-      env:
-        DOCKER_BUILDKIT: 1
-      with:
-        # The default image store in Docker Engine doesn't support loading multi-platform images.
-        # Because of this, the dry run excludes the 'platforms' input.
-        builder: ${{ steps.buildx.outputs.name }}
-        push: false
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-        context: ${{ inputs.path }}
-        file: ${{ inputs.path }}/${{ inputs.dockerfile }}
-        tags: ${{ steps.meta.outputs.tags }}
-        target: ${{ inputs.target }}
-        secrets: |
-          ${{ inputs.package-pat && inputs.package-pat || '' }}
-          ${{ inputs.font-awesome-key && inputs.font-awesome-key || '' }}
-        build-args: |
-          ${{ inputs.build-args }}
-        outputs: type=docker,dest=/tmp/${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}.tar
-
     - name: Install CoSign
       # Only run if dry run is explicitly set to 'false' and the image is being pushed to 'quay'.
       if: inputs.dry-run == 'false' && inputs.registry == 'quay'
@@ -380,70 +476,6 @@ runs:
             images+="${tag}@${DIGEST} "
           done
           cosign sign --yes ${images}
-
-    - name: Upload container image tarball artefact
-      # Only run if dry run is set to anything other than 'false', indicating that this is a dry run
-      id: upload-image-artefact
-      uses: actions/upload-artifact@v7
-      if: inputs.dry-run != 'false'
-      with:
-        name: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}.tar
-        path: /tmp/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}.tar
-
-    - name: Capture built container image tags
-      id: capture-tags
-      run: ${{ github.action_path }}/capture-tags.sh
-      shell: bash
-      env:
-        REGISTRY: "${{ inputs.registry }}"
-        AWS_REGISTRY_URL: "${{ steps.login-ecr.outputs.registry}}"
-        QUAY_REGISTRY_URL: "quay.io/telicent"
-        IMAGE_NAME: "${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}"
-        IMAGE_VERSION: "${{ steps.meta.outputs.version }}"
-
-    - name: Trivy dockerfile scan
-      # Only run if Trivy dockerfile scan is explicitly set to 'true'
-      if: inputs.trivy-scan-dockerfile == 'true'
-      uses: telicent-oss/shared-workflows/.github/actions/trivy-dockerfile-scan@main
-      with:
-        dockerfile: ${{ inputs.path }}/${{ inputs.dockerfile }}
-        github-token: ${{ inputs.github-token }}
-        scan-name: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-${{ inputs.dockerfile }}
-
-    - name: Trivy image scan
-      # Only run if Trivy image scan is explicitly set to 'true' AND (is a dry run OR (is not a dry run AND user is not dependabot))
-      if: inputs.trivy-scan-image == 'true' && (inputs.dry-run != 'false' || (inputs.dry-run == 'false' && github.actor != 'dependabot[bot]'))
-      uses: telicent-oss/shared-workflows/.github/actions/trivy-image-scan@main
-      with:
-        github-token: ${{ inputs.github-token }}
-        # Indicates that the image should be imported from a tarball artefact and scanned locally
-        image-from-artefact: ${{ inputs.dry-run != 'false' }}
-        image-ref: ${{ steps.capture-tags.outputs.image }}
-        registry: ${{ inputs.registry }}
-        quay-username: ${{ inputs.quay-username }}
-        quay-token: ${{ inputs.quay-token }}
-        scan-name: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-${{ inputs.dockerfile }}
-        fail-on-unfixed: ${{ inputs.fail-on-unfixed }}
-        remote-vex: ${{ inputs.remote-vex }}
-        trivy-ignores: ${{ inputs.trivy-ignores != '' && format('{0}/{1}', inputs.package-directory, inputs.trivy-ignores) || '' }}
-        uses-java: ${{ inputs.uses-maven }}
-
-    - name: Grype image scan
-      # Only run if Grype image scan is explicitly set to 'true' AND (is a dry run OR (is not a dry run AND user is not dependabot))
-      if: inputs.grype-scan-image == 'true' && (inputs.dry-run != 'false' || (inputs.dry-run == 'false' && github.actor != 'dependabot[bot]'))
-      uses: telicent-oss/shared-workflows/.github/actions/grype-image-scan@main
-      with:
-        github-token: ${{ inputs.github-token }}
-        # Indicates that the image should be imported from a tarball artefact and scanned locally
-        image-from-artefact: ${{ inputs.dry-run != 'false' }}
-        image-ref: ${{ steps.capture-tags.outputs.image }}
-        registry: ${{ inputs.registry }}
-        quay-username: ${{ inputs.quay-username }}
-        quay-token: ${{ inputs.quay-token }}
-        role-to-assume: ${{ inputs.role-to-assume }}
-        scan-name: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-${{ inputs.dockerfile }}
-        fail-on-unfixed: ${{ inputs.fail-on-unfixed }}
-        remote-vex: ${{ inputs.remote-vex }}
 
     - name: Notify MS Teams of image push
       if: inputs.teams-webhook-url != ''
