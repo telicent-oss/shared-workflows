@@ -1,0 +1,236 @@
+name: Publish
+
+# Reusable workflow that runs release-please and a version-prepare step once, then builds and
+# pushes a container image + Helm chart for every element of a caller-supplied matrix.
+#
+# When release-please has NOT created a release (i.e. a normal push to the default branch) the
+# development image and chart are published to ECR. When release-please HAS created a release the
+# release image and chart are published to Quay.
+#
+# The matrix is supplied by the caller as a JSON string, e.g:
+#   matrix: |
+#     {"include":[
+#       {"app-name":"ontology-adapter","chart":"charts/ontology-adapter","chart-name":"telicent-ontology-adapter","dockerfile":"Dockerfile","path":"."}
+#     ]}
+#
+# Required organisation/repository secrets:
+#   CODE_ARTIFACT_URL              - CodeArtifact PyPI URL (host + path)
+#   AWS_ROLE_DEPLOY_CODE_ARTIFACT  - ARN of the IAM role used to obtain a CodeArtifact token.
+#   QUAY_USERNAME / QUAY_TOKEN     - Quay credentials (only needed for release publishes).
+
+on:
+  workflow_call:
+    inputs:
+      matrix:
+        required: true
+        type: string
+        description: |
+          JSON-encoded matrix of applications to build and publish. Each element should provide:
+            app-name     - the main portion of the image/chart name.
+            chart        - path to the Helm chart, relative to the repository root.
+            chart-name   - the main portion of the chart name.
+            dockerfile   - the Dockerfile to build the image from.
+            path         - the path in which the Dockerfile is located (defaults to '.')
+          Typically wrapped in an "include" list, e.g. {"include":[{"app-name":"...","chart":"..."}]}.
+      code-artifact-domain:
+        required: false
+        type: string
+        default: telicent
+        description: The AWS CodeArtifact domain used when obtaining a token. Defaults to `telicent`.
+      pyproject-toml-path:
+        required: false
+        type: string
+        default: pyproject.toml
+        description: Path to the pyproject.toml used to determine the version. Defaults to `pyproject.toml`.
+      release-please-config-file:
+        required: false
+        type: string
+        default: .github/release-please-config.json
+        description: Path to the release-please config file.
+      release-please-manifest-file:
+        required: false
+        type: string
+        default: .github/release-please-manifest.json
+        description: Path to the release-please manifest file.
+    secrets:
+      CODE_ARTIFACT_URL:
+        required: true
+        description: CodeArtifact PyPI URL (host + path) used to build the PIP_EXTRA_INDEX_URL.
+      AWS_ROLE_DEPLOY_CODE_ARTIFACT:
+        required: true
+        description: ARN of the IAM role used to obtain a CodeArtifact token.
+      QUAY_USERNAME:
+        required: false
+        description: Quay username. Required for release publishes.
+      QUAY_TOKEN:
+        required: false
+        description: Quay token. Required for release publishes.
+
+# Revoke almost all permissions by default and grant only those needed to each job.
+# https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#permissions
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    # https://github.com/googleapis/release-please-action?tab=readme-ov-file#workflow-permissions
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      release-created: ${{ steps.release.outputs.release_created }}
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: ${{ inputs.release-please-config-file }}
+          manifest-file: ${{ inputs.release-please-manifest-file }}
+
+  # Prepare job to extract the version number from pyproject.toml. Runs once for the whole matrix.
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: ${{ inputs.pyproject-toml-path }}
+      - name: Install dependencies
+        run: pip install toml
+      - name: Get version from pyproject.toml
+        id: get-version
+        shell: python
+        run: |
+          import os, toml
+
+          version = toml.load("${{ inputs.pyproject-toml-path }}")["project"]["version"]
+          print(f'version: {version}')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'version={version}\n')
+
+  # Build and push the development container image + Helm chart to ECR for each matrix element
+  # (only when a release is NOT created). The image is built first so its SHA tag can flow to the
+  # Helm chart as a local step output, avoiding the matrix-job output clobbering that would occur
+  # if these were separate matrixed jobs.
+  dev-publish:
+    name: Publish dev image & chart to ECR (${{ matrix.app-name }})
+    if: needs.release-please.outputs.release-created != 'true'
+    needs:
+      - release-please
+      - prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(inputs.matrix) }}
+    steps:
+      - name: Configure CodeArtifact AWS credentials
+        id: creds
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_DEPLOY_CODE_ARTIFACT }}
+          aws-region: eu-west-2
+          mask-aws-account-id: true
+      - name: CodeArtifact login
+        id: code-artifact-login
+        uses: telicent-oss/shared-workflows/.github/actions/aws-codeartifact-login@main
+        with:
+          domain: ${{ inputs.code-artifact-domain }}
+          owner: "${{ steps.creds.outputs.aws-account-id }}"
+      - name: Build and push image to ECR
+        id: build-and-push-dev-image
+        uses: telicent-oss/shared-workflows/.github/actions/push-container-image@main
+        with:
+          app-name: ${{ matrix.app-name }}
+          app-name-prefix: ""
+          image-suffix: ${{ matrix.image-suffix }}
+          dockerfile: ${{ matrix.dockerfile }}
+          path: ${{ matrix.path || '.' }}
+          allow-development-tag: true
+          allow-mutable-tags: false
+          grype-scan-image: false
+          registry: aws
+          sha-tag-format: short
+          # Secrets
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          build-args: |
+            "PIP_EXTRA_INDEX_URL=https://aws:${{ steps.code-artifact-login.outputs.token }}@${{ secrets.CODE_ARTIFACT_URL }}"
+      - name: Package and push Helm chart to ECR
+        uses: telicent-oss/shared-workflows/.github/actions/push-helm-chart@main
+        with:
+          app-name: ${{ matrix.chart-name }}
+          app-name-prefix: ""
+          chart: ${{ matrix.chart }}
+          registry: aws
+          version: ${{ needs.prepare.outputs.version }}-${{ steps.build-and-push-dev-image.outputs.sha-image-tag }}
+          appVersion: ${{ steps.build-and-push-dev-image.outputs.sha-image-tag }}
+          replace-chart-versions: true
+
+  # Build and push the release container image + Helm chart to Quay for each matrix element
+  # (only when a release IS created).
+  release-publish:
+    name: Publish release image & chart to Quay (${{ matrix.app-name }})
+    if: needs.release-please.outputs.release-created == 'true'
+    needs:
+      - release-please
+      - prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(inputs.matrix) }}
+    steps:
+      - name: Configure CodeArtifact AWS credentials
+        id: creds
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_DEPLOY_CODE_ARTIFACT }}
+          aws-region: eu-west-2
+          mask-aws-account-id: true
+      - name: CodeArtifact login
+        id: code-artifact-login
+        uses: telicent-oss/shared-workflows/.github/actions/aws-codeartifact-login@main
+        with:
+          domain: ${{ inputs.code-artifact-domain }}
+          owner: "${{ steps.creds.outputs.aws-account-id }}"
+      - name: Build and push image to Quay
+        id: build-and-push-release-image
+        uses: telicent-oss/shared-workflows/.github/actions/push-container-image@main
+        with:
+          app-name: ${{ matrix.app-name }}
+          app-name-prefix: ""
+          image-suffix: ${{ matrix.image-suffix }}
+          dockerfile: ${{ matrix.dockerfile }}
+          path: ${{ matrix.path || '.' }}
+          allow-latest-tag: true
+          allow-mutable-tags: false
+          allow-sha-tag: false
+          registry: quay
+          version: ${{ needs.prepare.outputs.version }}
+          # Secrets
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          quay-username: ${{ secrets.QUAY_USERNAME }}
+          quay-token: ${{ secrets.QUAY_TOKEN }}
+          build-args: |
+            "PIP_EXTRA_INDEX_URL=https://aws:${{ steps.code-artifact-login.outputs.token }}@${{ secrets.CODE_ARTIFACT_URL }}"
+      - name: Package and push Helm chart to Quay
+        uses: telicent-oss/shared-workflows/.github/actions/push-helm-chart@main
+        with:
+          app-name: ${{ matrix.chart-name }}
+          app-name-prefix: ""
+          chart: ${{ matrix.chart }}
+          registry: quay
+          version: ${{ needs.prepare.outputs.version }}
+          # Secrets
+          quay-username: ${{ secrets.QUAY_USERNAME }}
+          quay-token: ${{ secrets.QUAY_TOKEN }}
