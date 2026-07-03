@@ -173,7 +173,7 @@ jobs:
             "PIP_EXTRA_INDEX_URL=https://aws:${{ steps.code-artifact-login.outputs.token }}@${{ secrets.CODE_ARTIFACT_URL }}"
       
   dev-publish-chart:
-    name: Publish dev chart to ECR (${{ matrix.app-name }})
+    name: Publish dev chart to ECR (${{ matrix.chart-name }})
     if: needs.release-please.outputs.release-created != 'true'
     needs:
       - release-please
@@ -248,7 +248,7 @@ jobs:
           build-args: |
             "PIP_EXTRA_INDEX_URL=https://aws:${{ steps.code-artifact-login.outputs.token }}@${{ secrets.CODE_ARTIFACT_URL }}"
   release-publish-chart:
-    name: Publish release chart to Quay (${{ matrix.app-name }})
+    name: Publish release chart to Quay (${{ matrix.chart-name }})
     if: needs.release-please.outputs.release-created == 'true'
     needs:
       - release-please
