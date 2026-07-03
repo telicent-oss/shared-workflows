@@ -127,6 +127,8 @@ jobs:
   dev-publish:
     name: Publish dev image to ECR (${{ matrix.app-name }})
     if: needs.release-please.outputs.release-created != 'true'
+    outputs: 
+      sha-image-tag: ${{ steps.build-and-push-dev-image.outputs.sha-image-tag }}
     needs:
       - release-please
       - prepare
@@ -176,6 +178,7 @@ jobs:
     needs:
       - release-please
       - prepare
+      - dev-publish
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -191,8 +194,8 @@ jobs:
           app-name-prefix: ""
           chart: ${{ matrix.chart }}
           registry: aws
-          version: ${{ needs.prepare.outputs.version }}-${{ steps.build-and-push-dev-image.outputs.sha-image-tag }}
-          appVersion: ${{ steps.build-and-push-dev-image.outputs.sha-image-tag }}
+          version: ${{ needs.prepare.outputs.version }}-${{ needs.dev-publish.outputs.sha-image-tag }}
+          appVersion: ${{ needs.dev-publish.outputs.sha-image-tag }}
           replace-chart-versions: true
 
   # Build and push the release container image + Helm chart to Quay for each matrix element
