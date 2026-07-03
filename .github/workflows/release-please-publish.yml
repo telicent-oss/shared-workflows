@@ -163,6 +163,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           build-args: |
             "PIP_EXTRA_INDEX_URL=https://aws:${{ steps.code-artifact-login.outputs.token }}@${{ secrets.CODE_ARTIFACT_URL }}"
+          role-to-assume: ${{ secrets.AWS_ROLE_DEPLOY }}
       - name: Package and push Helm chart to ECR
         uses: telicent-oss/shared-workflows/.github/actions/push-helm-chart@main
         with:
@@ -173,6 +174,7 @@ jobs:
           version: ${{ needs.prepare.outputs.version }}-${{ steps.build-and-push-dev-image.outputs.sha-image-tag }}
           appVersion: ${{ steps.build-and-push-dev-image.outputs.sha-image-tag }}
           replace-chart-versions: true
+          role-to-assume: ${{ secrets.AWS_ROLE_DEPLOY }}
 
   # Build and push the release container image + Helm chart to Quay for each matrix element
   # (only when a release IS created).
@@ -223,6 +225,7 @@ jobs:
           quay-token: ${{ secrets.QUAY_TOKEN }}
           build-args: |
             "PIP_EXTRA_INDEX_URL=https://aws:${{ steps.code-artifact-login.outputs.token }}@${{ secrets.CODE_ARTIFACT_URL }}"
+          role-to-assume: ${{ secrets.AWS_ROLE_DEPLOY }}
       - name: Package and push Helm chart to Quay
         uses: telicent-oss/shared-workflows/.github/actions/push-helm-chart@main
         with:
@@ -234,3 +237,4 @@ jobs:
           # Secrets
           quay-username: ${{ secrets.QUAY_USERNAME }}
           quay-token: ${{ secrets.QUAY_TOKEN }}
+          role-to-assume: ${{ secrets.AWS_ROLE_DEPLOY }}
