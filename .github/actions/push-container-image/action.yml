@@ -295,7 +295,10 @@ runs:
           type=raw,value=latest,enable=${{ env.TAG_LATEST }}
           type=raw,value=development,enable=${{ env.TAG_DEVELOPMENT }}
       env:
-        AWS_REGISTRY: ${{ inputs.registry == 'aws' && format('{0}/', steps.login-ecr.outputs.registry) || '' }}
+        # During a dry-run the ECR login step is skipped, so its `registry` output is empty. Without the
+        # dry-run guard this would evaluate to `format('{0}/', '')` = "/", producing malformed tags like
+        # `/name:development`. Dry-runs never push, so an empty prefix is correct here.
+        AWS_REGISTRY: ${{ inputs.registry == 'aws' && inputs.dry-run == 'false' && format('{0}/', steps.login-ecr.outputs.registry) || '' }}
         QUAY_REGISTRY: ${{ inputs.registry == 'quay' && 'quay.io/telicent/' || '' }}
         IMAGE_NAME: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}
         TAG_DEVELOPMENT: ${{ inputs.allow-development-tag == 'true' || (inputs.allow-mutable-tags == 'true' && github.ref_name != inputs.main-branch) }}
@@ -360,7 +363,9 @@ runs:
           ${{ inputs.font-awesome-key && inputs.font-awesome-key || '' }}
         build-args: |
           ${{ inputs.build-args }}
-        outputs: type=docker,dest=/tmp/${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}.tar
+        # Filename must match the `scan-name` the Trivy/Grype steps derive below, since they download the
+        # artifact and `docker load` it by that exact name. Include `-<dockerfile>` to keep them aligned.
+        outputs: type=docker,dest=/tmp/${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-${{ inputs.dockerfile }}.tar
 
     - name: Install CoSign
       # Only run if dry run is explicitly set to 'false' and the image is being pushed to 'quay'.
@@ -386,8 +391,12 @@ runs:
       uses: actions/upload-artifact@v7
       if: inputs.dry-run != 'false'
       with:
-        name: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}.tar
-        path: /tmp/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}.tar
+        # Name and path must match the dry-run build dest above and the `scan-name` used by the Trivy/Grype
+        # steps. These previously used `APP_NAME_PREFIX`-style refs (underscores), which do not resolve to the
+        # hyphenated inputs and silently evaluated to empty, so nothing was uploaded and the scans failed to
+        # download the tarball.
+        name: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-${{ inputs.dockerfile }}.tar
+        path: /tmp/${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-${{ inputs.dockerfile }}.tar
 
     - name: Capture built container image tags
       id: capture-tags
@@ -395,7 +404,8 @@ runs:
       shell: bash
       env:
         REGISTRY: "${{ inputs.registry }}"
-        AWS_REGISTRY_URL: "${{ steps.login-ecr.outputs.registry}}"
+        # Empty during a dry-run (ECR login is skipped); capture-tags.sh then omits the registry prefix.
+        AWS_REGISTRY_URL: "${{ inputs.dry-run == 'false' && steps.login-ecr.outputs.registry || '' }}"
         QUAY_REGISTRY_URL: "quay.io/telicent"
         IMAGE_NAME: "${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}"
         IMAGE_VERSION: "${{ steps.meta.outputs.version }}"
