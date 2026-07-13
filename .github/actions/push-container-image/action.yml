@@ -295,8 +295,8 @@ runs:
           type=raw,value=latest,enable=${{ env.TAG_LATEST }}
           type=raw,value=development,enable=${{ env.TAG_DEVELOPMENT }}
       env:
-        AWS_REGISTRY: ${{ inputs.registry == 'aws' && steps.login-ecr.outputs.registry || '' }}/
-        QUAY_REGISTRY: ${{ inputs.registry == 'quay' && 'quay.io/telicent' || '' }}/
+        AWS_REGISTRY: ${{ inputs.registry == 'aws' && format('{0}/', steps.login-ecr.outputs.registry) || '' }}
+        QUAY_REGISTRY: ${{ inputs.registry == 'quay' && 'quay.io/telicent/' || '' }}
         IMAGE_NAME: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}
         TAG_DEVELOPMENT: ${{ inputs.allow-development-tag == 'true' || (inputs.allow-mutable-tags == 'true' && github.ref_name != inputs.main-branch) }}
         TAG_LATEST: ${{ inputs.allow-latest-tag == 'true' || (inputs.allow-mutable-tags == 'true' && github.ref_name == inputs.main-branch) }}
