@@ -295,7 +295,10 @@ runs:
           type=raw,value=latest,enable=${{ env.TAG_LATEST }}
           type=raw,value=development,enable=${{ env.TAG_DEVELOPMENT }}
       env:
-        AWS_REGISTRY: ${{ inputs.registry == 'aws' && format('{0}/', steps.login-ecr.outputs.registry) || '' }}
+        # During a dry-run the ECR login step is skipped, so its `registry` output is empty. Without the
+        # dry-run guard this would evaluate to `format('{0}/', '')` = "/", producing malformed tags like
+        # `/name:development`. Dry-runs never push, so an empty prefix is correct here.
+        AWS_REGISTRY: ${{ inputs.registry == 'aws' && inputs.dry-run == 'false' && format('{0}/', steps.login-ecr.outputs.registry) || '' }}
         QUAY_REGISTRY: ${{ inputs.registry == 'quay' && 'quay.io/telicent/' || '' }}
         IMAGE_NAME: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}
         TAG_DEVELOPMENT: ${{ inputs.allow-development-tag == 'true' || (inputs.allow-mutable-tags == 'true' && github.ref_name != inputs.main-branch) }}
@@ -395,7 +398,8 @@ runs:
       shell: bash
       env:
         REGISTRY: "${{ inputs.registry }}"
-        AWS_REGISTRY_URL: "${{ steps.login-ecr.outputs.registry}}"
+        # Empty during a dry-run (ECR login is skipped); capture-tags.sh then omits the registry prefix.
+        AWS_REGISTRY_URL: "${{ inputs.dry-run == 'false' && steps.login-ecr.outputs.registry || '' }}"
         QUAY_REGISTRY_URL: "quay.io/telicent"
         IMAGE_NAME: "${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}"
         IMAGE_VERSION: "${{ steps.meta.outputs.version }}"
