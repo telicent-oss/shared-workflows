@@ -12,7 +12,7 @@ inputs:
     description: The prefix for the image name. Defaults to `telicent-`.
   dry-run:
     required: false
-    default: 'false'
+    default: "false"
     description: Whether to test the build and scan without pushing to the registry.
   github-token:
     required: true
@@ -21,11 +21,11 @@ inputs:
   # Application build options
   enable-buildkit-cache:
     required: false
-    default: 'false'
+    default: "false"
     description: Whether the docker buildkit cache is required.
   java-version:
     required: false
-    default: '21'
+    default: "21"
     description: Specifies the JDK version to install and build with.  Defaults to 21.
   jdk:
     required: false
@@ -37,11 +37,11 @@ inputs:
     description: If release has multiple package that are SBOM targets, then set this to disambiguate SBOMs.
   download-sbom:
     required: false
-    default: 'true'
+    default: "true"
     description: Whether to attempt to download a previously uploaded SBOM artifact for use in the image build.
   uses-maven:
     required: false
-    default: 'false'
+    default: "false"
     description: Whether your build requires the JDK and Maven to be present.
 
   # Container registry options
@@ -61,27 +61,27 @@ inputs:
   # Container build and tag options
   allow-latest-tag:
     required: false
-    default: 'false'
+    default: "false"
     description: |
       Set to `true` to explicitly add the `latest` tag.
       The tag may still be added implicitly if `allow-mutable-tags` is set to `true` and the reference branch is the branch specified as `main-branch`.
   allow-development-tag:
     required: false
-    default: 'false'
+    default: "false"
     description: |
       Set to `true` to explicitly add the `development` tag.
       The tag may still be added implicitly if `allow-mutable-tags` is set to `true` and the reference branch is differs from the branch specified as `main-branch`.
   allow-mutable-tags:
     required: false
-    default: 'true'
+    default: "true"
     description: Set to `false` to avoid adding mutable tags like `latest` and `development` based on the branch specified as `main-branch`.
   allow-sha-tag:
     required: false
-    default: 'true'
+    default: "true"
     description: Set to `false` to avoid adding the image SHA as a tag.
   allow-version-tag:
     required: false
-    default: 'true'
+    default: "true"
     description: Set to `false` to avoid adding a version tag.
   build-args:
     required: false
@@ -131,22 +131,22 @@ inputs:
   # Trivy/Grype scanning options
   grype-scan-image:
     required: false
-    default: 'true'
+    default: "true"
     description: Whether to run a Grype scan on the built image.
   trivy-ignores:
     required: false
     description: Name of trivy ignore file. Only allowed for BUILD image, MUST NOT be used with DEPLOY images.
   trivy-scan-dockerfile:
     required: false
-    default: 'true'
+    default: "true"
     description: Whether to run a Trivy scan on the Dockerfile used to build the image.
   trivy-scan-image:
     required: false
-    default: 'true'
+    default: "true"
     description: Whether to run a Trivy scan on the built image.
   fail-on-unfixed:
     required: false
-    default: 'false'
+    default: "false"
     description: Whether to fail the scan if unfixed vulnerabilities are found.
   remote-vex:
     required: false
@@ -174,7 +174,6 @@ outputs:
 runs:
   using: composite
   steps:
-
     - name: Validate registry inputs
       uses: telicent-oss/shared-workflows/.github/actions/validate-registry-inputs@main
       with:
@@ -284,7 +283,7 @@ runs:
       with:
         # Defines the base image names in repository/name format
         images: |
-          ${{ env.AWS_REGISTRY }}${{ env.QUAY_REGISTRY }}/${{ env.IMAGE_NAME }}
+          ${{ env.AWS_REGISTRY }}${{ env.QUAY_REGISTRY }}${{ env.IMAGE_NAME }}
         # Manually handling latest below so disabling automatic latest handling
         flavor: |
           latest=false
@@ -296,8 +295,8 @@ runs:
           type=raw,value=latest,enable=${{ env.TAG_LATEST }}
           type=raw,value=development,enable=${{ env.TAG_DEVELOPMENT }}
       env:
-        AWS_REGISTRY: ${{ inputs.registry == 'aws' && steps.login-ecr.outputs.registry || '' }}
-        QUAY_REGISTRY: ${{ inputs.registry == 'quay' && 'quay.io/telicent' || '' }}
+        AWS_REGISTRY: ${{ inputs.registry == 'aws' && steps.login-ecr.outputs.registry || '' }}/
+        QUAY_REGISTRY: ${{ inputs.registry == 'quay' && 'quay.io/telicent' || '' }}/
         IMAGE_NAME: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}
         TAG_DEVELOPMENT: ${{ inputs.allow-development-tag == 'true' || (inputs.allow-mutable-tags == 'true' && github.ref_name != inputs.main-branch) }}
         TAG_LATEST: ${{ inputs.allow-latest-tag == 'true' || (inputs.allow-mutable-tags == 'true' && github.ref_name == inputs.main-branch) }}
@@ -375,11 +374,11 @@ runs:
         DIGEST: ${{ steps.build-images.outputs.digest }}
         TAGS: ${{ steps.meta.outputs.tags }}
       run: |
-          images=""
-          for tag in ${TAGS}; do
-            images+="${tag}@${DIGEST} "
-          done
-          cosign sign --yes ${images}
+        images=""
+        for tag in ${TAGS}; do
+          images+="${tag}@${DIGEST} "
+        done
+        cosign sign --yes ${images}
 
     - name: Upload container image tarball artefact
       # Only run if dry run is set to anything other than 'false', indicating that this is a dry run
