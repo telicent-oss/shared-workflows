@@ -391,8 +391,12 @@ runs:
       uses: actions/upload-artifact@v7
       if: inputs.dry-run != 'false'
       with:
-        name: ${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}.tar
-        path: /tmp/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}.tar
+        # Name and path must match the dry-run build dest above and the `scan-name` used by the Trivy/Grype
+        # steps. These previously used `APP_NAME_PREFIX`-style refs (underscores), which do not resolve to the
+        # hyphenated inputs and silently evaluated to empty, so nothing was uploaded and the scans failed to
+        # download the tarball.
+        name: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-${{ inputs.dockerfile }}.tar
+        path: /tmp/${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-${{ inputs.dockerfile }}.tar
 
     - name: Capture built container image tags
       id: capture-tags
