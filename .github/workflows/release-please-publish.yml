@@ -21,16 +21,22 @@ name: Publish
 on:
   workflow_call:
     inputs:
-      matrix:
+      image-matrix:
         required: true
         type: string
         description: |
           JSON-encoded matrix of applications to build and publish. Each element should provide:
             app-name     - the main portion of the image/chart name.
-            chart        - path to the Helm chart, relative to the repository root.
-            chart-name   - the main portion of the chart name.
             dockerfile   - the Dockerfile to build the image from.
             path         - the path in which the Dockerfile is located (defaults to '.')
+          Typically wrapped in an "include" list, e.g. {"include":[{"app-name":"...","chart":"..."}]}.
+      chart-matrix:
+        required: true
+        type: string
+        description: |
+          JSON-encoded matrix of applications to build and publish. Each element should provide:
+            chart        - path to the Helm chart, relative to the repository root.
+            chart-name   - the main portion of the chart name.
           Typically wrapped in an "include" list, e.g. {"include":[{"app-name":"...","chart":"..."}]}.
       code-artifact-domain:
         required: false
@@ -119,8 +125,10 @@ jobs:
   # Helm chart as a local step output, avoiding the matrix-job output clobbering that would occur
   # if these were separate matrixed jobs.
   dev-publish:
-    name: Publish dev image & chart to ECR (${{ matrix.app-name }})
+    name: Publish dev image to ECR (${{ matrix.app-name }})
     if: needs.release-please.outputs.release-created != 'true'
+    outputs: 
+      sha-image-tag: ${{ steps.build-and-push-dev-image.outputs.sha-image-tag }}
     needs:
       - release-please
       - prepare
@@ -130,7 +138,7 @@ jobs:
       id-token: write
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(inputs.matrix) }}
+      matrix: ${{ fromJson(inputs.image-matrix) }}
     steps:
       - name: Configure CodeArtifact AWS credentials
         id: creds
@@ -163,6 +171,22 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           build-args: |
             "PIP_EXTRA_INDEX_URL=https://aws:${{ steps.code-artifact-login.outputs.token }}@${{ secrets.CODE_ARTIFACT_URL }}"
+      
+  dev-publish-chart:
+    name: Publish dev chart to ECR (${{ matrix.chart-name }})
+    if: needs.release-please.outputs.release-created != 'true'
+    needs:
+      - release-please
+      - prepare
+      - dev-publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(inputs.chart-matrix) }}
+    steps:
       - name: Package and push Helm chart to ECR
         uses: telicent-oss/shared-workflows/.github/actions/push-helm-chart@main
         with:
@@ -170,14 +194,14 @@ jobs:
           app-name-prefix: ""
           chart: ${{ matrix.chart }}
           registry: aws
-          version: ${{ needs.prepare.outputs.version }}-${{ steps.build-and-push-dev-image.outputs.sha-image-tag }}
-          appVersion: ${{ steps.build-and-push-dev-image.outputs.sha-image-tag }}
+          version: ${{ needs.prepare.outputs.version }}-${{ needs.dev-publish.outputs.sha-image-tag }}
+          appVersion: ${{ needs.dev-publish.outputs.sha-image-tag }}
           replace-chart-versions: true
 
   # Build and push the release container image + Helm chart to Quay for each matrix element
   # (only when a release IS created).
-  release-publish:
-    name: Publish release image & chart to Quay (${{ matrix.app-name }})
+  release-publish-image:
+    name: Publish release image to Quay (${{ matrix.app-name }})
     if: needs.release-please.outputs.release-created == 'true'
     needs:
       - release-please
@@ -188,7 +212,7 @@ jobs:
       id-token: write
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(inputs.matrix) }}
+      matrix: ${{ fromJson(inputs.image-matrix) }}
     steps:
       - name: Configure CodeArtifact AWS credentials
         id: creds
@@ -223,6 +247,21 @@ jobs:
           quay-token: ${{ secrets.QUAY_TOKEN }}
           build-args: |
             "PIP_EXTRA_INDEX_URL=https://aws:${{ steps.code-artifact-login.outputs.token }}@${{ secrets.CODE_ARTIFACT_URL }}"
+  release-publish-chart:
+    name: Publish release chart to Quay (${{ matrix.chart-name }})
+    if: needs.release-please.outputs.release-created == 'true'
+    needs:
+      - release-please
+      - prepare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(inputs.chart-matrix) }}    
+      
+    steps:
       - name: Package and push Helm chart to Quay
         uses: telicent-oss/shared-workflows/.github/actions/push-helm-chart@main
         with:
