@@ -363,7 +363,9 @@ runs:
           ${{ inputs.font-awesome-key && inputs.font-awesome-key || '' }}
         build-args: |
           ${{ inputs.build-args }}
-        outputs: type=docker,dest=/tmp/${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}.tar
+        # Filename must match the `scan-name` the Trivy/Grype steps derive below, since they download the
+        # artifact and `docker load` it by that exact name. Include `-<dockerfile>` to keep them aligned.
+        outputs: type=docker,dest=/tmp/${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-${{ inputs.dockerfile }}.tar
 
     - name: Install CoSign
       # Only run if dry run is explicitly set to 'false' and the image is being pushed to 'quay'.
