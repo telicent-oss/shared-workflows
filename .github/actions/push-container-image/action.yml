@@ -58,8 +58,10 @@ inputs:
     description: The AWS CodeArtifact domain used when obtaining a token. Only used when `codeartifact-role` is set.
   codeartifact-domain-owner:
     required: false
-    default: "098669589541"
-    description: The AWS account ID that owns the CodeArtifact domain. Only used when `codeartifact-role` is set.
+    description: |
+      The AWS account ID that owns the CodeArtifact domain. Intentionally not defaulted so that an AWS account
+      number is not embedded in this OSS action — pass it from a secret in the calling workflow, e.g.
+      `${{ secrets.AWS_ACCOUNT_ID }}`. Required when `codeartifact-role` is set.
   codeartifact-repository-id:
     required: false
     default: aws-codeartifact-telicent

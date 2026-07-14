@@ -56,7 +56,7 @@ repositories and the Maven cache restored from the preceding Maven workflow.
 | :--- | :--- | :--- | :--- |
 | `codeartifact-role` | | No | ARN of the AWS IAM role to assume to obtain a CodeArtifact token for the Maven build. When set, the action logs into CodeArtifact and wires the token into Maven's `settings.xml`. When omitted, no CodeArtifact login is performed. |
 | `codeartifact-domain` | `'telicent'` | No | The AWS CodeArtifact domain used when obtaining a token. |
-| `codeartifact-domain-owner` | `'098669589541'` | No | The AWS account ID that owns the CodeArtifact domain. |
+| `codeartifact-domain-owner` | | No | The AWS account ID that owns the CodeArtifact domain. Not defaulted (to keep the account number out of this OSS action); pass it from a secret in the calling workflow, e.g. `${{ secrets.AWS_ACCOUNT_ID }}`. Required when `codeartifact-role` is set. |
 | `codeartifact-repository-id` | `'aws-codeartifact-telicent'` | No | The Maven server id that matches the CodeArtifact repository declared in your `pom.xml`, so the obtained token is associated with the right server. |
 | `codeartifact-token-lifetime` | `'3600'` | No | Lifetime, in seconds, of the CodeArtifact token. |
 
@@ -76,6 +76,7 @@ permission to obtain a CodeArtifact authorization token. For example:
           uses-maven: true
           role-to-assume: ${{ secrets.AWS_ROLE_DEPLOY }}
           codeartifact-role: ${{ secrets.AWS_ROLE_DEPLOY_CODE_ARTIFACT }}
+          codeartifact-domain-owner: ${{ secrets.AWS_ACCOUNT_ID }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
