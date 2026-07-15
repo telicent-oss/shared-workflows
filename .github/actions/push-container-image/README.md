@@ -45,6 +45,41 @@ specified.
 | `java-version` | `'21'` | No | Specifies the JDK version to install and build with. |
 | `jdk` | `'temurin'` | No | Specifies the JDK to use. |
 
+### CodeArtifact Options
+
+These only apply to `uses-maven` builds. Set `codeartifact-role` when the on-runner `mvn package` needs to
+resolve private Maven dependencies that live only in AWS CodeArtifact (i.e. artifacts that are not published to
+a public repository such as Maven Central). When it is omitted the action behaves as before, relying on public
+repositories and the Maven cache restored from the preceding Maven workflow.
+
+| Name | Default | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `codeartifact-role` | | No | ARN of the AWS IAM role to assume to obtain a CodeArtifact token for the Maven build. When set, the action logs into CodeArtifact and wires the token into Maven's `settings.xml`. When omitted, no CodeArtifact login is performed. |
+| `codeartifact-domain` | `'telicent'` | No | The AWS CodeArtifact domain used when obtaining a token. |
+| `codeartifact-domain-owner` | | No | The AWS account ID that owns the CodeArtifact domain. Not defaulted (to keep the account number out of this OSS action); pass it from a secret in the calling workflow, e.g. `${{ secrets.AWS_ACCOUNT_ID }}`. Required when `codeartifact-role` is set. |
+| `codeartifact-repository-id` | `'aws-codeartifact-telicent'` | No | The Maven server id that matches the CodeArtifact repository declared in your `pom.xml`, so the obtained token is associated with the right server. |
+| `codeartifact-token-lifetime` | `'3600'` | No | Lifetime, in seconds, of the CodeArtifact token. |
+
+The calling job must have `id-token: write` permission and the supplied role must be assumable via OIDC and have
+permission to obtain a CodeArtifact authorization token. For example:
+
+```yaml
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: telicent-oss/shared-workflows/.github/actions/push-container-image@main
+        with:
+          app-name: my-service
+          registry: aws
+          dockerfile: docker/Dockerfile
+          uses-maven: true
+          role-to-assume: ${{ secrets.AWS_ROLE_DEPLOY }}
+          codeartifact-role: ${{ secrets.AWS_ROLE_DEPLOY_CODE_ARTIFACT }}
+          codeartifact-domain-owner: ${{ secrets.AWS_ACCOUNT_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+```
+
 ### Container Registry Options
 
 | Name | Default | Required                           | Description |

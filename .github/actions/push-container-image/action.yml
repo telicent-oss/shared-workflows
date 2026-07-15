@@ -44,6 +44,36 @@ inputs:
     default: "false"
     description: Whether your build requires the JDK and Maven to be present.
 
+  # CodeArtifact options (only used by `uses-maven`)
+  codeartifact-role:
+    required: false
+    description: |
+      ARN of the AWS IAM role to assume in order to obtain an AWS CodeArtifact token so that a
+      `uses-maven` build can resolve private Maven dependencies. When omitted no CodeArtifact login is
+      performed and dependencies must be resolvable from public repositories or the restored Maven cache
+      (this preserves the previous behaviour).
+  codeartifact-domain:
+    required: false
+    default: telicent
+    description: The AWS CodeArtifact domain used when obtaining a token. Only used when `codeartifact-role` is set.
+  codeartifact-domain-owner:
+    required: false
+    description: |
+      The AWS account ID that owns the CodeArtifact domain. Intentionally not defaulted so that an AWS account
+      number is not embedded in this OSS action — pass it from a secret in the calling workflow, e.g.
+      `${{ secrets.AWS_ACCOUNT_ID }}`. Required when `codeartifact-role` is set.
+  codeartifact-repository-id:
+    required: false
+    default: aws-codeartifact-telicent
+    description: |
+      The Maven server id that matches the CodeArtifact repository declared in your pom.xml
+      (`<repository>`/`<distributionManagement>`). The obtained token is associated with this server id so
+      that Maven authenticates correctly against that repository. Only used when `codeartifact-role` is set.
+  codeartifact-token-lifetime:
+    required: false
+    default: "3600"
+    description: Lifetime (in seconds) of the AWS CodeArtifact token. Only used when `codeartifact-role` is set.
+
   # Container registry options
   registry:
     required: true
@@ -192,20 +222,59 @@ runs:
     - name: Checkout
       uses: actions/checkout@v6.0.2
 
+    # When a CodeArtifact role is supplied, configure Maven with a server entry for the CodeArtifact
+    # repository. The credentials reference environment variables that are populated by the CodeArtifact
+    # login step below at the time the Maven build runs.
+    - name: Install Java and Maven (with CodeArtifact)
+      if: inputs.uses-maven == 'true' && inputs.codeartifact-role != ''
+      uses: actions/setup-java@v5.2.0
+      with:
+        java-version: ${{ inputs.java-version }}
+        distribution: ${{ inputs.jdk }}
+        cache: maven
+        server-id: ${{ inputs.codeartifact-repository-id }}
+        server-username: AWS_CODEARTIFACT_USER
+        server-password: AWS_CODEARTIFACT_TOKEN
+
     - name: Install Java and Maven
-      if: inputs.uses-maven == 'true'
+      if: inputs.uses-maven == 'true' && inputs.codeartifact-role == ''
       uses: actions/setup-java@v5.2.0
       with:
         java-version: ${{ inputs.java-version }}
         distribution: ${{ inputs.jdk }}
         cache: maven
 
-    # NB - Assumption here is that this action has been called after the Maven workflow has been called so the
-    #      Maven Cache already has all our dependencies present in it and tests have already passed
+    # Obtain a short-lived AWS CodeArtifact token so the Maven build can resolve private dependencies.
+    # Only runs when a CodeArtifact role ARN is supplied. The main-account credentials required for ECR
+    # are configured later, after the Maven build, so assuming the CodeArtifact role here is safe.
+    - name: Configure AWS credentials for CodeArtifact
+      if: inputs.uses-maven == 'true' && inputs.codeartifact-role != ''
+      uses: aws-actions/configure-aws-credentials@v6
+      with:
+        role-to-assume: ${{ inputs.codeartifact-role }}
+        aws-region: eu-west-2
+        mask-aws-account-id: true
+
+    - name: AWS CodeArtifact Login
+      id: codeartifact-login
+      if: inputs.uses-maven == 'true' && inputs.codeartifact-role != ''
+      uses: telicent-oss/shared-workflows/.github/actions/aws-codeartifact-login@main
+      with:
+        domain: ${{ inputs.codeartifact-domain }}
+        owner: ${{ inputs.codeartifact-domain-owner }}
+        token-lifetime: ${{ inputs.codeartifact-token-lifetime }}
+
+    # NB - When no CodeArtifact role is supplied the assumption is that this action has been called after
+    #      the Maven workflow, so the restored Maven cache already contains all dependencies and tests have
+    #      already passed. Supplying `codeartifact-role` makes private dependency resolution robust to
+    #      cache misses (for example after a dependency version bump changes the cache key).
     - name: Quick Maven Build
       if: inputs.uses-maven == 'true'
       run: mvn package -U --batch-mode -DskipTests
       shell: bash
+      env:
+        AWS_CODEARTIFACT_USER: ${{ steps.codeartifact-login.outputs.user }}
+        AWS_CODEARTIFACT_TOKEN: ${{ steps.codeartifact-login.outputs.token }}
 
     - name: Download build artifact
       uses: actions/download-artifact@v8
