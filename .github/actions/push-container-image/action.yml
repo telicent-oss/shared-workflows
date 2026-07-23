@@ -276,16 +276,31 @@ runs:
         AWS_CODEARTIFACT_USER: ${{ steps.codeartifact-login.outputs.user }}
         AWS_CODEARTIFACT_TOKEN: ${{ steps.codeartifact-login.outputs.token }}
 
+    - name: Decide whether to skip image publish path
+      id: skip-publish-path
+      shell: bash
+      run: |
+        if [ "${{ github.actor }}" = "dependabot[bot]" ]; then
+          echo "skip=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Skip image publish path for Dependabot
+      if: steps.skip-publish-path.outputs.skip == 'true'
+      shell: bash
+      run: echo "Skipping container build, push, and image-scanning path for Dependabot."
+
     - name: Download build artifact
       uses: actions/download-artifact@v8
-      if: inputs.build-artifact
+      if: inputs.build-artifact && steps.skip-publish-path.outputs.skip != 'true'
       with:
         name: ${{ inputs.build-artifact }}
         path: ${{ inputs.build-artifact }}/
 
     - name: Get SBOM from artifact
       uses: actions/download-artifact@v8
-      if: ${{ inputs.download-sbom == 'true' }}
+      if: ${{ inputs.download-sbom == 'true' && steps.skip-publish-path.outputs.skip != 'true' }}
       # Allow to continue even if SBOM is not found
       continue-on-error: true
       with:
@@ -294,7 +309,7 @@ runs:
 
     - name: Enable buildkit cache
       uses: actions/cache@v5.0.5
-      if: inputs.enable-buildkit-cache == 'true'
+      if: inputs.enable-buildkit-cache == 'true' && steps.skip-publish-path.outputs.skip != 'true'
       with:
         path: /tmp/buildkit-cache/buildkit-state.tar
         key: ${{ runner.os }}-buildkit-${{ github.sha }}
@@ -303,7 +318,7 @@ runs:
 
     - name: Load buildkit state from cache
       uses: dashevo/gh-action-cache-buildkit-state@v1.0.3
-      if: inputs.enable-buildkit-cache == 'true'
+      if: inputs.enable-buildkit-cache == 'true' && steps.skip-publish-path.outputs.skip != 'true'
       with:
         builder: buildx_buildkit_${{ steps.buildx.outputs.name }}0
         cache-path: /tmp/buildkit-cache
@@ -312,7 +327,7 @@ runs:
     - name: Configure AWS credentials from main account
       id: aws-login
       # Only run if dry run is explicitly set to 'false'
-      if: inputs.registry == 'aws' && inputs.dry-run == 'false'
+      if: inputs.registry == 'aws' && inputs.dry-run == 'false' && steps.skip-publish-path.outputs.skip != 'true'
       uses: aws-actions/configure-aws-credentials@v6
       with:
         role-to-assume: ${{ inputs.role-to-assume != '' && inputs.role-to-assume || 'arn:aws:iam::098669589541:role/GitHubDeploymentRole' }}
@@ -321,7 +336,7 @@ runs:
 
     - name: Docker Login to Amazon ECR
       # Only run if dry run is explicitly set to 'false'
-      if: inputs.registry == 'aws' && inputs.dry-run == 'false'
+      if: inputs.registry == 'aws' && inputs.dry-run == 'false' && steps.skip-publish-path.outputs.skip != 'true'
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
       with:
@@ -329,8 +344,7 @@ runs:
 
     - name: Docker Login to Quay
       # Only run if dry run is explicitly set to 'false'
-      # Dependabot triggered PRs don't have access to Quay credentials to push images, so no need to run in this case either
-      if: inputs.registry == 'quay' && inputs.dry-run == 'false' && github.actor != 'dependabot[bot]'
+      if: inputs.registry == 'quay' && inputs.dry-run == 'false' && steps.skip-publish-path.outputs.skip != 'true'
       uses: docker/login-action@v4.1.0
       with:
         registry: quay.io
@@ -338,16 +352,19 @@ runs:
         password: ${{ inputs.quay-token }}
 
     - name: Set up QEMU
+      if: steps.skip-publish-path.outputs.skip != 'true'
       uses: docker/setup-qemu-action@v4.0.0
       with:
         platforms: all
 
     - name: Set up Docker buildx
       id: buildx
+      if: steps.skip-publish-path.outputs.skip != 'true'
       uses: docker/setup-buildx-action@v4.0.0
 
     - name: Prepare Docker image names and tags
       id: meta
+      if: steps.skip-publish-path.outputs.skip != 'true'
       uses: docker/metadata-action@v6.0.0
       with:
         # Defines the base image names in repository/name format
@@ -375,6 +392,7 @@ runs:
 
     - name: Output SHA image tag
       id: output-sha-image-tag
+      if: steps.skip-publish-path.outputs.skip != 'true'
       shell: bash
       run: |
         jq '.' <<< "$DOCKER_METADATA"
@@ -387,14 +405,13 @@ runs:
       # Only run if dry run is explicitly set to 'false'
       id: build-images
       uses: docker/build-push-action@v7.1.0
-      if: inputs.dry-run == 'false'
+      if: inputs.dry-run == 'false' && steps.skip-publish-path.outputs.skip != 'true'
       env:
         DOCKER_BUILDKIT: 1
       with:
         builder: ${{ steps.buildx.outputs.name }}
         platforms: linux/amd64,linux/arm64
-        # Dependabot triggered PRs don't have access to Quay credentials to push images
-        push: ${{ ! (inputs.registry == 'quay' && github.actor == 'dependabot[bot]') }}
+        push: true
         cache-from: type=gha
         cache-to: type=gha,mode=max
         context: ${{ inputs.path }}
@@ -413,7 +430,7 @@ runs:
       # Only run if dry run is set to anything other than 'false', indicating that this is a dry run
       id: build-images-dry-run
       uses: docker/build-push-action@v7.1.0
-      if: inputs.dry-run != 'false'
+      if: inputs.dry-run != 'false' && steps.skip-publish-path.outputs.skip != 'true'
       env:
         DOCKER_BUILDKIT: 1
       with:
@@ -438,11 +455,11 @@ runs:
 
     - name: Install CoSign
       # Only run if dry run is explicitly set to 'false' and the image is being pushed to 'quay'.
-      if: inputs.dry-run == 'false' && inputs.registry == 'quay'
+      if: inputs.dry-run == 'false' && inputs.registry == 'quay' && steps.skip-publish-path.outputs.skip != 'true'
       uses: sigstore/cosign-installer@v3
     - name: Sign charts on Quay.io
       # Only run if dry run is explicitly set to 'false' and the image is being pushed to 'quay'.
-      if: inputs.dry-run == 'false' && inputs.registry == 'quay'
+      if: inputs.dry-run == 'false' && inputs.registry == 'quay' && steps.skip-publish-path.outputs.skip != 'true'
       shell: bash
       env:
         DIGEST: ${{ steps.build-images.outputs.digest }}
@@ -458,7 +475,7 @@ runs:
       # Only run if dry run is set to anything other than 'false', indicating that this is a dry run
       id: upload-image-artefact
       uses: actions/upload-artifact@v7
-      if: inputs.dry-run != 'false'
+      if: inputs.dry-run != 'false' && steps.skip-publish-path.outputs.skip != 'true'
       with:
         # Name and path must match the dry-run build dest above and the `scan-name` used by the Trivy/Grype
         # steps. These previously used `APP_NAME_PREFIX`-style refs (underscores), which do not resolve to the
@@ -469,6 +486,7 @@ runs:
 
     - name: Capture built container image tags
       id: capture-tags
+      if: steps.skip-publish-path.outputs.skip != 'true'
       run: ${{ github.action_path }}/capture-tags.sh
       shell: bash
       env:
@@ -481,7 +499,7 @@ runs:
 
     - name: Trivy dockerfile scan
       # Only run if Trivy dockerfile scan is explicitly set to 'true'
-      if: inputs.trivy-scan-dockerfile == 'true'
+      if: inputs.trivy-scan-dockerfile == 'true' && steps.skip-publish-path.outputs.skip != 'true'
       uses: telicent-oss/shared-workflows/.github/actions/trivy-dockerfile-scan@main
       with:
         dockerfile: ${{ inputs.path }}/${{ inputs.dockerfile }}
@@ -489,8 +507,7 @@ runs:
         scan-name: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}-${{ inputs.dockerfile }}
 
     - name: Trivy image scan
-      # Only run if Trivy image scan is explicitly set to 'true' AND (is a dry run OR (is not a dry run AND user is not dependabot))
-      if: inputs.trivy-scan-image == 'true' && (inputs.dry-run != 'false' || (inputs.dry-run == 'false' && github.actor != 'dependabot[bot]'))
+      if: inputs.trivy-scan-image == 'true' && steps.skip-publish-path.outputs.skip != 'true'
       uses: telicent-oss/shared-workflows/.github/actions/trivy-image-scan@main
       with:
         github-token: ${{ inputs.github-token }}
@@ -507,8 +524,7 @@ runs:
         uses-java: ${{ inputs.uses-maven }}
 
     - name: Grype image scan
-      # Only run if Grype image scan is explicitly set to 'true' AND (is a dry run OR (is not a dry run AND user is not dependabot))
-      if: inputs.grype-scan-image == 'true' && (inputs.dry-run != 'false' || (inputs.dry-run == 'false' && github.actor != 'dependabot[bot]'))
+      if: inputs.grype-scan-image == 'true' && steps.skip-publish-path.outputs.skip != 'true'
       uses: telicent-oss/shared-workflows/.github/actions/grype-image-scan@main
       with:
         github-token: ${{ inputs.github-token }}
@@ -524,7 +540,7 @@ runs:
         remote-vex: ${{ inputs.remote-vex }}
 
     - name: Notify MS Teams of image push
-      if: inputs.teams-webhook-url != ''
+      if: inputs.teams-webhook-url != '' && steps.skip-publish-path.outputs.skip != 'true'
       uses: telicent-oss/shared-workflows/.github/actions/notify-teams@main
       with:
         app-name: ${{ inputs.app-name}}
