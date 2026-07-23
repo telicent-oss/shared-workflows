@@ -20,6 +20,9 @@ automatically sign container images that are pushed to it.
 * Execute a Trivy dockerfile scan when `trivy-scan-dockerfile` is `true`.
 * Execute a Trivy image scan when `trivy-scan-image` is `true`.
 * Execute a Grype image scan when `grype-scan-image` is `true`.
+* Generate a SonarQube code health report and upload it to S3 when the
+`registry` is `quay`, this is not a dry run, and both `sonar-token` and
+`sonar-report-s3-uri` have been specified.
 * Send an MS Teams notification to a Teams Workflow when the step to build and
 push the container image fails, and when a `teams-workflow-url` has been
 specified.
@@ -112,6 +115,24 @@ permission to obtain a CodeArtifact authorization token. For example:
 | `dockerfile` | | Yes | The name of the Dockerfile to build the image from. |
 | `target` | | No | The target stage within the Dockerfile to build the image from. |
 | `image-suffix` | | No | A suffix to use as part of the image name. |
+
+### SonarQube Code Health Report Options
+
+The report is only generated when the `registry` is `quay`, `dry-run` is
+`false`, and both `sonar-token` and `sonar-report-s3-uri` are set. See the
+[sonar-report-generation](../sonar-report-generation/README.md) action for
+details of the report itself.
+
+| Name | Default | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `sonar-token` | | No | A SonarQube user token with permission to browse the project, supplied from a secret. Setting this (together with `sonar-report-s3-uri`) enables the report. |
+| `sonar-report-s3-uri` | | No | Destination for the report, e.g. `s3://my-bucket/reports/sonar/`. A URI ending in `/` is treated as a prefix and the generated file name is appended to it. |
+| `sonar-project-key` | | Yes (if `sonar-token` is set) | The key of the SonarQube project to report on. |
+| `sonar-host-url` | `'https://sonarcloud.io'` | No | Base URL of the SonarQube server. |
+| `sonar-branch` | | No | The branch to report on. Defaults to the project's main branch. |
+| `sonar-report-aws-region` | `'eu-west-2'` | No | AWS region used when uploading the report. |
+| `sonar-report-aws-role` | `role-to-assume` | No | ARN of the AWS IAM role to assume to upload the report. Needs `s3:PutObject` on `sonar-report-s3-uri`. |
+| `sonar-fail-on-quality-gate` | `'false'` | No | Whether to fail the job when the project's quality gate is failing. The report is still generated and uploaded first. |
 
 ### MS Teams Notification Options
 

@@ -1,0 +1,140 @@
+name: Static Application Security Testing
+description: |
+  Perform Static Application Security Testing (SAST) scanning against a repo. As of ODY go live to prod, this is now a hard requirement for release.
+author: Telicent
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  # SonarQube scan options
+  sonar-host-url:
+    required: false
+    default: https://sonarcloud.io
+    description: |
+      Base URL of the SonarQube server used for the scan, for example
+      `https://sonar.example.com`. Defaults to `https://sonarcloud.io`.
+  sonar-token:
+    required: true
+    description: |
+      A SonarQube token with permission to analyse the project, supplied from a secret.
+  sonar-project-key:
+    required: false
+    description: |
+      The key of the SonarQube project to analyse. Only required when the repo has no
+      `sonar-project.properties` declaring `sonar.projectKey`.
+  sonar-organization:
+    required: false
+    description: |
+      The SonarQube organization the project belongs to. Required by SonarQube Cloud
+      (`https://sonarcloud.io`) unless declared in `sonar-project.properties`.
+  sonar-fail-on-quality-gate:
+    required: false
+    default: "true"
+    description: |
+      Whether to perform just the scan or to enforce it with a hard failure gate.
+  sonar-polling-timeout-seconds:
+    required: false
+    default: "300"
+    description: |
+      The maximum time, in seconds, to wait for the quality gate result. Only used when
+      `sonar-fail-on-quality-gate` is `true`.
+  project-base-dir:
+    required: false
+    default: "."
+    description: |
+      Base directory of the code repo most likely will be . (the default) except in a monorepo where it could be apps/<application-name>
+  args:
+    required: false
+    description: |
+      Additional arguments to pass to the Sonar Scanner CLI, for example
+      `-Dsonar.sources=src -Dsonar.tests=test`.
+
+outputs:
+  quality-gate-status:
+    description: |
+      The quality gate result, one of `PASSED`, `WARN` or `FAILED`. Only populated when
+      `sonar-fail-on-quality-gate` is `true`.
+    value: ${{ steps.quality-gate.outputs.quality-gate-status }}
+
+runs:
+  using: composite
+  steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        # Ensure a SonarQube host URL is provided
+        if [ -z "$SONAR_HOST_URL" ]; then
+          echo "::error::A SonarQube host URL must be provided using the 'sonar-host-url' input."
+          exit 1
+        fi
+
+        # Ensure a SonarQube token is provided
+        if [ -z "$SONAR_TOKEN" ]; then
+          echo "::error::A SonarQube token must be provided using the 'sonar-token' input."
+          exit 1
+        fi
+
+        # Ensure the polling timeout is a positive whole number
+        if ! [[ "$POLLING_TIMEOUT" =~ ^[0-9]+$ ]] || [ "$POLLING_TIMEOUT" -le 0 ]; then
+          echo "::error::The 'sonar-polling-timeout-seconds' input must be a positive whole number, got '$POLLING_TIMEOUT'."
+          exit 1
+        fi
+      env:
+        SONAR_HOST_URL: ${{ inputs.sonar-host-url }}
+        SONAR_TOKEN: ${{ inputs.sonar-token }}
+        POLLING_TIMEOUT: ${{ inputs.sonar-polling-timeout-seconds }}
+
+    - name: Resolve scanner arguments
+      id: scanner-args
+      shell: bash
+      run: |
+        # The project key and organization are optional because a repo may instead
+        # declare them in sonar-project.properties.
+        args=()
+        if [ -n "$SONAR_PROJECT_KEY" ]; then
+          args+=("-Dsonar.projectKey=$SONAR_PROJECT_KEY")
+        fi
+        if [ -n "$SONAR_ORGANIZATION" ]; then
+          args+=("-Dsonar.organization=$SONAR_ORGANIZATION")
+        fi
+        if [ -n "$EXTRA_ARGS" ]; then
+          # Collapse any newlines so a multi-line 'args' input cannot break the
+          # key=value form of GITHUB_OUTPUT.
+          args+=("$(echo "$EXTRA_ARGS" | tr '\n' ' ')")
+        fi
+
+        # Strip any trailing slash so the report path does not gain a double separator
+        # when the caller passes something like 'apps/my-app/'.
+        BASE_DIR="${PROJECT_BASE_DIR%/}"
+        BASE_DIR="${BASE_DIR:-.}"
+
+        {
+          echo "args=${args[*]}"
+          echo "report-task-file=${BASE_DIR}/.scannerwork/report-task.txt"
+        } >> "$GITHUB_OUTPUT"
+      env:
+        SONAR_PROJECT_KEY: ${{ inputs.sonar-project-key }}
+        SONAR_ORGANIZATION: ${{ inputs.sonar-organization }}
+        PROJECT_BASE_DIR: ${{ inputs.project-base-dir }}
+        EXTRA_ARGS: ${{ inputs.args }}
+
+    - name: Check code quality
+      uses: SonarSource/sonarqube-scan-action@7006c4492b2e0ee0f816d36501671557c97f5995 # v8.1.0
+      with:
+        projectBaseDir: ${{ inputs.project-base-dir }}
+        args: ${{ steps.scanner-args.outputs.args }}
+      env:
+        SONAR_TOKEN: ${{ inputs.sonar-token }}
+        SONAR_HOST_URL: ${{ inputs.sonar-host-url }}
+
+    - name: Quality gate
+      id: quality-gate
+      if: inputs.sonar-fail-on-quality-gate == 'true'
+      uses: SonarSource/sonarqube-quality-gate-action@cf038b0e0cdecfa9e56c198bbb7d21d751d62c3b # v1.2.0
+      with:
+        scanMetadataReportFile: ${{ steps.scanner-args.outputs.report-task-file }}
+        pollingTimeoutSec: ${{ inputs.sonar-polling-timeout-seconds }}
+      env:
+        SONAR_TOKEN: ${{ inputs.sonar-token }}
+        SONAR_HOST_URL: ${{ inputs.sonar-host-url }}
