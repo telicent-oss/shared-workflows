@@ -22,6 +22,16 @@ inputs:
       Path to the pyproject.toml file, relative to the repository root.
       Defaults to `pyproject.toml`.
 
+outputs:
+  pip-extra-index-url:
+    description: |
+      The PIP_EXTRA_INDEX_URL value used to reach AWS CodeArtifact for this run
+      (empty string if no code-artefact-role was supplied). Requirements files
+      generated or installed by this action never have the index URL embedded
+      in them, so later steps needing CodeArtifact access (e.g. `python -m build`)
+      must set this as their own PIP_EXTRA_INDEX_URL env var.
+    value: ${{ steps.code-artifact-login.outputs.token != '' && format('https://aws:{0}@telicent-{1}.d.codeartifact.eu-west-2.amazonaws.com/pypi/telicent-code-artifacts/simple/', steps.code-artifact-login.outputs.token, steps.creds.outputs.aws-account-id) || '' }}
+
 runs:
   using: composite
   steps:

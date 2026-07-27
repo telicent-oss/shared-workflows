@@ -35,6 +35,7 @@ runs:
   using: composite
   steps:
     - name: Prepare Python
+      id: prepare
       uses: telicent-oss/shared-workflows/.github/actions/python-prepare@lab-89-hash-pinned-python
       with:
         code-artefact-role: ${{ inputs.code-artefact-role}}
@@ -55,3 +56,5 @@ runs:
       if: ${{ inputs.skip-build == 'false' }}
       shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
       run: python -m build
+      env:
+        PIP_EXTRA_INDEX_URL: ${{ steps.prepare.outputs.pip-extra-index-url }}
