@@ -90,3 +90,5 @@ runs:
       if: inputs.install-requirements == 'true'
       shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
       run: pip install --require-hashes -r ${{ env.REQUIREMENTS_PATH }}
+      env:
+        PIP_EXTRA_INDEX_URL: ${{ steps.code-artifact-login.outputs.token != '' && format('https://aws:{0}@telicent-{1}.d.codeartifact.eu-west-2.amazonaws.com/pypi/telicent-code-artifacts/simple/', steps.code-artifact-login.outputs.token, steps.creds.outputs.aws-account-id) || '' }}
