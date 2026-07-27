@@ -52,6 +52,10 @@ runs:
     - name: Unit tests
       shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
       run: ${{ inputs.test-command }}
+    - name: Install build
+      if: ${{ inputs.skip-build == 'false' }}
+      shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
+      run: python -m pip install build
     - name: Build
       if: ${{ inputs.skip-build == 'false' }}
       shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
