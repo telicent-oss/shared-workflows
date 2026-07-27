@@ -35,7 +35,7 @@ runs:
   using: composite
   steps:
     - name: Prepare Python
-      uses: telicent-oss/shared-workflows/.github/actions/python-prepare@main
+      uses: telicent-oss/shared-workflows/.github/actions/python-prepare@lab-89-hash-pinned-python
       with:
         code-artefact-role: ${{ inputs.code-artefact-role}}
         extra-args: ${{ inputs.extra-args }}
