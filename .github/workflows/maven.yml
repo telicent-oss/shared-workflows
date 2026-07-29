@@ -184,6 +184,18 @@ jobs:
           images: ${{ inputs.PUBLIC_IMAGES }}
           restore-only: false
 
+  maven-central-audit:
+    # Only run audit for OSS repositories that will be publishing to Maven Central
+    if: ${{ contains(github.repository_owner, 'oss') }}
+    needs:
+      - cache-dependencies
+    uses: telicent-oss/shared-workflows/.github/workflows/maven-central-audit.yml@add-mvn-central-audit
+    with:
+      MAVEN_REPOSITORY_ID: ${{ inputs.MAVEN_REPOSITORY_ID }}
+      JAVA_VERSION: ${{ inputs.JAVA_VERSION }}
+      JDK: ${{ inputs.JDK }}
+    secrets: inherit
+
   build:
     needs: 
       - cache-dependencies
