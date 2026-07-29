@@ -214,7 +214,7 @@ jobs:
       contents: read
     needs:
       - cache-dependencies
-    uses: telicent-oss/shared-workflows/.github/workflows/maven-central-audit.yml@add-mvn-central-audit
+    uses: telicent-oss/shared-workflows/.github/workflows/maven-central-audit.yml@main
     with:
       MAVEN_REPOSITORY_ID: ${{ inputs.MAVEN_REPOSITORY_ID }}
       JAVA_VERSION: ${{ inputs.JAVA_VERSION }}
