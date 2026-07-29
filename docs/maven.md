@@ -44,7 +44,10 @@ The serial Maven workflow does the following:
     - Does a `mvn dependency:go-offline` to populate a GitHub Actions Cache used in the subsequent job
 2. A `cache-docker-images` job that:
     - Pulls and caches specified `PUBLIC_IMAGES` if on the `MAIN_BRANCH`
-3. A `build` job that:
+3. A `maven-central-audit` job that:
+    - Verifies that the repository will produce a release to Maven Central that falls within defined release limits
+      (total files and total size)
+4. A `build` job that:
     - Configures Java and Maven
     - Optionally logs into DockerHub if configured to do so (see `USES_DOCKERHUB_IMAGES` in [workflow
       inputs](#workflow-inputs))
@@ -55,7 +58,7 @@ The serial Maven workflow does the following:
     - Scans the project for high/critical severity vulnerabilities attaching reports to the build
    vulnerabilities with `trivy`
     - Adds the detected Maven project version (value of `project.version`) to the job outputs
-4. A `github-release` job that runs only when the built version is not a `SNAPSHOT` and the workflow was triggered from
+5. A `github-release` job that runs only when the built version is not a `SNAPSHOT` and the workflow was triggered from
    a Git tag:
     - Configures Java and Maven
     - Does a quick Maven build (`mvn install -DskipTests`) since this job is dependent on the `build` job being
@@ -69,10 +72,13 @@ For the parallel build version of the workflow the steps are slightly different:
 
 1. A `cache-dependencies` job, this is the same as for the serial workflow
 2. A `cache-docker-images` job, this is the same as for the serial workflow
-3. A `detect-modules` job that:
+3. A `maven-central-audit` job that:
+    - Verifies that the repository will produce a release to Maven Central that falls within defined release limits
+      (total files and total size)
+4. A `detect-modules` job that:
     - Configures Java and Maven
     - Generates a JSON Output that is an array of the modules found in the repository
-4. A `build` job for each detected module that:
+5. A `build` job for each detected module that:
     - Configures Java and Maven
     - Optionally logs into DockerHub if configured to do so (see `USES_DOCKERHUB_IMAGES` in [workflow
       inputs](#workflow-inputs))
@@ -81,14 +87,14 @@ For the parallel build version of the workflow the steps are slightly different:
     - Tests the module with `mvn install -pl :module`
       - **NB** If the workflow detects no changes to any `src/` or `pom.xml` files then `-DskipTests` is added to the
          `mvn` arguments here to avoid re-running tests when no Java changes are present e.g. PRs that update only docs
-4. A `scan-and-publish` job that: 
+6. A `scan-and-publish` job that: 
     - Configures Java and Maven
     - Does a quick Maven build (`mvn install -DskipTests`) since this job is dependent on the `build` jobs being
       successful which has built and verified each individual module
     - Scans the project for high/critical severity vulnerabilities attaching reports to the build vulnerabilities with
    `trivy`
     - Adds the detected Maven project version (value of `project.version`) to the job outputs
-5. A `github-release` job that is the same as the serial build
+7. A `github-release` job that is the same as the serial build
 
 Note that many aspects of the above may be configured via [workflow inputs](#workflow-inputs).
 
