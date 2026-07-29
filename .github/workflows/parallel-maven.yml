@@ -210,6 +210,8 @@ jobs:
   maven-central-audit:
     # Only run audit for OSS repositories that will be publishing to Maven Central
     if: ${{ contains(github.repository_owner, 'oss') }}
+    permissions:
+      contents: read
     needs:
       - cache-dependencies
     uses: telicent-oss/shared-workflows/.github/workflows/maven-central-audit.yml@add-mvn-central-audit
