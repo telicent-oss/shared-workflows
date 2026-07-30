@@ -1,0 +1,86 @@
+name: Maven Central Audit
+
+on:
+  workflow_call:
+    inputs:
+      MAVEN_REPOSITORY_ID:
+        required: false
+        type: string
+        default: central
+        description: |
+          Specifies the ID of the repository to which `SNAPSHOT`s and Releases are published, this **MUST** match 
+          the ID of a repository defined in the `pom.xml` for the project in order for credentials to be correctly 
+          configured.
+      JAVA_VERSION:
+        required: false
+        type: number
+        default: 21
+        description: |
+          Specifies the JDK version to install and build with.  Defaults to 21.
+      JDK:
+        required: false
+        type: string
+        default: temurin
+        description: |
+          Specifies the JDK to use, defaults to `temurin`.
+    secrets:
+      MVN_USER_NAME:
+        required: false
+        description: |
+          Username for authenticating to a Maven repository to publish releases.
+      MVN_USER_PWD:
+        required: false
+        description: |
+          Password/Token for authenticating to a Maven repository to publish releases.
+      GPG_PRIVATE_KEY:
+        required: false
+        description: |
+          A GPG Private Key that will be used to sign the built artifacts during the build process.  The `pom.xml`
+          **MUST** invoke the `maven-gpg-plugin` for this to have an effect.
+      GPG_PASSPHRASE:
+        required: false
+        description: |
+          The passphrase protecting the provided GPG Private Key.
+      
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  maven-central-audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    name: Maven Central Audit
+    env:
+      # These have to be exported into the environment due to how the setup-java action configures the Maven
+      # settings.xml file to avoid directly embedding credentials into it.
+      MAVEN_USERNAME: ${{ secrets.MVN_USER_NAME }}
+      MAVEN_PASSWORD: ${{ secrets.MVN_USER_PWD }}
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v6.0.2
+
+      - name: Install Java and Maven
+        uses: actions/setup-java@v5.3.0
+        with:
+          java-version: ${{ inputs.JAVA_VERSION }}
+          distribution: ${{ inputs.JDK }}
+          cache: maven
+          server-id: ${{ inputs.MAVEN_REPOSITORY_ID }}
+          # Forced to use indirection here, the setup-java action configures the Maven settings.xml to reference
+          # the credentials via environment variables
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+
+      - name: Import GPG key
+        uses: crazy-max/ghaction-import-gpg@v7.0.0
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Run Maven Central Audit
+        uses: telicent-oss/mvn-central-audit@v1
+        with:
+          # Specify limits, if a release would be above this size then the build will be failed
+          max-files: 600
+          max-size: 16000000 # 16MB
