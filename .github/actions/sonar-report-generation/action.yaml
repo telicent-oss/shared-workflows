@@ -1,0 +1,298 @@
+name: SonarQube Code Health Report
+description: |
+  Query the SonarQube Web API for a project, render a PDF code health report
+  and upload it to an S3 path.
+author: Telicent
+branding:
+  icon: 'file-text'
+  color: 'blue'
+
+inputs:
+  sonar-host-url:
+    required: false
+    default: https://sonarcloud.io
+    description: |
+      Base URL of the SonarQube server, for example `https://sonar.example.com`.
+      Defaults to `https://sonarcloud.io`.
+  sonar-token:
+    required: true
+    description: |
+      A SonarQube token with permission to browse the project.
+      Should be supplied from a secret.
+  sonar-project-key:
+    required: true
+    description: The key of the SonarQube project to report on.
+  sonar-branch:
+    required: false
+    description: |
+      The branch to report on.
+      Defaults to the project's main branch when not specified.
+  project-version:
+    required: false
+    description: |
+      The version of the code that was analysed, shown on the report as the
+      analysed version.
+      Takes precedence over the version SonarQube recorded against the last
+      analysis, and is the only way to populate the field where the token
+      cannot read the analysis history.
+  s3-uri:
+    required: true
+    description: |
+      Destination for the report, for example `s3://my-bucket/reports/sonar/`.
+      A URI ending in `/` is treated as a prefix and the generated file name is
+      appended to it, otherwise the URI is used as the full object key.
+  aws-region:
+    required: false
+    description: |
+      AWS region to use for the upload.
+      Only required when the region is not already set in the job environment.
+  aws-role-to-assume:
+    required: false
+    description: |
+      ARN of an AWS IAM role to assume before uploading.
+      When not specified, the credentials already available to the job are used.
+  s3-extra-args:
+    required: false
+    description: |
+      Additional arguments to pass to `aws s3 cp`, for example
+      `--sse aws:kms --sse-kms-key-id <key-arn>`.
+  report-name:
+    required: false
+    description: |
+      File name to give the report.
+      Defaults to `sonar-code-health-<project-key>-<branch>-<timestamp>.pdf`.
+  history-days:
+    required: false
+    default: '90'
+    description: |
+      Number of days of history to include in the trend charts.
+      Defaults to 90.
+  fail-on-quality-gate:
+    required: false
+    default: 'false'
+    description: |
+      Whether to fail the action when the project's quality gate is failing.
+      The report is still generated and uploaded before the failure.
+      Defaults to `false`.
+  job-summary:
+    required: false
+    default: 'true'
+    description: |
+      Whether to write a summary of the report to the GitHub job summary.
+      Defaults to `true`.
+  upload-artifact:
+    required: false
+    default: 'true'
+    description: |
+      Whether to also store the report as a GitHub artifact.
+      Defaults to `true`.
+  artifact-name:
+    required: false
+    default: sonar-code-health-report
+    description: |
+      Name of the GitHub artifact to store the report in.
+      Defaults to `sonar-code-health-report`.
+  artifact-retention-days:
+    required: false
+    default: '30'
+    description: |
+      Number of days to retain the GitHub artifact for.
+      Defaults to 30.
+  python-version:
+    required: false
+    default: '3.12'
+    description: |
+      The Python version used to generate the report.
+      Defaults to 3.12.
+
+outputs:
+  report-path:
+    description: Path to the generated PDF report on the runner.
+    value: ${{ steps.generate.outputs.report-path }}
+  report-name:
+    description: File name of the generated PDF report.
+    value: ${{ steps.generate.outputs.report-name }}
+  report-s3-uri:
+    description: The S3 URI the report was uploaded to.
+    value: ${{ steps.upload.outputs.s3-uri }}
+  quality-gate-status:
+    description: The project's quality gate status, one of `OK`, `ERROR`, `WARN` or `NONE`.
+    value: ${{ steps.generate.outputs.quality-gate-status }}
+  summary-json:
+    description: Path to a JSON summary of the metrics included in the report.
+    value: ${{ steps.generate.outputs.summary-json }}
+
+runs:
+  using: composite
+  steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        # Ensure a SonarQube host URL is provided
+        if [ -z "$SONAR_HOST_URL" ]; then
+          echo "::error::A SonarQube host URL must be provided using the 'sonar-host-url' input."
+          exit 1
+        fi
+
+        # Ensure a SonarQube token is provided
+        if [ -z "$SONAR_TOKEN" ]; then
+          echo "::error::A SonarQube token must be provided using the 'sonar-token' input."
+          exit 1
+        fi
+
+        # Ensure a project key is provided
+        if [ -z "$SONAR_PROJECT_KEY" ]; then
+          echo "::error::A project key must be provided using the 'sonar-project-key' input."
+          exit 1
+        fi
+
+        # Ensure a well formed S3 URI is provided
+        if [ -z "$S3_URI" ]; then
+          echo "::error::A destination must be provided using the 's3-uri' input."
+          exit 1
+        fi
+        if [[ "$S3_URI" != s3://* ]]; then
+          echo "::error::The 's3-uri' input must start with 's3://', got '$S3_URI'."
+          exit 1
+        fi
+        BUCKET="${S3_URI#s3://}"
+        if [ -z "${BUCKET%%/*}" ]; then
+          echo "::error::The 's3-uri' input must include a bucket name, got '$S3_URI'."
+          exit 1
+        fi
+      env:
+        SONAR_HOST_URL: ${{ inputs.sonar-host-url }}
+        SONAR_TOKEN: ${{ inputs.sonar-token }}
+        SONAR_PROJECT_KEY: ${{ inputs.sonar-project-key }}
+        S3_URI: ${{ inputs.s3-uri }}
+
+    - name: Set up Python ${{ inputs.python-version }}
+      uses: actions/setup-python@v5.6.0
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install report dependencies
+      shell: bash
+      run: python -m pip install --disable-pip-version-check -r "$REQUIREMENTS"
+      env:
+        REQUIREMENTS: ${{ github.action_path }}/scripts/requirements.txt
+
+    - name: Generate code health report
+      id: generate
+      shell: bash
+      run: |
+        mkdir -p "$OUTPUT_DIR"
+
+        args=(
+          --host-url "$SONAR_HOST_URL"
+          --project-key "$SONAR_PROJECT_KEY"
+          --output-dir "$OUTPUT_DIR"
+          --history-days "$HISTORY_DAYS"
+          --summary-json "$OUTPUT_DIR/summary.json"
+          --markdown-summary "$OUTPUT_DIR/summary.md"
+        )
+        if [ -n "$SONAR_BRANCH" ]; then
+          args+=(--branch "$SONAR_BRANCH")
+        fi
+        if [ -n "$PROJECT_VERSION" ]; then
+          args+=(--project-version "$PROJECT_VERSION")
+        fi
+        if [ -n "$REPORT_NAME" ]; then
+          args+=(--output "$OUTPUT_DIR/$REPORT_NAME")
+        fi
+
+        python "${{ github.action_path }}/scripts/generate_report.py" "${args[@]}"
+
+        REPORT_PATH=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["reportPath"])' "$OUTPUT_DIR/summary.json")
+        QUALITY_GATE=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["qualityGateStatus"])' "$OUTPUT_DIR/summary.json")
+
+        {
+          echo "report-path=$REPORT_PATH"
+          echo "report-name=$(basename "$REPORT_PATH")"
+          echo "quality-gate-status=$QUALITY_GATE"
+          echo "summary-json=$OUTPUT_DIR/summary.json"
+        } >> "$GITHUB_OUTPUT"
+      env:
+        SONAR_HOST_URL: ${{ inputs.sonar-host-url }}
+        SONAR_TOKEN: ${{ inputs.sonar-token }}
+        SONAR_PROJECT_KEY: ${{ inputs.sonar-project-key }}
+        SONAR_BRANCH: ${{ inputs.sonar-branch }}
+        PROJECT_VERSION: ${{ inputs.project-version }}
+        REPORT_NAME: ${{ inputs.report-name }}
+        HISTORY_DAYS: ${{ inputs.history-days }}
+        OUTPUT_DIR: ${{ runner.temp }}/sonar-code-health
+
+    - name: Write job summary
+      if: inputs.job-summary == 'true'
+      shell: bash
+      run: cat "$SUMMARY" >> "$GITHUB_STEP_SUMMARY"
+      env:
+        SUMMARY: ${{ runner.temp }}/sonar-code-health/summary.md
+
+    - name: Configure AWS credentials
+      if: inputs.aws-role-to-assume != ''
+      uses: aws-actions/configure-aws-credentials@v6
+      with:
+        role-to-assume: ${{ inputs.aws-role-to-assume }}
+        aws-region: ${{ inputs.aws-region }}
+        mask-aws-account-id: true
+
+    - name: Upload report to S3
+      id: upload
+      shell: bash
+      run: |
+        # A bare bucket or a trailing slash means a prefix, so the generated
+        # file name is appended. Anything else is used as the full object key.
+        BUCKET_AND_KEY="${S3_URI#s3://}"
+        BUCKET="${BUCKET_AND_KEY%%/*}"
+        KEY="${BUCKET_AND_KEY#"$BUCKET"}"
+        if [ -z "${KEY#/}" ] || [[ "$S3_URI" == */ ]]; then
+          DESTINATION="s3://${BUCKET}${KEY%/}/${REPORT_NAME}"
+        else
+          DESTINATION="$S3_URI"
+        fi
+
+        args=(--content-type application/pdf)
+        if [ -n "$AWS_REGION_INPUT" ]; then
+          args+=(--region "$AWS_REGION_INPUT")
+        fi
+        if [ -n "$EXTRA_ARGS" ]; then
+          # Word splitting is intended here so callers can pass multiple flags
+          read -ra EXTRA <<< "$EXTRA_ARGS"
+          args+=("${EXTRA[@]}")
+        fi
+
+        aws s3 cp "$REPORT_PATH" "$DESTINATION" "${args[@]}"
+
+        echo "s3-uri=$DESTINATION" >> "$GITHUB_OUTPUT"
+        echo "Uploaded code health report to $DESTINATION"
+      env:
+        S3_URI: ${{ inputs.s3-uri }}
+        REPORT_PATH: ${{ steps.generate.outputs.report-path }}
+        REPORT_NAME: ${{ steps.generate.outputs.report-name }}
+        AWS_REGION_INPUT: ${{ inputs.aws-region }}
+        EXTRA_ARGS: ${{ inputs.s3-extra-args }}
+
+    - name: Store the report as an artifact
+      if: inputs.upload-artifact == 'true'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ inputs.artifact-name }}
+        path: |
+          ${{ steps.generate.outputs.report-path }}
+          ${{ runner.temp }}/sonar-code-health/summary.json
+        retention-days: ${{ inputs.artifact-retention-days }}
+
+    - name: Check the quality gate
+      if: inputs.fail-on-quality-gate == 'true'
+      shell: bash
+      run: |
+        if [ "$QUALITY_GATE" != "OK" ]; then
+          echo "::error::The SonarQube quality gate for '$SONAR_PROJECT_KEY' is '$QUALITY_GATE'. See $REPORT_URI for details."
+          exit 1
+        fi
+        echo "The SonarQube quality gate for '$SONAR_PROJECT_KEY' passed."
+      env:
+        QUALITY_GATE: ${{ steps.generate.outputs.quality-gate-status }}
+        SONAR_PROJECT_KEY: ${{ inputs.sonar-project-key }}
+        REPORT_URI: ${{ steps.upload.outputs.s3-uri }}

@@ -12,7 +12,7 @@ inputs:
     description: The prefix for the image name. Defaults to `telicent-`.
   dry-run:
     required: false
-    default: 'false'
+    default: "false"
     description: Whether to test the build and scan without pushing to the registry.
   github-token:
     required: true
@@ -21,11 +21,11 @@ inputs:
   # Application build options
   enable-buildkit-cache:
     required: false
-    default: 'false'
+    default: "false"
     description: Whether the docker buildkit cache is required.
   java-version:
     required: false
-    default: '21'
+    default: "21"
     description: Specifies the JDK version to install and build with.  Defaults to 21.
   jdk:
     required: false
@@ -37,12 +37,42 @@ inputs:
     description: If release has multiple package that are SBOM targets, then set this to disambiguate SBOMs.
   download-sbom:
     required: false
-    default: 'true'
+    default: "true"
     description: Whether to attempt to download a previously uploaded SBOM artifact for use in the image build.
   uses-maven:
     required: false
-    default: 'false'
+    default: "false"
     description: Whether your build requires the JDK and Maven to be present.
+
+  # CodeArtifact options (only used by `uses-maven`)
+  codeartifact-role:
+    required: false
+    description: |
+      ARN of the AWS IAM role to assume in order to obtain an AWS CodeArtifact token so that a
+      `uses-maven` build can resolve private Maven dependencies. When omitted no CodeArtifact login is
+      performed and dependencies must be resolvable from public repositories or the restored Maven cache
+      (this preserves the previous behaviour).
+  codeartifact-domain:
+    required: false
+    default: telicent
+    description: The AWS CodeArtifact domain used when obtaining a token. Only used when `codeartifact-role` is set.
+  codeartifact-domain-owner:
+    required: false
+    description: |
+      The AWS account ID that owns the CodeArtifact domain. Intentionally not defaulted so that an AWS account
+      number is not embedded in this OSS action — pass it from a secret in the calling workflow, e.g.
+      `secrets.AWS_ACCOUNT_ID`. Required when `codeartifact-role` is set.
+  codeartifact-repository-id:
+    required: false
+    default: aws-codeartifact-telicent
+    description: |
+      The Maven server id that matches the CodeArtifact repository declared in your pom.xml
+      (`<repository>`/`<distributionManagement>`). The obtained token is associated with this server id so
+      that Maven authenticates correctly against that repository. Only used when `codeartifact-role` is set.
+  codeartifact-token-lifetime:
+    required: false
+    default: "3600"
+    description: Lifetime (in seconds) of the AWS CodeArtifact token. Only used when `codeartifact-role` is set.
 
   # Container registry options
   registry:
@@ -61,27 +91,27 @@ inputs:
   # Container build and tag options
   allow-latest-tag:
     required: false
-    default: 'false'
+    default: "false"
     description: |
       Set to `true` to explicitly add the `latest` tag.
       The tag may still be added implicitly if `allow-mutable-tags` is set to `true` and the reference branch is the branch specified as `main-branch`.
   allow-development-tag:
     required: false
-    default: 'false'
+    default: "false"
     description: |
       Set to `true` to explicitly add the `development` tag.
       The tag may still be added implicitly if `allow-mutable-tags` is set to `true` and the reference branch is differs from the branch specified as `main-branch`.
   allow-mutable-tags:
     required: false
-    default: 'true'
+    default: "true"
     description: Set to `false` to avoid adding mutable tags like `latest` and `development` based on the branch specified as `main-branch`.
   allow-sha-tag:
     required: false
-    default: 'true'
+    default: "true"
     description: Set to `false` to avoid adding the image SHA as a tag.
   allow-version-tag:
     required: false
-    default: 'true'
+    default: "true"
     description: Set to `false` to avoid adding a version tag.
   build-args:
     required: false
@@ -123,6 +153,42 @@ inputs:
     required: false
     description: Optional suffix for the version of the image, used in tagging the image.
 
+  # SonarQube code health report options
+  sonar-host-url:
+    required: false
+    default: https://sonarcloud.io
+    description: Base URL of the SonarQube server used for the code health report. Only used when `registry` is `quay`.
+  sonar-token:
+    required: false
+    description: |
+      A SonarQube token with permission to browse the project, supplied from a secret. The code health report is
+      only generated when this and `sonar-report-s3-uri` are both set, and the registry is `quay`.
+  sonar-project-key:
+    required: false
+    description: The key of the SonarQube project to report on. Required when `sonar-token` is set.
+  sonar-branch:
+    required: false
+    description: The branch to report on. Defaults to the project's main branch when not specified.
+  sonar-report-s3-uri:
+    required: false
+    description: |
+      Destination for the code health report, for example `s3://my-bucket/reports/sonar/`. A URI ending in `/` is
+      treated as a prefix and the generated file name is appended to it. The report is only generated when this
+      and `sonar-token` are both set, and the registry is `quay`.
+  sonar-report-aws-region:
+    required: false
+    default: eu-west-2
+    description: AWS region used when uploading the code health report.
+  sonar-report-aws-role:
+    required: false
+    description: |
+      ARN of the AWS IAM role to assume in order to upload the code health report. Defaults to `role-to-assume`
+      when not specified. The role needs `s3:PutObject` on `sonar-report-s3-uri`.
+  sonar-fail-on-quality-gate:
+    required: false
+    default: "false"
+    description: Whether to fail the job when the project's SonarQube quality gate is failing. The report is still generated and uploaded first.
+
   # MS Teams notification options
   teams-webhook-url:
     required: false
@@ -131,22 +197,22 @@ inputs:
   # Trivy/Grype scanning options
   grype-scan-image:
     required: false
-    default: 'true'
+    default: "true"
     description: Whether to run a Grype scan on the built image.
   trivy-ignores:
     required: false
     description: Name of trivy ignore file. Only allowed for BUILD image, MUST NOT be used with DEPLOY images.
   trivy-scan-dockerfile:
     required: false
-    default: 'true'
+    default: "true"
     description: Whether to run a Trivy scan on the Dockerfile used to build the image.
   trivy-scan-image:
     required: false
-    default: 'true'
+    default: "true"
     description: Whether to run a Trivy scan on the built image.
   fail-on-unfixed:
     required: false
-    default: 'false'
+    default: "false"
     description: Whether to fail the scan if unfixed vulnerabilities are found.
   remote-vex:
     required: false
@@ -174,7 +240,6 @@ outputs:
 runs:
   using: composite
   steps:
-
     - name: Validate registry inputs
       uses: telicent-oss/shared-workflows/.github/actions/validate-registry-inputs@main
       with:
@@ -193,20 +258,59 @@ runs:
     - name: Checkout
       uses: actions/checkout@v6.0.2
 
+    # When a CodeArtifact role is supplied, configure Maven with a server entry for the CodeArtifact
+    # repository. The credentials reference environment variables that are populated by the CodeArtifact
+    # login step below at the time the Maven build runs.
+    - name: Install Java and Maven (with CodeArtifact)
+      if: inputs.uses-maven == 'true' && inputs.codeartifact-role != ''
+      uses: actions/setup-java@v5.2.0
+      with:
+        java-version: ${{ inputs.java-version }}
+        distribution: ${{ inputs.jdk }}
+        cache: maven
+        server-id: ${{ inputs.codeartifact-repository-id }}
+        server-username: AWS_CODEARTIFACT_USER
+        server-password: AWS_CODEARTIFACT_TOKEN
+
     - name: Install Java and Maven
-      if: inputs.uses-maven == 'true'
+      if: inputs.uses-maven == 'true' && inputs.codeartifact-role == ''
       uses: actions/setup-java@v5.2.0
       with:
         java-version: ${{ inputs.java-version }}
         distribution: ${{ inputs.jdk }}
         cache: maven
 
-    # NB - Assumption here is that this action has been called after the Maven workflow has been called so the
-    #      Maven Cache already has all our dependencies present in it and tests have already passed
+    # Obtain a short-lived AWS CodeArtifact token so the Maven build can resolve private dependencies.
+    # Only runs when a CodeArtifact role ARN is supplied. The main-account credentials required for ECR
+    # are configured later, after the Maven build, so assuming the CodeArtifact role here is safe.
+    - name: Configure AWS credentials for CodeArtifact
+      if: inputs.uses-maven == 'true' && inputs.codeartifact-role != ''
+      uses: aws-actions/configure-aws-credentials@v6
+      with:
+        role-to-assume: ${{ inputs.codeartifact-role }}
+        aws-region: eu-west-2
+        mask-aws-account-id: true
+
+    - name: AWS CodeArtifact Login
+      id: codeartifact-login
+      if: inputs.uses-maven == 'true' && inputs.codeartifact-role != ''
+      uses: telicent-oss/shared-workflows/.github/actions/aws-codeartifact-login@main
+      with:
+        domain: ${{ inputs.codeartifact-domain }}
+        owner: ${{ inputs.codeartifact-domain-owner }}
+        token-lifetime: ${{ inputs.codeartifact-token-lifetime }}
+
+    # NB - When no CodeArtifact role is supplied the assumption is that this action has been called after
+    #      the Maven workflow, so the restored Maven cache already contains all dependencies and tests have
+    #      already passed. Supplying `codeartifact-role` makes private dependency resolution robust to
+    #      cache misses (for example after a dependency version bump changes the cache key).
     - name: Quick Maven Build
       if: inputs.uses-maven == 'true'
       run: mvn package -U --batch-mode -DskipTests
       shell: bash
+      env:
+        AWS_CODEARTIFACT_USER: ${{ steps.codeartifact-login.outputs.user }}
+        AWS_CODEARTIFACT_TOKEN: ${{ steps.codeartifact-login.outputs.token }}
 
     - name: Download build artifact
       uses: actions/download-artifact@v8
@@ -286,7 +390,7 @@ runs:
       with:
         # Defines the base image names in repository/name format
         images: |
-          ${{ env.AWS_REGISTRY }}${{ env.QUAY_REGISTRY }}/${{ env.IMAGE_NAME }}
+          ${{ env.AWS_REGISTRY }}${{ env.QUAY_REGISTRY }}${{ env.IMAGE_NAME }}
         # Manually handling latest below so disabling automatic latest handling
         flavor: |
           latest=false
@@ -298,8 +402,11 @@ runs:
           type=raw,value=latest,enable=${{ env.TAG_LATEST }}
           type=raw,value=development,enable=${{ env.TAG_DEVELOPMENT }}
       env:
-        AWS_REGISTRY: ${{ inputs.registry == 'aws' && steps.login-ecr.outputs.registry || '' }}
-        QUAY_REGISTRY: ${{ inputs.registry == 'quay' && 'quay.io/telicent' || '' }}
+        # During a dry-run the ECR login step is skipped, so its `registry` output is empty. Without the
+        # dry-run guard this would evaluate to `format('{0}/', '')` = "/", producing malformed tags like
+        # `/name:development`. Dry-runs never push, so an empty prefix is correct here.
+        AWS_REGISTRY: ${{ inputs.registry == 'aws' && inputs.dry-run == 'false' && format('{0}/', steps.login-ecr.outputs.registry) || '' }}
+        QUAY_REGISTRY: ${{ inputs.registry == 'quay' && 'quay.io/telicent/' || '' }}
         IMAGE_NAME: ${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}
         TAG_DEVELOPMENT: ${{ inputs.allow-development-tag == 'true' || (inputs.allow-mutable-tags == 'true' && github.ref_name != inputs.main-branch) }}
         TAG_LATEST: ${{ inputs.allow-latest-tag == 'true' || (inputs.allow-mutable-tags == 'true' && github.ref_name == inputs.main-branch) }}
@@ -382,7 +489,8 @@ runs:
       shell: bash
       env:
         REGISTRY: "${{ inputs.registry }}"
-        AWS_REGISTRY_URL: "${{ steps.login-ecr.outputs.registry}}"
+        # Empty during a dry-run (ECR login is skipped); capture-tags.sh then omits the registry prefix.
+        AWS_REGISTRY_URL: "${{ inputs.dry-run == 'false' && steps.login-ecr.outputs.registry || '' }}"
         QUAY_REGISTRY_URL: "quay.io/telicent"
         IMAGE_NAME: "${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}"
         IMAGE_VERSION: "${{ steps.meta.outputs.version }}"
@@ -476,6 +584,21 @@ runs:
             images+="${tag}@${DIGEST} "
           done
           cosign sign --yes ${images}
+    - name: SonarQube code health report
+      # Only run when actually pushing to Quay, and only when the SonarQube token and report destination are
+      # supplied. Dry runs are skipped so that they remain free of side effects.
+      if: inputs.registry == 'quay' && inputs.dry-run == 'false' && inputs.sonar-token != '' && inputs.sonar-report-s3-uri != ''
+      uses: telicent-oss/shared-workflows/.github/actions/sonar-report-generation@main
+      with:
+        sonar-host-url: ${{ inputs.sonar-host-url }}
+        sonar-token: ${{ inputs.sonar-token }}
+        sonar-project-key: ${{ inputs.sonar-project-key }}
+        sonar-branch: ${{ inputs.sonar-branch }}
+        project-version: ${{ inputs.version }}${{ inputs.version-suffix }}
+        s3-uri: ${{ inputs.sonar-report-s3-uri }}
+        aws-region: ${{ inputs.sonar-report-aws-region }}
+        aws-role-to-assume: ${{ inputs.sonar-report-aws-role != '' && inputs.sonar-report-aws-role || inputs.role-to-assume }}
+        fail-on-quality-gate: ${{ inputs.sonar-fail-on-quality-gate }}
 
     - name: Notify MS Teams of image push
       if: inputs.teams-webhook-url != ''

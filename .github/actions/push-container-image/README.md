@@ -20,6 +20,9 @@ automatically sign container images that are pushed to it.
 * Execute a Trivy dockerfile scan when `trivy-scan-dockerfile` is `true`.
 * Execute a Trivy image scan when `trivy-scan-image` is `true`.
 * Execute a Grype image scan when `grype-scan-image` is `true`.
+* Generate a SonarQube code health report and upload it to S3 when the
+`registry` is `quay`, this is not a dry run, and both `sonar-token` and
+`sonar-report-s3-uri` have been specified.
 * Send an MS Teams notification to a Teams Workflow when the step to build and
 push the container image fails, and when a `teams-workflow-url` has been
 specified.
@@ -44,6 +47,41 @@ specified.
 | `uses-maven` | `'false'` | No | Whether the build requires the JDK and Maven to be present. |
 | `java-version` | `'21'` | No | Specifies the JDK version to install and build with. |
 | `jdk` | `'temurin'` | No | Specifies the JDK to use. |
+
+### CodeArtifact Options
+
+These only apply to `uses-maven` builds. Set `codeartifact-role` when the on-runner `mvn package` needs to
+resolve private Maven dependencies that live only in AWS CodeArtifact (i.e. artifacts that are not published to
+a public repository such as Maven Central). When it is omitted the action behaves as before, relying on public
+repositories and the Maven cache restored from the preceding Maven workflow.
+
+| Name | Default | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `codeartifact-role` | | No | ARN of the AWS IAM role to assume to obtain a CodeArtifact token for the Maven build. When set, the action logs into CodeArtifact and wires the token into Maven's `settings.xml`. When omitted, no CodeArtifact login is performed. |
+| `codeartifact-domain` | `'telicent'` | No | The AWS CodeArtifact domain used when obtaining a token. |
+| `codeartifact-domain-owner` | | No | The AWS account ID that owns the CodeArtifact domain. Not defaulted (to keep the account number out of this OSS action); pass it from a secret in the calling workflow, e.g. `${{ secrets.AWS_ACCOUNT_ID }}`. Required when `codeartifact-role` is set. |
+| `codeartifact-repository-id` | `'aws-codeartifact-telicent'` | No | The Maven server id that matches the CodeArtifact repository declared in your `pom.xml`, so the obtained token is associated with the right server. |
+| `codeartifact-token-lifetime` | `'3600'` | No | Lifetime, in seconds, of the CodeArtifact token. |
+
+The calling job must have `id-token: write` permission and the supplied role must be assumable via OIDC and have
+permission to obtain a CodeArtifact authorization token. For example:
+
+```yaml
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: telicent-oss/shared-workflows/.github/actions/push-container-image@main
+        with:
+          app-name: my-service
+          registry: aws
+          dockerfile: docker/Dockerfile
+          uses-maven: true
+          role-to-assume: ${{ secrets.AWS_ROLE_DEPLOY }}
+          codeartifact-role: ${{ secrets.AWS_ROLE_DEPLOY_CODE_ARTIFACT }}
+          codeartifact-domain-owner: ${{ secrets.AWS_ACCOUNT_ID }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+```
 
 ### Container Registry Options
 
@@ -77,6 +115,24 @@ specified.
 | `dockerfile` | | Yes | The name of the Dockerfile to build the image from. |
 | `target` | | No | The target stage within the Dockerfile to build the image from. |
 | `image-suffix` | | No | A suffix to use as part of the image name. |
+
+### SonarQube Code Health Report Options
+
+The report is only generated when the `registry` is `quay`, `dry-run` is
+`false`, and both `sonar-token` and `sonar-report-s3-uri` are set. See the
+[sonar-report-generation](../sonar-report-generation/README.md) action for
+details of the report itself.
+
+| Name | Default | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `sonar-token` | | No | A SonarQube user token with permission to browse the project, supplied from a secret. Setting this (together with `sonar-report-s3-uri`) enables the report. |
+| `sonar-report-s3-uri` | | No | Destination for the report, e.g. `s3://my-bucket/reports/sonar/`. A URI ending in `/` is treated as a prefix and the generated file name is appended to it. |
+| `sonar-project-key` | | Yes (if `sonar-token` is set) | The key of the SonarQube project to report on. |
+| `sonar-host-url` | `'https://sonarcloud.io'` | No | Base URL of the SonarQube server. |
+| `sonar-branch` | | No | The branch to report on. Defaults to the project's main branch. |
+| `sonar-report-aws-region` | `'eu-west-2'` | No | AWS region used when uploading the report. |
+| `sonar-report-aws-role` | `role-to-assume` | No | ARN of the AWS IAM role to assume to upload the report. Needs `s3:PutObject` on `sonar-report-s3-uri`. |
+| `sonar-fail-on-quality-gate` | `'false'` | No | Whether to fail the job when the project's quality gate is failing. The report is still generated and uploaded first. |
 
 ### MS Teams Notification Options
 

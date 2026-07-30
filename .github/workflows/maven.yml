@@ -89,9 +89,9 @@ on:
       RUN_WINDOWS_BUILD:
         required: false
         type: boolean
-        default: true
+        default: false
         description: |
-          Specifies whether to build, run and verify against Windows.
+          No longer supported.
       CHANGELOG_FILE:
         required: false
         type: string
@@ -188,11 +188,7 @@ jobs:
     needs: 
       - cache-dependencies
       - cache-docker-images
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-      fail-fast: false
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     env:
       # These have to be exported into the environment due to how the setup-java action configures the Maven
       # settings.xml file to avoid directly embedding credentials into it.
@@ -208,7 +204,7 @@ jobs:
       
       - name: Login to Docker Hub
         uses: docker/login-action@v4.2.0
-        if: ${{ inputs.USES_DOCKERHUB_IMAGES && matrix.os == 'ubuntu-latest' }}
+        if: ${{ inputs.USES_DOCKERHUB_IMAGES }}
         with:
           username: ${{ secrets.DOCKER_READ_USER }}
           password: ${{ secrets.DOCKER_READ_PWD }}
@@ -221,7 +217,7 @@ jobs:
           restore-only: ${{ github.ref_name != inputs.MAIN_BRANCH }}
 
       - name: Install Java and Maven
-        uses: actions/setup-java@v5.3.0
+        uses: actions/setup-java@v5.4.0
         with:
           java-version: ${{ inputs.JAVA_VERSION }}
           distribution: ${{ inputs.JDK }}
@@ -233,7 +229,6 @@ jobs:
           server-password: MAVEN_PASSWORD
 
       - name: Check whether GPG Signing is Enabled
-        if: ${{ matrix.os == 'ubuntu-latest' }}
         id: gpg-check
         run: |
           if [ "${{ secrets.GPG_PRIVATE_KEY }}" != "" ]; then
@@ -243,7 +238,7 @@ jobs:
           fi
 
       - name: Import GPG key
-        if: ${{ matrix.os == 'ubuntu-latest' && steps.gpg-check.outputs.enabled == 'true' }}
+        if: ${{ steps.gpg-check.outputs.enabled == 'true' }}
         uses: crazy-max/ghaction-import-gpg@v7.0.0
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
@@ -251,34 +246,38 @@ jobs:
 
       - name: Generate Extra Maven Arguments (if needed)
         id: extra-maven-args
-        if: ${{ matrix.os == 'windows-latest' || steps.gpg-check.outputs.enabled == 'false' }}
+        if: ${{ steps.gpg-check.outputs.enabled == 'false' }}
         shell: bash
         run: |
           echo "args=-Dgpg.skip=true" >> "$GITHUB_OUTPUT"
 
-      - name: Build and Verify Maven Package
-        if: ${{ matrix.os == 'ubuntu-latest' }}
-        run: |
-          if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
-          else
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
-          fi
+      - name: Check whether any Java code changed
+        id: java-changes
+        uses: rvesse/detect-changes-action@v1
+        with:
+          base: ${{ inputs.MAIN_BRANCH }}
+          pattern: src/|pom.xml
+          flags: -E
+          # Ensures we always run tests when building on main
+          output-on-base: true
+          summary: false
+          notices: false
 
-      - name: Build and Verify Maven Package (Windows - Docker Profile disabled)
-        if: ${{ matrix.os == 'windows-latest' && inputs.RUN_WINDOWS_BUILD }}
-        shell: bash
-        # Remember that Windows Action runners DO NOT support Docker so explicitly disable the Docker profile
+      - name: Build and Verify Maven Package
+        # NB - If we don't detect any Java code or Maven metadata changes then we skipTests
+        #      This lets builds run faster if developers are only updating docs, Helm Charts, Dockerfile's etc and not
+        #      changing the Java code itself
+        # Note that we also skip CycloneDX SBOM generation as that can be expensive and we don't need SBOMs at this
+        # stage of the workflow, they'll get generated later for security scans and/or release publishing
         run: |
           if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P-${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ case(steps.java-changes.outputs.changed == 'false', '-DskipTests', '') }} -Dcyclonedx.skip ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
           else
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P-${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ case(steps.java-changes.outputs.changed == 'false', '-DskipTests', '') }} -Dcyclonedx.skip ${{ inputs.MAVEN_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
           fi
 
       - name: Trivy Vulnerability Scanning
         id: trivy-scan
-        if: ${{ matrix.os == 'ubuntu-latest' }}
         uses: telicent-oss/trivy-action@v1
         with:
           gh-token: ${{ secrets.GITHUB_TOKEN }}
@@ -290,7 +289,7 @@ jobs:
             ${{ inputs.REMOTE_VEX }}
 
       - name: Upload JaCoCo Report
-        if: ${{ matrix.os == 'ubuntu-latest'  && inputs.PUBLISH_JACOCO_REPORT }}
+        if: ${{ inputs.PUBLISH_JACOCO_REPORT }}
         uses: actions/upload-artifact@v7
         with:
           name: jacoco-report
@@ -300,7 +299,6 @@ jobs:
 
       - name: Detect Maven version
         id: project
-        if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
           echo version=$(mvn -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_OUTPUT
 

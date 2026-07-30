@@ -50,6 +50,8 @@ The serial Maven workflow does the following:
       inputs](#workflow-inputs))
     - Restores the cached Docker images if `PUBLIC_IMAGES` is set
     - Builds the project with `mvn install`
+        - **NB** If the workflow detects no changes to any `src/` or `pom.xml` files then `-DskipTests` is added to the
+         `mvn` arguments here to avoid re-running tests when no Java changes are present e.g. PRs that update only docs
     - Scans the project for high/critical severity vulnerabilities attaching reports to the build
    vulnerabilities with `trivy`
     - Adds the detected Maven project version (value of `project.version`) to the job outputs
@@ -77,6 +79,8 @@ For the parallel build version of the workflow the steps are slightly different:
     - Restores the cached Docker images if `PUBLIC_IMAGES` is set
     - Builds the module and its dependencies with `mvn install -DskipTests -am -pl :module`
     - Tests the module with `mvn install -pl :module`
+      - **NB** If the workflow detects no changes to any `src/` or `pom.xml` files then `-DskipTests` is added to the
+         `mvn` arguments here to avoid re-running tests when no Java changes are present e.g. PRs that update only docs
 4. A `scan-and-publish` job that: 
     - Configures Java and Maven
     - Does a quick Maven build (`mvn install -DskipTests`) since this job is dependent on the `build` jobs being
@@ -84,9 +88,6 @@ For the parallel build version of the workflow the steps are slightly different:
     - Scans the project for high/critical severity vulnerabilities attaching reports to the build vulnerabilities with
    `trivy`
     - Adds the detected Maven project version (value of `project.version`) to the job outputs
-    - Optionally deploys `SNAPSHOT`s if the build is a `SNAPSHOT` and it's on the `MAIN_BRANCH`, and `PUBLISH_SNAPSHOTS`
-      is configured appropriately, i.e. `mvn deploy -DskipTests`, tests are skipped as this step only runs if the
-      earlier full build was successful
 5. A `github-release` job that is the same as the serial build
 
 Note that many aspects of the above may be configured via [workflow inputs](#workflow-inputs).

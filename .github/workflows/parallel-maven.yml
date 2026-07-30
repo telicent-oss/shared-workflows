@@ -172,7 +172,7 @@ jobs:
         uses: actions/checkout@v6.0.2
 
       - name: Install Java and Maven
-        uses: actions/setup-java@v5.3.0
+        uses: actions/setup-java@v5.4.0
         with:
           java-version: ${{ inputs.JAVA_VERSION }}
           distribution: ${{ inputs.JDK }}
@@ -219,12 +219,13 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    name: ${{ matrix.module }}
     steps:
       - name: Check out Git repository
         uses: actions/checkout@v6.0.2
       
       - name: Install Java and Maven
-        uses: actions/setup-java@v5.3.0
+        uses: actions/setup-java@v5.4.0
         with:
           java-version: ${{ inputs.JAVA_VERSION }}
           distribution: ${{ inputs.JDK }}
@@ -233,9 +234,9 @@ jobs:
       - name: Build Required Modules without Tests
         run: |
           if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} -am -DskipTests -Dgpg.skip ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }}
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} -am -DskipTests -Dcyclonedx.skip -Dgpg.skip ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }}
           else
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} -am -DskipTests -Dgpg.skip ${{ inputs.MAVEN_ARGS }}
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} -am -DskipTests -Dcyclonedx.skip -Dgpg.skip ${{ inputs.MAVEN_ARGS }}
           fi
 
       - name: Determine if Cached Docker Images are needed
@@ -267,15 +268,32 @@ jobs:
           images: ${{ inputs.PUBLIC_IMAGES }}
           restore-only: ${{ github.ref_name != inputs.MAIN_BRANCH }}
 
+      - name: Check whether any Java code changed
+        id: java-changes
+        uses: rvesse/detect-changes-action@v1
+        with:
+          base: ${{ inputs.MAIN_BRANCH }}
+          pattern: src/|pom.xml
+          flags: -E
+          # Ensures we always run tests when building on main
+          output-on-base: true
+          summary: false
+          notices: false
+
       - name: Build and Verify Maven Module
+        # NB - If we don't detect any Java code or Maven metadata changes then we skipTests
+        #      This lets builds run faster if developers are only updating docs, Helm Charts, Dockerfile's etc and not
+        #      changing the Java code itself
+        # Note that we also skip CycloneDX SBOM generation as that can be expensive and we don't need SBOMs at this
+        # stage of the workflow, they'll get generated later for security scans and/or release publishing
         run: |
           if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} -Dgpg.skip ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }}
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} ${{ case(steps.java-changes.outputs.changed == 'false', '-DskipTests', '') }} -Dcyclonedx.skip -Dgpg.skip ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }}
           else
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} -Dgpg.skip ${{ inputs.MAVEN_ARGS }}
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} ${{ case(steps.java-changes.outputs.changed == 'false', '-DskipTests', '') }} -Dcyclonedx.skip -Dgpg.skip ${{ inputs.MAVEN_ARGS }}
           fi
 
-      - name: JaCoCo Report - ${{ matrix.module }})
+      - name: Upload JaCoCo Report
         if: ${{ inputs.PUBLISH_JACOCO_REPORT }}
         uses: actions/upload-artifact@v7
         with:
@@ -303,7 +321,7 @@ jobs:
         uses: actions/checkout@v6.0.2
 
       - name: Install Java and Maven
-        uses: actions/setup-java@v5.3.0
+        uses: actions/setup-java@v5.4.0
         with:
           java-version: ${{ inputs.JAVA_VERSION }}
           distribution: ${{ inputs.JDK }}
