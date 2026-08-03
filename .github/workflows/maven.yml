@@ -186,7 +186,8 @@ jobs:
 
   maven-central-audit:
     # Only run audit for OSS repositories that will be publishing to Maven Central
-    if: ${{ contains(github.repository_owner, 'oss') }}
+    # Also don't run for Dependabot PRs as Dependabot doesn't have access to the GPG secrets
+    if: ${{ contains(github.repository_owner, 'oss') && github.actor != 'dependabot[bot]' }}
     permissions:
       contents: read
     needs:
