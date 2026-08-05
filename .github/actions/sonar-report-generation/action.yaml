@@ -20,8 +20,19 @@ inputs:
       A SonarQube token with permission to browse the project.
       Should be supplied from a secret.
   sonar-project-key:
-    required: true
-    description: The key of the SonarQube project to report on.
+    required: false
+    description: |
+      The key of the SonarQube project to report on.
+      Used as the fallback when `sonar.projectKey` cannot be read from
+      `sonar-project-file`. One of the two must resolve to a key.
+  sonar-project-file:
+    required: false
+    default: sonar-project.properties
+    description: |
+      Path to a SonarQube properties file, relative to the workspace, read for
+      `sonar.projectKey`. A key found here takes precedence over
+      `sonar-project-key`. Missing files are not an error, so long as
+      `sonar-project-key` is set. Set to an empty string to skip the lookup.
   sonar-branch:
     required: false
     description: |
@@ -106,6 +117,9 @@ inputs:
       Defaults to 3.12.
 
 outputs:
+  sonar-project-key:
+    description: The project key the report was generated for, whether read from `sonar-project-file` or taken from `sonar-project-key`.
+    value: ${{ steps.validate.outputs.sonar-project-key }}
   report-path:
     description: Path to the generated PDF report on the runner.
     value: ${{ steps.generate.outputs.report-path }}
@@ -125,7 +139,8 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Validate inputs
+    - name: Validate inputs and resolve the project key
+      id: validate
       shell: bash
       run: |
         # Ensure a SonarQube host URL is provided
@@ -140,11 +155,33 @@ runs:
           exit 1
         fi
 
-        # Ensure a project key is provided
-        if [ -z "$SONAR_PROJECT_KEY" ]; then
-          echo "::error::A project key must be provided using the 'sonar-project-key' input."
+        # Prefer the project key declared in the properties file, so a repository that already
+        # configures its own analysis does not have to repeat the key in the workflow. Keys are
+        # separated from their value by '=' or ':', and the last declaration wins, as in a Java
+        # properties file. Lines starting with '#' or '!' are comments and never match.
+        KEY_FROM_FILE=""
+        if [ -n "$SONAR_PROJECT_FILE" ] && [ -f "$SONAR_PROJECT_FILE" ]; then
+          KEY_FROM_FILE=$(tr -d '\r' < "$SONAR_PROJECT_FILE" |
+            sed -n 's/^[[:space:]]*sonar\.projectKey[[:space:]]*[=:][[:space:]]*\(..*\)$/\1/p' |
+            sed 's/[[:space:]]*$//' |
+            grep -v '^$' |
+            tail -n 1)
+        fi
+
+        if [ -n "$KEY_FROM_FILE" ]; then
+          if [ -n "$SONAR_PROJECT_KEY" ] && [ "$KEY_FROM_FILE" != "$SONAR_PROJECT_KEY" ]; then
+            echo "::warning::'$SONAR_PROJECT_FILE' declares the project key '$KEY_FROM_FILE', which takes precedence over the 'sonar-project-key' input of '$SONAR_PROJECT_KEY'."
+          fi
+          SONAR_PROJECT_KEY="$KEY_FROM_FILE"
+          echo "Reporting on project '$SONAR_PROJECT_KEY', read from '$SONAR_PROJECT_FILE'."
+        elif [ -n "$SONAR_PROJECT_KEY" ]; then
+          echo "Reporting on project '$SONAR_PROJECT_KEY', from the 'sonar-project-key' input."
+        else
+          echo "::error::A project key must be provided, either as 'sonar.projectKey' in '${SONAR_PROJECT_FILE:-a properties file named by the sonar-project-file input}' or using the 'sonar-project-key' input."
           exit 1
         fi
+
+        echo "sonar-project-key=$SONAR_PROJECT_KEY" >> "$GITHUB_OUTPUT"
 
         # Ensure a well formed S3 URI is provided
         if [ -z "$S3_URI" ]; then
@@ -164,6 +201,7 @@ runs:
         SONAR_HOST_URL: ${{ inputs.sonar-host-url }}
         SONAR_TOKEN: ${{ inputs.sonar-token }}
         SONAR_PROJECT_KEY: ${{ inputs.sonar-project-key }}
+        SONAR_PROJECT_FILE: ${{ inputs.sonar-project-file }}
         S3_URI: ${{ inputs.s3-uri }}
 
     - name: Set up Python ${{ inputs.python-version }}
@@ -215,7 +253,7 @@ runs:
       env:
         SONAR_HOST_URL: ${{ inputs.sonar-host-url }}
         SONAR_TOKEN: ${{ inputs.sonar-token }}
-        SONAR_PROJECT_KEY: ${{ inputs.sonar-project-key }}
+        SONAR_PROJECT_KEY: ${{ steps.validate.outputs.sonar-project-key }}
         SONAR_BRANCH: ${{ inputs.sonar-branch }}
         PROJECT_VERSION: ${{ inputs.project-version }}
         REPORT_NAME: ${{ inputs.report-name }}
@@ -294,5 +332,5 @@ runs:
         echo "The SonarQube quality gate for '$SONAR_PROJECT_KEY' passed."
       env:
         QUALITY_GATE: ${{ steps.generate.outputs.quality-gate-status }}
-        SONAR_PROJECT_KEY: ${{ inputs.sonar-project-key }}
+        SONAR_PROJECT_KEY: ${{ steps.validate.outputs.sonar-project-key }}
         REPORT_URI: ${{ steps.upload.outputs.s3-uri }}
