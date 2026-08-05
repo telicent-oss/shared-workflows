@@ -165,7 +165,15 @@ inputs:
       only generated when this and `sonar-report-s3-uri` are both set, and the registry is `quay`.
   sonar-project-key:
     required: false
-    description: The key of the SonarQube project to report on. Required when `sonar-token` is set.
+    description: |
+      The key of the SonarQube project to report on. Used as the fallback when `sonar.projectKey` cannot be read
+      from `sonar-project-file`, so it is only required where the repository has no such file.
+  sonar-project-file:
+    required: false
+    default: sonar-project.properties
+    description: |
+      Path to a SonarQube properties file, relative to the workspace, read for `sonar.projectKey`. A key found
+      here takes precedence over `sonar-project-key`. Set to an empty string to skip the lookup.
   sonar-branch:
     required: false
     description: The branch to report on. Defaults to the project's main branch when not specified.
@@ -568,6 +576,7 @@ runs:
         sonar-host-url: ${{ inputs.sonar-host-url }}
         sonar-token: ${{ inputs.sonar-token }}
         sonar-project-key: ${{ inputs.sonar-project-key }}
+        sonar-project-file: ${{ inputs.sonar-project-file }}
         sonar-branch: ${{ inputs.sonar-branch }}
         project-version: ${{ inputs.version }}${{ inputs.version-suffix }}
         s3-uri: ${{ inputs.sonar-report-s3-uri }}

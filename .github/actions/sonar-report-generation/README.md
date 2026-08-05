@@ -8,6 +8,8 @@ path in S3.
 
 When invoked, the action will carry out the following steps.
 
+* Resolve the project key, preferring `sonar.projectKey` from
+  `sonar-project-file` and falling back to the `sonar-project-key` input.
 * Read the project's measures, quality gate result, issue breakdown and
   historic trends from the SonarQube Web API.
 * Render a PDF report covering the quality gate, the four SonarQube ratings,
@@ -50,6 +52,21 @@ account that created the token. The symptom is a report missing its trends and
 last analysis date, with warnings naming the endpoints that were refused. Check
 the prefix on the token: a User Token starts `squ_`.
 
+### Project Key
+
+The project key is resolved in this order.
+
+1. `sonar.projectKey` in the file named by `sonar-project-file`, which defaults
+   to `sonar-project.properties` in the root of the workspace. The repository
+   must be checked out for this to be found, and the last declaration in the
+   file wins, as in a Java properties file.
+2. The `sonar-project-key` input.
+
+The action fails when neither yields a key. A repository that already runs its
+own analysis therefore needs no `sonar-project-key`, and the workflow cannot
+drift from the key the scanner actually used. Where the file declares a key and
+the input is also set, the file wins and a warning names both.
+
 ## Inputs
 
 ### SonarQube Options
@@ -58,7 +75,8 @@ the prefix on the token: a User Token starts `squ_`.
 | :--- | :--- | :--- | :--- |
 | `sonar-host-url` | `https://sonarcloud.io` | No | Base URL of the SonarQube server. |
 | `sonar-token` | | Yes | A SonarQube token with permission to browse the project. |
-| `sonar-project-key` | | Yes | The key of the project to report on. |
+| `sonar-project-key` | | No | The key of the project to report on. Only required when the repo has no `sonar-project.properties` declaring `sonar.projectKey`. |
+| `sonar-project-file` | `sonar-project.properties` | No | Properties file, relative to the workspace, read for `sonar.projectKey`. A key found here takes precedence over `sonar-project-key`. Set to an empty string to skip the lookup. |
 | `sonar-branch` | | No | The branch to report on. Defaults to the project's main branch. |
 | `project-version` | | No | The version of the code that was analysed, shown on the report as the analysed version. Takes precedence over the version SonarQube recorded, and is the only way to populate the field where the token cannot read the analysis history. |
 
@@ -88,6 +106,7 @@ the prefix on the token: a User Token starts `squ_`.
 
 | Output | Description |
 | :--- | :--- |
+| `sonar-project-key` | The project key the report was generated for. |
 | `report-path` | Path to the generated PDF on the runner. |
 | `report-name` | File name of the generated PDF. |
 | `report-s3-uri` | The S3 URI the report was uploaded to. |

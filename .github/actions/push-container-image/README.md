@@ -127,7 +127,8 @@ details of the report itself.
 | :--- | :--- | :--- | :--- |
 | `sonar-token` | | No | A SonarQube user token with permission to browse the project, supplied from a secret. Setting this (together with `sonar-report-s3-uri`) enables the report. |
 | `sonar-report-s3-uri` | | No | Destination for the report, e.g. `s3://my-bucket/reports/sonar/`. A URI ending in `/` is treated as a prefix and the generated file name is appended to it. |
-| `sonar-project-key` | | Yes (if `sonar-token` is set) | The key of the SonarQube project to report on. |
+| `sonar-project-key` | | No | The key of the SonarQube project to report on. Only required when the repo has no `sonar-project.properties` declaring `sonar.projectKey`. |
+| `sonar-project-file` | `sonar-project.properties` | No | Properties file, relative to the workspace, read for `sonar.projectKey`. A key found here takes precedence over `sonar-project-key`. Set to an empty string to skip the lookup. |
 | `sonar-host-url` | `'https://sonarcloud.io'` | No | Base URL of the SonarQube server. |
 | `sonar-branch` | | No | The branch to report on. Defaults to the project's main branch. |
 | `sonar-report-aws-region` | `'eu-west-2'` | No | AWS region used when uploading the report. |
