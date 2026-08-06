@@ -316,6 +316,13 @@ jobs:
           path: |
             target/site/jacoco/
             **/target/site/jacoco/
+            
+      # The project key and source layout come from sonar-project.properties.
+      - name: Check code quality
+        uses: telicent-oss/shared-workflows/.github/actions/sast-scanning@main
+        with:
+          sonar-host-url: ${{ secrets.SONAR_HOST_URL }}
+          sonar-token: ${{ secrets.SONAR_TOKEN }}
   
 
   scan-and-publish:
