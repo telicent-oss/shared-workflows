@@ -112,6 +112,13 @@ on:
           obtained and supplied to security scanners to filter out vulnerabilities.
 
           Generally only needed if your repository relies on other libraries that have applicable VEX statements.
+      SONAR_QUALITY_GATE:
+        required: false
+        type: boolean
+        default: true
+        description: |
+          Whether a failing SonarQube Quality Gate fails the build.  Set to false while a project is being brought 
+          up to standard, so analysis is still published without blocking the build.
     secrets:
       MVN_USER_NAME:
         required: false
@@ -140,6 +147,16 @@ on:
         required: false
         description: |
           The passphrase protecting the provided GPG Private Key.
+      SONAR_HOST_URL:
+        required: false
+        description: |
+          Base URL of the SonarQube server used for code quality scanning.  If not supplied
+          the SonarQube scan and quality gate are skipped.
+      SONAR_TOKEN:
+        required: false
+        description: |
+          A SonarQube token with permission to analyse the project.  Required for the code
+          quality scan to run, alongside `SONAR_HOST_URL`.
 
     outputs:
       version: 
@@ -222,8 +239,29 @@ jobs:
       JDK: ${{ inputs.JDK }}
     secrets: inherit
   
+  prepare-sonarqube:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+
+      - name: Check whether SonarQube is Configured
+        id: sq-check
+        run: |
+          if [ -n "$SONAR_HOST_URL" ] && [ -n "$SONAR_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    outputs:
+      is-configured: ${{ steps.sq-check.outputs.enabled }}
+  
   build:
     needs: 
+      - prepare-sonarqube
       - detect-modules
       - cache-docker-images
     strategy:
@@ -309,21 +347,69 @@ jobs:
           fi
 
       - name: Upload JaCoCo Report
-        if: ${{ inputs.PUBLISH_JACOCO_REPORT }}
+        if: ${{ inputs.PUBLISH_JACOCO_REPORT || needs.prepare-sonarqube.outputs.is-configured == 'true' }}
         uses: actions/upload-artifact@v7
         with:
           name: jacoco-report-${{ matrix.module }}
           path: |
             target/site/jacoco/
             **/target/site/jacoco/
-            
-      # The project key and source layout come from sonar-project.properties.
-      - name: Check code quality
-        uses: telicent-oss/shared-workflows/.github/actions/sast-scanning@main
-        with:
-          sonar-host-url: ${{ secrets.SONAR_HOST_URL }}
-          sonar-token: ${{ secrets.SONAR_TOKEN }}
   
+  code-scan:
+    runs-on: ubuntu-latest
+    needs: 
+      - prepare-sonarqube
+      - build
+    permissions: 
+      contents: read
+    if: ${{ needs.prepare-sonarqube.outputs.is-configured == 'true' }}
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Install Java and Maven
+        uses: actions/setup-java@v5.4.0
+        with:
+          java-version: ${{ inputs.JAVA_VERSION }}
+          distribution: ${{ inputs.JDK }}
+          cache: maven
+      
+      - name: Check whether any Java code changed
+        id: java-changes
+        uses: rvesse/detect-changes-action@v1
+        with:
+          base: ${{ inputs.MAIN_BRANCH }}
+          pattern: src/|pom.xml
+          flags: -E
+          # Ensures we always run tests when building on main
+          output-on-base: true
+          summary: false
+          notices: false
+
+      - name: Download coverage reports
+        uses: actions/download-artifact@v7
+        with:
+          pattern: jacoco-report-*
+          path: sonar-coverage
+      
+      - name: SonarQube scan
+        id: code-quality
+        if: ${{ steps.java-changes.outputs.changed == 'true' }}
+        uses: telicent-oss/shared-workflows/.github/actions/mvn-sast-scanning@sonarqube-to-mvn
+        with:
+          sonar-token: ${{ secrets.SONAR_TOKEN }}
+          sonar-host-url: ${{ secrets.SONAR_HOST_URL }}
+          compile: 'true'
+          coverage-report-paths: ${{ github.workspace }}/sonar-coverage/**/jacoco.xml
+          maven-args: ${{ inputs.MAVEN_ARGS }}
+          fail-on-quality-gate: ${{ inputs.SONAR_QUALITY_GATE }}
+      
+      - name: Publish SonarQube Dashboard Link
+        if: ${{ !cancelled() && steps.code-quality.outputs.dashboard-url != '' }}
+        run: |
+          echo "### [SonarQube dashboard](${{ steps.code-quality.outputs.dashboard-url }})" >> "$GITHUB_STEP_SUMMARY"
 
   scan-and-publish:
     needs: build
