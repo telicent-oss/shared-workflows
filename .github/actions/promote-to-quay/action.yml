@@ -28,6 +28,52 @@ inputs:
     default: telicent
     description: The Quay.io organisation to push to. Defaults to `telicent`.
 
+  # SonarQube code health report options
+  sonar-host-url:
+    required: false
+    default: https://sonarcloud.io
+    description: Base URL of the SonarQube server used for the code health report.
+  sonar-token:
+    required: false
+    description: |
+      A SonarQube token with permission to browse the project, supplied from a secret. The code health report is
+      only generated when this and `sonar-report-s3-uri` are both set, so repositories without SonarQube set up
+      can simply omit them.
+  sonar-project-key:
+    required: false
+    description: |
+      The key of the SonarQube project to report on. Used as the fallback when `sonar.projectKey` cannot be read
+      from `sonar-project-file`, so it is only required where the repository has no such file.
+  sonar-project-file:
+    required: false
+    default: sonar-project.properties
+    description: |
+      Path to a SonarQube properties file, relative to the workspace, read for `sonar.projectKey`. A key found
+      here takes precedence over `sonar-project-key`. Set to an empty string to skip the lookup, which also
+      avoids the checkout this action would otherwise perform to read the file.
+  sonar-branch:
+    required: false
+    description: The branch to report on. Defaults to the project's main branch when not specified.
+  sonar-report-s3-uri:
+    required: false
+    description: |
+      Destination for the code health report, for example `s3://my-bucket/reports/sonar/`. A URI ending in `/` is
+      treated as a prefix and the generated file name is appended to it. The report is only generated when this
+      and `sonar-token` are both set.
+  sonar-report-aws-region:
+    required: false
+    default: eu-west-2
+    description: AWS region used when uploading the code health report.
+  sonar-report-aws-role:
+    required: false
+    description: |
+      ARN of the AWS IAM role to assume in order to upload the code health report. Defaults to `role-to-assume`
+      when not specified. The role needs `s3:PutObject` on `sonar-report-s3-uri`.
+  sonar-fail-on-quality-gate:
+    required: false
+    default: "false"
+    description: Whether to fail the job when the project's SonarQube quality gate is failing. The report is still generated and uploaded first.
+
 outputs:
   image-digest:
     description: The digest of the image pushed to Quay.io. Empty if image promotion was skipped.
@@ -137,3 +183,33 @@ runs:
       env:
         CHART_REF: ${{ steps.push-chart.outputs.chart-ref }}
       run: cosign sign --yes "$CHART_REF"
+
+    ###
+    # Code health reporting steps
+    #
+    # These run last because the report generation assumes its own AWS role for the S3 upload, which replaces
+    # the credentials the promotion steps above rely on.
+    ###
+
+    # Promotion itself needs no source, so the repository is only checked out where the project key is to be
+    # read from a properties file in it.
+    - name: Checkout for the SonarQube project configuration
+      if: inputs.sonar-token != '' && inputs.sonar-report-s3-uri != '' && inputs.sonar-project-file != ''
+      uses: actions/checkout@v6.0.2
+
+    - name: SonarQube code health report
+      # Only run when the SonarQube token and report destination are supplied, so that repositories without
+      # SonarQube set up are unaffected.
+      if: inputs.sonar-token != '' && inputs.sonar-report-s3-uri != ''
+      uses: telicent-oss/shared-workflows/.github/actions/sonar-report-generation@main
+      with:
+        sonar-host-url: ${{ inputs.sonar-host-url }}
+        sonar-token: ${{ inputs.sonar-token }}
+        sonar-project-key: ${{ inputs.sonar-project-key }}
+        sonar-project-file: ${{ inputs.sonar-project-file }}
+        sonar-branch: ${{ inputs.sonar-branch }}
+        project-version: ${{ inputs.version }}
+        s3-uri: ${{ inputs.sonar-report-s3-uri }}
+        aws-region: ${{ inputs.sonar-report-aws-region }}
+        aws-role-to-assume: ${{ inputs.sonar-report-aws-role != '' && inputs.sonar-report-aws-role || inputs.role-to-assume }}
+        fail-on-quality-gate: ${{ inputs.sonar-fail-on-quality-gate }}
