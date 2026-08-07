@@ -344,10 +344,10 @@ jobs:
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-      - name: Check code quality
+      - name: Sonarqube code quality check
         id: code-quality
         if: ${{ steps.sq-check.outputs.enabled == 'true' && steps.java-changes.outputs.changed == 'true' }}
-        uses: telicent-oss/shared-workflows/.github/actions/mvn-sast-scanning@sonarqube-to-mvn
+        uses: telicent-oss/shared-workflows/.github/actions/mvn-sast-scanning@main
         with:
           sonar-host-url: ${{ secrets.SONAR_HOST_URL }}
           sonar-token: ${{ secrets.SONAR_TOKEN }}

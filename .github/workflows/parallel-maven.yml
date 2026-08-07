@@ -356,6 +356,7 @@ jobs:
             **/target/site/jacoco/
   
   sonarqube-code-scan:
+    name: Scan code with sonarqube
     runs-on: ubuntu-latest
     needs: 
       - prepare-sonarqube
@@ -394,10 +395,10 @@ jobs:
           pattern: jacoco-report-*
           path: sonar-coverage
       
-      - name: SonarQube scan
+      - name: Sonarqube code quality check
         id: code-quality
         if: ${{ steps.java-changes.outputs.changed == 'true' }}
-        uses: telicent-oss/shared-workflows/.github/actions/mvn-sast-scanning@sonarqube-to-mvn
+        uses: telicent-oss/shared-workflows/.github/actions/mvn-sast-scanning@main
         with:
           sonar-token: ${{ secrets.SONAR_TOKEN }}
           sonar-host-url: ${{ secrets.SONAR_HOST_URL }}
