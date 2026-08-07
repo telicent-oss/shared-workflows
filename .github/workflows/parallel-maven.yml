@@ -355,7 +355,7 @@ jobs:
             target/site/jacoco/
             **/target/site/jacoco/
   
-  code-scan:
+  sonarqube-code-scan:
     runs-on: ubuntu-latest
     needs: 
       - prepare-sonarqube
