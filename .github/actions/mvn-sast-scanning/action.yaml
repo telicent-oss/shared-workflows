@@ -41,7 +41,7 @@ inputs:
       Value for sonar.coverage.jacoco.xmlReportPaths.  Leave empty when tests ran in this job,
       as the scanner's per-module default of target/site/jacoco/jacoco.xml applies.  When
       coverage was produced in other jobs and downloaded as artifacts, pass an absolute glob,
-      e.g. ${{ github.workspace }}/sonar-coverage/**/jacoco.xml
+      e.g. "<pwd>/sonar-coverage/**/jacoco.xml
   fail-on-quality-gate:
     required: false
     default: "true"
