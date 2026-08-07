@@ -120,6 +120,13 @@ on:
           obtained and supplied to security scanners to filter out vulnerabilities.
 
           Generally only needed if your repository relies on other libraries that have applicable VEX statements.
+      SONAR_QUALITY_GATE:
+        required: false
+        type: boolean
+        default: true
+        description: |
+          Whether a failing SonarQube Quality Gate fails the build.  Set to false while a project is being brought 
+          up to standard, so analysis is still published without blocking the build.
     secrets:
       MVN_USER_NAME:
         required: false
@@ -148,6 +155,16 @@ on:
         required: false
         description: |
           The passphrase protecting the provided GPG Private Key.
+      SONAR_HOST_URL:
+        required: false
+        description: |
+          Base URL of the SonarQube server used for code quality scanning.  If not supplied
+          the SonarQube scan and quality gate are skipped.
+      SONAR_TOKEN:
+        required: false
+        description: |
+          A SonarQube token with permission to analyse the project.  Required for the code
+          quality scan to run, alongside `SONAR_HOST_URL`.
 
     outputs:
       version: 
@@ -216,6 +233,9 @@ jobs:
     steps:
       - name: Check out Git repository
         uses: actions/checkout@v6.0.2
+        with:
+          # To allow for commit tracing in SonarQube code quality checks
+          fetch-depth: 0
       
       - name: Login to Docker Hub
         uses: docker/login-action@v4.2.0
@@ -311,6 +331,34 @@ jobs:
           path: |
             target/site/jacoco/
             **/target/site/jacoco/
+      
+      - name: Check whether SonarQube is Configured
+        id: sq-check
+        run: |
+          if [ -n "$SONAR_HOST_URL" ] && [ -n "$SONAR_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Sonarqube code quality check
+        id: code-quality
+        if: ${{ steps.sq-check.outputs.enabled == 'true' && steps.java-changes.outputs.changed == 'true' }}
+        uses: telicent-oss/shared-workflows/.github/actions/mvn-sast-scanning@main
+        with:
+          sonar-host-url: ${{ secrets.SONAR_HOST_URL }}
+          sonar-token: ${{ secrets.SONAR_TOKEN }}
+          compile: 'false'
+          maven-args: ${{ inputs.MAVEN_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
+          fail-on-quality-gate: ${{ inputs.SONAR_QUALITY_GATE }}
+      
+      - name: Publish SonarQube Dashboard Link
+        if: ${{ !cancelled() && steps.code-quality.outputs.dashboard-url != '' }}
+        run: |
+          echo "### [SonarQube dashboard](${{ steps.code-quality.outputs.dashboard-url }})" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Detect Maven version
         id: project

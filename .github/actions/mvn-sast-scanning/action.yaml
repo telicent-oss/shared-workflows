@@ -1,0 +1,156 @@
+name: SonarQube Maven Scan
+description: |
+  Runs SonarQube analysis for a Maven project via the SonarScanner for Maven (mvn sonar:sonar),
+  optionally enforcing the Quality Gate as a hard failure.
+
+  The caller is responsible for checking out the repository (with fetch-depth: 0 so Sonar can
+  attribute new code correctly) and installing Java and Maven first.
+
+  Per-project configuration lives in the consuming repository's pom.xml, which should pin
+  org.sonarsource.scanner.maven:sonar-maven-plugin in pluginManagement and declare
+  sonar.projectKey (plus sonar.organization for SonarQube Cloud) as properties.  Modules that
+  should not be analysed (e.g. benchmarks) set the sonar.skip property.
+author: Telicent
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  sonar-host-url:
+    required: false
+    default: https://sonarcloud.io
+    description: Base URL of the SonarQube server used for the scan.
+  sonar-token:
+    required: true
+    description: A SonarQube token with permission to analyse the project, supplied from a secret.
+  compile:
+    required: false
+    default: auto
+    description: |
+      Whether to compile the project (mvn test-compile) before scanning, since the Sonar
+      Java analyser requires compiled classes in target/classes:
+      - "false": a build step already ran in this job (single-job workflows)
+      - "true":  the scan runs in a fresh job (fan-in after a matrix build)
+      - "auto":  compile if any module containing src/main/java has no target/classes directory.
+        Errs towards compiling when in doubt; prefer an explicit "true"/"false" in fan-in
+        workflows that download build output for only a subset of modules.
+  coverage-report-paths:
+    required: false
+    default: ""
+    description: |
+      Value for sonar.coverage.jacoco.xmlReportPaths.  Leave empty when tests ran in this job,
+      as the scanner's per-module default of target/site/jacoco/jacoco.xml applies.  When
+      coverage was produced in other jobs and downloaded as artifacts, pass an absolute glob,
+      e.g. "<pwd>/sonar-coverage/**/jacoco.xml"
+  fail-on-quality-gate:
+    required: false
+    default: "true"
+    description: Whether to fail the build when the SonarQube Quality Gate fails.
+  quality-gate-timeout-seconds:
+    required: false
+    default: "300"
+    description: Maximum time, in seconds, to wait for the Quality Gate result.
+  maven-args:
+    required: false
+    default: ""
+    description: Additional arguments to pass to the Maven invocations.
+
+outputs:
+  dashboard-url:
+    description: |
+      URL of the analysis dashboard on the SonarQube server.  Emitted even when the Quality
+      Gate fails, so callers can surface it in job summaries or PR comments.
+    value: ${{ steps.scan.outputs.dashboard-url }}
+
+runs:
+  using: composite
+  steps:
+    - name: Validate inputs
+      shell: bash
+      env:
+        SONAR_TOKEN: ${{ inputs.sonar-token }}
+        GATE_TIMEOUT: ${{ inputs.quality-gate-timeout-seconds }}
+        COMPILE: ${{ inputs.compile }}
+        FAIL_ON_GATE: ${{ inputs.fail-on-quality-gate }}
+      run: |
+        if [ -z "$SONAR_TOKEN" ]; then
+          echo "::error::A SonarQube token must be provided using the 'sonar-token' input."
+          exit 1
+        fi
+        if ! [[ "$GATE_TIMEOUT" =~ ^[0-9]+$ ]] || [ "$GATE_TIMEOUT" -le 0 ]; then
+          echo "::error::'quality-gate-timeout-seconds' must be a positive whole number, got '$GATE_TIMEOUT'."
+          exit 1
+        fi
+        # Unquoted YAML booleans reach the action as strings of unpredictable case,
+        # hence the case-insensitive comparison here and in later steps
+        case "$(echo "$COMPILE" | tr '[:upper:]' '[:lower:]')" in
+          true|false|auto) ;;
+          *)
+            echo "::error::'compile' must be one of 'true', 'false' or 'auto', got '$COMPILE'."
+            exit 1
+            ;;
+        esac
+        case "$(echo "$FAIL_ON_GATE" | tr '[:upper:]' '[:lower:]')" in
+          true|false) ;;
+          *)
+            echo "::error::'fail-on-quality-gate' must be 'true' or 'false', got '$FAIL_ON_GATE'."
+            exit 1
+            ;;
+        esac
+
+    - name: Compile project (if needed)
+      shell: bash
+      env:
+        COMPILE: ${{ inputs.compile }}
+        EXTRA_MAVEN_ARGS: ${{ inputs.maven-args }}
+      run: |
+        case "$(echo "$COMPILE" | tr '[:upper:]' '[:lower:]')" in
+          true)  NEED_COMPILE=true ;;
+          false) NEED_COMPILE=false ;;
+          auto)
+            # A missed module makes the scan fail or under-analyse, while a redundant compile
+            # only costs time, so any module with sources but no classes triggers a compile
+            NEED_COMPILE=false
+            while IFS= read -r srcdir; do
+              module="${srcdir%/src/main/java}"
+              if [ ! -d "$module/target/classes" ]; then
+                echo "::notice::compile=auto: '$module' has sources but no target/classes."
+                NEED_COMPILE=true
+                break
+              fi
+            done < <(find . -type d -path '*/src/main/java' -not -path '*/target/*')
+            echo "::notice::compile=auto resolved to compile=$NEED_COMPILE"
+            ;;
+        esac
+        if [ "$NEED_COMPILE" = "true" ]; then
+          # Sonar's Java analyser needs bytecode, but tests are never rerun here, so coverage
+          # must be supplied via the coverage-report-paths input in this scenario
+          mvn test-compile --batch-mode -DskipTests -Dgpg.skip -Dcyclonedx.skip \
+            -Dmaven.javadoc.skip -Dmaven.source.skip -q $EXTRA_MAVEN_ARGS
+        fi
+
+    - name: SonarQube Analysis
+      id: scan
+      shell: bash
+      env:
+        SONAR_TOKEN: ${{ inputs.sonar-token }}
+        SONAR_HOST_URL: ${{ inputs.sonar-host-url }}
+        COVERAGE_PATHS: ${{ inputs.coverage-report-paths }}
+        FAIL_ON_GATE: ${{ inputs.fail-on-quality-gate }}
+        GATE_TIMEOUT: ${{ inputs.quality-gate-timeout-seconds }}
+        EXTRA_MAVEN_ARGS: ${{ inputs.maven-args }}
+      run: |
+        args=(sonar:sonar --batch-mode
+              "-Dsonar.host.url=$SONAR_HOST_URL"
+              "-Dsonar.qualitygate.wait=$(echo "$FAIL_ON_GATE" | tr '[:upper:]' '[:lower:]')"
+              "-Dsonar.qualitygate.timeout=$GATE_TIMEOUT")
+        if [ -n "$COVERAGE_PATHS" ]; then
+          args+=("-Dsonar.coverage.jacoco.xmlReportPaths=$COVERAGE_PATHS")
+        fi
+        status=0
+        mvn "${args[@]}" $EXTRA_MAVEN_ARGS || status=$?
+        REPORT=$(find . -path '*/target/sonar/report-task.txt' -print -quit)
+        if [ -n "$REPORT" ]; then
+          echo "dashboard-url=$(grep '^dashboardUrl=' "$REPORT" | cut -d'=' -f2-)" >> "$GITHUB_OUTPUT"
+        fi
+        exit $status
