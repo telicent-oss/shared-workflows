@@ -129,7 +129,9 @@ runs:
         if [ "$NEED_COMPILE" = "true" ]; then
           # Sonar's Java analyser needs bytecode, but tests are never rerun here, so coverage
           # must be supplied via the coverage-report-paths input in this scenario
-          mvn test-compile -P${{ inputs.maven-profiles }} --batch-mode -DskipTests -Dgpg.skip -Dcyclonedx.skip \
+          # Need to do a full package as some projects only build supplementary artifacts (which are also test 
+          # dependencies) in the package phase
+          mvn package -P${{ inputs.maven-profiles }} --batch-mode -DskipTests -Dgpg.skip -Dcyclonedx.skip \
             -Dmaven.javadoc.skip -Dmaven.source.skip -q $EXTRA_MAVEN_ARGS
         fi
 
