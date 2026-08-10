@@ -405,6 +405,7 @@ jobs:
           compile: 'true'
           coverage-report-paths: ${{ github.workspace }}/sonar-coverage/**/jacoco.xml
           maven-args: ${{ inputs.MAVEN_ARGS }}
+          maven-profiles: ${{ inputs.DOCKER_PROFILE }}
           fail-on-quality-gate: ${{ inputs.SONAR_QUALITY_GATE }}
       
       - name: Publish SonarQube Dashboard Link

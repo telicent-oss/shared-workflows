@@ -54,6 +54,10 @@ inputs:
     required: false
     default: ""
     description: Additional arguments to pass to the Maven invocations.
+  maven-profiles:
+    required: false
+    default: "docker"
+    description: Specifies the Maven profile(s) to activate (if needed)
 
 outputs:
   dashboard-url:
@@ -125,7 +129,7 @@ runs:
         if [ "$NEED_COMPILE" = "true" ]; then
           # Sonar's Java analyser needs bytecode, but tests are never rerun here, so coverage
           # must be supplied via the coverage-report-paths input in this scenario
-          mvn test-compile --batch-mode -DskipTests -Dgpg.skip -Dcyclonedx.skip \
+          mvn test-compile -P${{ inputs.maven-profiles }} --batch-mode -DskipTests -Dgpg.skip -Dcyclonedx.skip \
             -Dmaven.javadoc.skip -Dmaven.source.skip -q $EXTRA_MAVEN_ARGS
         fi
 
@@ -148,7 +152,7 @@ runs:
           args+=("-Dsonar.coverage.jacoco.xmlReportPaths=$COVERAGE_PATHS")
         fi
         status=0
-        mvn "${args[@]}" $EXTRA_MAVEN_ARGS || status=$?
+        mvn "${args[@]}" -P${{ inputs.maven-profiles }} $EXTRA_MAVEN_ARGS || status=$?
         REPORT=$(find . -path '*/target/sonar/report-task.txt' -print -quit)
         if [ -n "$REPORT" ]; then
           echo "dashboard-url=$(grep '^dashboardUrl=' "$REPORT" | cut -d'=' -f2-)" >> "$GITHUB_OUTPUT"

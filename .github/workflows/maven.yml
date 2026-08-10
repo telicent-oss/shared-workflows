@@ -353,6 +353,7 @@ jobs:
           sonar-token: ${{ secrets.SONAR_TOKEN }}
           compile: 'false'
           maven-args: ${{ inputs.MAVEN_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
+          maven-profiles: ${{ inputs.DOCKER_PROFILE }}
           fail-on-quality-gate: ${{ inputs.SONAR_QUALITY_GATE }}
       
       - name: Publish SonarQube Dashboard Link
