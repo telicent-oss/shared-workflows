@@ -131,7 +131,7 @@ runs:
         VERSION: ${{ inputs.version }}
         TEMP_DIR: ${{ runner.temp }}
       run: |
-        oras cp oci://$ECR_REGISTRY/$IMAGE:$VERSION oci://quay.io/$QUAY_ORG/$IMAGE:$VERSION 2>&1 | tee "${TEMP_DIR}/docker-push-output.txt"
+        oras cp $ECR_REGISTRY/$IMAGE:$VERSION quay.io/$QUAY_ORG/$IMAGE:$VERSION 2>&1 | tee "${TEMP_DIR}/docker-push-output.txt"
         DIGEST=$(grep "^Digest" "${TEMP_DIR}/docker-push-output.txt" | awk '{print $NF}')
         [[ -n "$DIGEST" ]] || { echo "Failed to parse digest from oras output"; exit 1; }
         echo "image-digest=$DIGEST" >> "$GITHUB_OUTPUT"
@@ -154,7 +154,7 @@ runs:
         VERSION: ${{ inputs.version }}
         TEMP_DIR: ${{ runner.temp }}
       run: |
-        oras cp oci://$ECR_REGISTRY/charts/$CHART:$VERSION oci://quay.io/$QUAY_ORG/charts/$CHART:$VERSION 2>&1 | tee "${TEMP_DIR}/helm-push-output.txt"
+        oras cp $ECR_REGISTRY/charts/$CHART:$VERSION quay.io/$QUAY_ORG/charts/$CHART:$VERSION 2>&1 | tee "${TEMP_DIR}/helm-push-output.txt"
         DIGEST=$(grep "^Digest" "${TEMP_DIR}/helm-push-output.txt" | awk '{print $NF}')
         [[ -n "$DIGEST" ]] || { echo "Failed to parse digest from oras output"; exit 1; }
         echo "chart-ref=quay.io/$QUAY_ORG/charts/$CHART:$VERSION@$DIGEST" >> "$GITHUB_OUTPUT"
