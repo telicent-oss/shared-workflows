@@ -237,6 +237,7 @@ jobs:
       MAVEN_REPOSITORY_ID: ${{ inputs.MAVEN_REPOSITORY_ID }}
       JAVA_VERSION: ${{ inputs.JAVA_VERSION }}
       JDK: ${{ inputs.JDK }}
+      MAIN_BRANCH: ${{ inputs.MAIN_BRANCH }}
     secrets: inherit
   
   prepare-sonarqube:

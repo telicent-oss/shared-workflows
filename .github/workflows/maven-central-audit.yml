@@ -23,6 +23,14 @@ on:
         default: temurin
         description: |
           Specifies the JDK to use, defaults to `temurin`.
+      MAIN_BRANCH:
+        required: false
+        type: string
+        default: main
+        description: |
+          Specifies the main branch for the repository.
+
+          Used in determining whether there are relevant changes that should trigger the Maven Central Audit.
     secrets:
       MVN_USER_NAME:
         required: false
@@ -78,7 +86,32 @@ jobs:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
+      # Only changes to pom.xml files are likely to have significant changes on release size
+      # While code changes will change release size marginally its only actual POM changes, e.g.,
+      # introducing new modules, reconfiguring plugins etc. that are likely to cause substantial
+      # changes in the release size
+      #
+      # Therefore by checking whether the POM files have changed we can avoid running the audit
+      # on branches that don't affect this
+      #
+      # Note that we always run the audit on main branch builds as an ongoing sanity check.  There
+      # are some non-POM changes that could cause substantial changes in the release size, e.g., a 
+      # large resource file added to a module, but we expect those to be rare and generally developers
+      # would spot those and query them during the PR reviews.
+      - name: Check whether any POM files changed
+        id: pom-changes
+        uses: rvesse/detect-changes-action@v1
+        with:
+          base: ${{ inputs.MAIN_BRANCH }}
+          pattern: pom.xml
+          flags: -F
+          # Ensures we always run audit when building on main
+          output-on-base: true
+          summary: false
+          notices: false
+
       - name: Run Maven Central Audit
+        if: ${{ steps.pom-changes.outputs.changed == 'true' }}
         uses: telicent-oss/mvn-central-audit@v1
         with:
           # Specify limits, if a release would be above this size then the build will be failed
