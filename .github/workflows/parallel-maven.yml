@@ -117,8 +117,26 @@ on:
         type: boolean
         default: true
         description: |
-          Whether a failing SonarQube Quality Gate fails the build.  Set to false while a project is being brought 
-          up to standard, so analysis is still published without blocking the build.
+          Whether SonarQube runs at all in this workflow.  When true (the default) the scan is
+          enforced on branch builds and reported without blocking on the main branch, see
+          `SONAR_MODE` for the detail.  Set to false to skip the SonarQube job entirely.
+      SONAR_MODE:
+        required: false
+        type: string
+        default: ""
+        description: |
+          Overrides where the SonarQube Quality Gate is enforced.  One of:
+          - `enforce`: fail the build on a failing Quality Gate, wherever it runs
+          - `warn`: report a failing Quality Gate as a warning and a job summary entry, never failing the build
+          - `off`: skip the SonarQube job entirely
+
+          Left empty (the default) the mode is derived from the ref: `enforce` on branch builds,
+          `warn` on the main branch and `release/*` branches, and `off` on tags, so that merges
+          and release branch work are not blocked and tag workflows do not spend time re-running
+          SonarQube. `SONAR_QUALITY_GATE: false` also forces `off`.
+
+          Set `warn` explicitly while a project is being brought up to standard, in preference to
+          disabling SonarQube outright.
     secrets:
       MVN_USER_NAME:
         required: false
@@ -257,8 +275,40 @@ jobs:
         env:
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      # Resolved here rather than inline at the point of use so that the policy - what is
+      # enforced where - lives in exactly one place per workflow and is visible in the logs.
+      - name: Resolve the Quality Gate mode
+        id: sq-mode
+        run: |
+          if [ "$GATE_ENABLED" != "true" ]; then
+            MODE=off
+            REASON="SONAR_QUALITY_GATE is false"
+          elif [ -n "$MODE_OVERRIDE" ]; then
+            MODE="$MODE_OVERRIDE"
+            REASON="SONAR_MODE was set explicitly"
+          elif [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            MODE=off
+            REASON="this is a tag build, and release evidence comes from sonar-report-generation rather than a fresh build-time scan"
+          elif [[ "$GITHUB_REF_NAME" == release/* ]]; then
+            MODE=warn
+            REASON="this is a release branch build, and release work must not be blocked by a code quality verdict"
+          elif [ "$GITHUB_REF_NAME" = "$MAIN_BRANCH" ]; then
+            MODE=warn
+            REASON="this is a build of the main branch, and merges must not be blocked by a code quality verdict"
+          else
+            MODE=enforce
+            REASON="this is a branch build, which is where the Quality Gate is enforced"
+          fi
+          echo "Quality Gate mode '$MODE': $REASON."
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+        env:
+          GATE_ENABLED: ${{ inputs.SONAR_QUALITY_GATE }}
+          MODE_OVERRIDE: ${{ inputs.SONAR_MODE }}
+          MAIN_BRANCH: ${{ inputs.MAIN_BRANCH }}
     outputs:
       is-configured: ${{ steps.sq-check.outputs.enabled }}
+      quality-gate-mode: ${{ steps.sq-mode.outputs.mode }}
   
   build:
     needs: 
@@ -329,8 +379,9 @@ jobs:
           base: ${{ inputs.MAIN_BRANCH }}
           pattern: src/|pom.xml
           flags: -E
-          # Ensures we always run tests when building on main
-          output-on-base: true
+          # Unlike the build matrix, there is no value in re-analysing main when nothing under
+          # src/ or pom.xml changed.
+          output-on-base: false
           summary: false
           notices: false
 
@@ -364,7 +415,16 @@ jobs:
       - build
     permissions: 
       contents: read
-    if: ${{ needs.prepare-sonarqube.outputs.is-configured == 'true' }}
+    # Dependabot only ever bumps dependency declarations, and release-please release
+    # commits only bump versions and changelogs, so neither can change a Quality Gate
+    # outcome.  Skipping them avoids a scan, and a wait for the verdict, that cannot tell
+    # us anything - and in release-please's case avoids a release commit being the thing
+    # that reports a pre-existing quality problem.
+    if: >-
+      ${{ needs.prepare-sonarqube.outputs.is-configured == 'true'
+          && needs.prepare-sonarqube.outputs.quality-gate-mode != 'off'
+          && github.actor != 'dependabot[bot]'
+          && !startsWith(github.event.head_commit.message, 'chore(main): release') }}
     steps:
       - name: Check out Git repository
         uses: actions/checkout@v6.0.2
@@ -407,7 +467,7 @@ jobs:
           coverage-report-paths: ${{ github.workspace }}/sonar-coverage/**/jacoco.xml
           maven-args: ${{ inputs.MAVEN_ARGS }}
           maven-profiles: ${{ inputs.DOCKER_PROFILE }}
-          fail-on-quality-gate: ${{ inputs.SONAR_QUALITY_GATE }}
+          quality-gate: ${{ needs.prepare-sonarqube.outputs.quality-gate-mode }}
       
       - name: Publish SonarQube Dashboard Link
         if: ${{ !cancelled() && steps.code-quality.outputs.dashboard-url != '' }}
