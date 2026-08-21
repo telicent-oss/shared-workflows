@@ -21,11 +21,7 @@ on:
 
 jobs:
   cache-dependencies:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-      fail-fast: false
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     permissions:
       contents: read
     steps:
