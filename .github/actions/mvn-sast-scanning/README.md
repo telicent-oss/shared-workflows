@@ -1,8 +1,8 @@
 # Maven Static Application Security Testing Action
 
 This GitHub action runs a SonarQube analysis over a Maven project using the
-[SonarScanner for Maven][1] (`mvn sonar:sonar`) and, by default, enforces the
-project's quality gate as a hard failure.
+[SonarScanner for Maven][1] (`mvn sonar:sonar`) and reports, and optionally
+enforces, the project's quality gate.
 
 It is the Maven counterpart to the [sast-scanning][2] action, which uses the
 standalone Sonar Scanner CLI. Prefer this action for Maven projects: the Maven
@@ -18,8 +18,11 @@ When invoked, the action will carry out the following steps.
   the scanner to fail opaquely.
 * Compile the project if required (see [Compilation](#compilation)), since the
   Sonar Java analyser needs bytecode in `target/classes` to work from.
-* Run `mvn sonar:sonar`, waiting for the quality gate result and failing the
-  job when the gate is not passing, unless `fail-on-quality-gate` is `false`.
+* Run `mvn sonar:sonar` and, unless `quality-gate` is `off`, wait for the
+  quality gate result. Whether a failing gate fails the job depends on
+  `quality-gate` — see [The quality gate](#the-quality-gate).
+* Distinguish a quality gate verdict from a scan that never reached the server:
+  the latter fails the job in every mode, so `warn` cannot hide a broken scan.
 * Emit the analysis dashboard URL as an output, even when the quality gate
   fails — which is exactly when a developer needs the link.
 
@@ -117,7 +120,8 @@ whether the action produces them itself (via `mvn test-compile`):
 | `sonar-token` | | Yes | A SonarQube token with permission to analyse the project. |
 | `compile` | `auto` | No | Whether to compile before scanning: `true`, `false` or `auto`. See [Compilation](#compilation). |
 | `coverage-report-paths` | | No | Value for `sonar.coverage.jacoco.xmlReportPaths`. Leave empty when tests ran in this job, as the scanner's per-module default of `target/site/jacoco/jacoco.xml` applies. When coverage was produced in other jobs and downloaded as artifacts, pass an absolute glob. |
-| `fail-on-quality-gate` | `'true'` | No | Whether to fail the build when the quality gate fails. |
+| `quality-gate` | `warn` | No | `enforce`, `warn` or `off`. See [The quality gate](#the-quality-gate). |
+| `fail-on-quality-gate` | | No | **Deprecated** — use `quality-gate`. `true` maps to `enforce`, `false` maps to `off`. |
 | `quality-gate-timeout-seconds` | `'300'` | No | Maximum time to wait for the quality gate result. |
 | `maven-args` | | No | Additional arguments for the Maven invocations, for example `-pl` or extra `-D` properties. |
 
@@ -126,6 +130,32 @@ whether the action produces them itself (via `mvn test-compile`):
 | Output | Description |
 | :--- | :--- |
 | `dashboard-url` | URL of the analysis dashboard on the SonarQube server. Emitted even when the quality gate fails, so callers can surface it in job summaries or PR comments. |
+| `quality-gate-status` | The observed gate result, `PASSED`, `FAILED` or empty when not observed. Populated in `warn` mode too, so a caller can route a non-blocking failure to a notification or check run. |
+
+## The Quality Gate
+
+`quality-gate` controls two separate decisions — whether the verdict is
+*observed*, and whether it is *enforced*.
+
+| Mode | Waits for the verdict | Fails the build | Reports the result |
+| :--- | :--- | :--- | :--- |
+| `enforce` | yes | yes | yes |
+| `warn` | yes | no | yes — warning annotation and job summary |
+| `off` | no | no | no — nothing is observed |
+
+`off` is genuinely silent: the scanner submits the analysis and returns
+without asking for the result, so there is nothing left to report. To unblock
+a project's build while it is brought up to standard, use `warn`, not `off`.
+
+A scan that fails before reaching the server — bad credentials, a compilation
+failure, a network problem — is a tooling failure rather than a verdict, and
+fails the build in every mode.
+
+Note that a gate which does not resolve within
+`quality-gate-timeout-seconds` is indistinguishable from one that failed, so a
+slow analysis queue reports as a failure. That is a reason to prefer `warn` on
+refs which must not be blocked.
+
 
 ## Usage
 
@@ -212,7 +242,7 @@ still published but a failing gate does not block the build.
         uses: telicent-oss/shared-workflows/.github/actions/mvn-sast-scanning@main
         with:
           sonar-token: ${{ secrets.SONAR_TOKEN }}
-          fail-on-quality-gate: 'false'
+          quality-gate: warn
 ```
 
 ### Surfacing the Dashboard URL
