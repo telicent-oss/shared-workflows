@@ -120,6 +120,27 @@ jobs:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
+      # NB - This is needed because sometimes Maven won't resolve internal project dependencies
+      #      if this is the very first build for that version e.g. release builds
+      - name: Quick Maven Build
+        run: |
+          mvn install -DskipTests -Dgpg.skip -Dcyclonedx.skip -Dmaven.javadoc.skip -Dmaven.source.skip -Dlombok.delombok.skip -q
+
+      - name: Detect Maven version
+        id: project
+        run: |
+          echo version=$(mvn -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_OUTPUT
+
+      # Ensure that the declared Maven Project version matches the Git Tag applied to this release commit
+      # If these are not correct this will cause problems for downstream package consumers that rely on this metadata in
+      # the pom.xml being accurate
+      - name: Maven Release Version Sanity Check
+        run: |
+          if [ "${{ steps.project.outputs.version }}" != "${{ github.ref_name }}" ]; then
+            echo "::error::Maven project declares version ${{ steps.project.outputs.version }} BUT Git tag is ${{ github.ref_name }} which DOES NOT match.  This mismatch will cause problems for downstream package consumers and is not permitted."
+            exit 1
+          fi
+
       # Note this job only runs after a successful build job so safe to skip tests at this point
       - name: Deploy Maven Release
         run: |
@@ -128,11 +149,6 @@ jobs:
           else
             mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }} -DskipTests
           fi
-
-      - name: Detect Maven version
-        id: project
-        run: |
-          echo version=$(mvn -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_OUTPUT
 
       # If a CHANGELOG file has been provided find the developer curated release notes for 
       # the release from that file
