@@ -125,8 +125,26 @@ on:
         type: boolean
         default: true
         description: |
-          Whether a failing SonarQube Quality Gate fails the build.  Set to false while a project is being brought 
-          up to standard, so analysis is still published without blocking the build.
+          Whether SonarQube runs at all in this workflow.  When true (the default) the scan is
+          enforced on branch builds and reported without blocking on the main branch, see
+          `SONAR_MODE` for the detail.  Set to false to skip the SonarQube job entirely.
+      SONAR_MODE:
+        required: false
+        type: string
+        default: ""
+        description: |
+          Overrides where the SonarQube Quality Gate is enforced.  One of:
+          - `enforce`: fail the build on a failing Quality Gate, wherever it runs
+          - `warn`: report a failing Quality Gate as a warning and a job summary entry, never failing the build
+          - `off`: skip the SonarQube job entirely
+
+          Left empty (the default) the mode is derived from the ref: `enforce` on branch builds,
+          `warn` on the main branch and `release/*` branches, and `off` on tags, so that merges
+          and release branch work are not blocked and tag workflows do not spend time re-running
+          SonarQube. `SONAR_QUALITY_GATE: false` also forces `off`.
+
+          Set `warn` explicitly while a project is being brought up to standard, in preference to
+          disabling SonarQube outright.
     secrets:
       MVN_USER_NAME:
         required: false
@@ -217,10 +235,63 @@ jobs:
       MAIN_BRANCH: ${{ inputs.MAIN_BRANCH }}
     secrets: inherit
 
+  # Secrets cannot be referenced from a job-level 'if', so whether SonarQube is configured
+  # is resolved in a job of its own and consumed via 'needs'.  The Quality Gate mode is
+  # resolved here too, so the policy - what is enforced where - lives in one place.
+  prepare-sonarqube:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check whether SonarQube is Configured
+        id: sq-check
+        run: |
+          if [ -n "$SONAR_HOST_URL" ] && [ -n "$SONAR_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Resolve the Quality Gate mode
+        id: sq-mode
+        run: |
+          if [ "$GATE_ENABLED" != "true" ]; then
+            MODE=off
+            REASON="SONAR_QUALITY_GATE is false"
+          elif [ -n "$MODE_OVERRIDE" ]; then
+            MODE="$MODE_OVERRIDE"
+            REASON="SONAR_MODE was set explicitly"
+          elif [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            MODE=off
+            REASON="this is a tag build, and release evidence comes from sonar-report-generation rather than a fresh build-time scan"
+          elif [[ "$GITHUB_REF_NAME" == release/* ]]; then
+            MODE=warn
+            REASON="this is a release branch build, and release work must not be blocked by a code quality verdict"
+          elif [ "$GITHUB_REF_NAME" = "$MAIN_BRANCH" ]; then
+            MODE=warn
+            REASON="this is a build of the main branch, and merges must not be blocked by a code quality verdict"
+          else
+            MODE=enforce
+            REASON="this is a branch build, which is where the Quality Gate is enforced"
+          fi
+          echo "Quality Gate mode '$MODE': $REASON."
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+        env:
+          GATE_ENABLED: ${{ inputs.SONAR_QUALITY_GATE }}
+          MODE_OVERRIDE: ${{ inputs.SONAR_MODE }}
+          MAIN_BRANCH: ${{ inputs.MAIN_BRANCH }}
+    outputs:
+      is-configured: ${{ steps.sq-check.outputs.enabled }}
+      quality-gate-mode: ${{ steps.sq-mode.outputs.mode }}
+
   build:
-    needs: 
+    needs:
       - cache-dependencies
       - cache-docker-images
+      - prepare-sonarqube
     runs-on: ubuntu-latest
     env:
       # These have to be exported into the environment due to how the setup-java action configures the Maven
@@ -325,38 +396,94 @@ jobs:
             ${{ inputs.REMOTE_VEX }}
 
       - name: Upload JaCoCo Report
-        if: ${{ inputs.PUBLISH_JACOCO_REPORT }}
+        # Also uploaded when SonarQube is configured, since the scan now runs in its own
+        # job and needs the coverage this job produced
+        if: ${{ inputs.PUBLISH_JACOCO_REPORT || needs.prepare-sonarqube.outputs.is-configured == 'true' }}
         uses: actions/upload-artifact@v7
         with:
           name: jacoco-report
           path: |
             target/site/jacoco/
             **/target/site/jacoco/
-      
-      - name: Check whether SonarQube is Configured
-        id: sq-check
+
+      - name: Detect Maven version
+        id: project
         run: |
-          if [ -n "$SONAR_HOST_URL" ] && [ -n "$SONAR_TOKEN" ]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-          fi
-        env:
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          echo version=$(mvn -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_OUTPUT
+
+  # SonarQube runs as its own job rather than as a step in 'build', so that a code quality
+  # verdict can never fail the job that produces the artifacts, sets the version output and
+  # gates the release.  This mirrors parallel-maven.yml.  Nothing depends on this job.
+  sonarqube-code-scan:
+    name: Scan code with sonarqube
+    runs-on: ubuntu-latest
+    needs:
+      - prepare-sonarqube
+      - build
+    permissions:
+      contents: read
+    # Dependabot only ever bumps dependency declarations, and release-please release
+    # commits only bump versions and changelogs, so neither can change a Quality Gate
+    # outcome.  Skipping them avoids a scan, and a wait for the verdict, that cannot tell
+    # us anything - and in release-please's case avoids a release commit being the thing
+    # that reports a pre-existing quality problem.
+    if: >-
+      ${{ needs.prepare-sonarqube.outputs.is-configured == 'true'
+          && needs.prepare-sonarqube.outputs.quality-gate-mode != 'off'
+          && github.actor != 'dependabot[bot]'
+          && !startsWith(github.event.head_commit.message, 'chore(main): release') }}
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v6.0.2
+        with:
+          # To allow for commit tracing in SonarQube code quality checks
+          fetch-depth: 0
+
+      - name: Install Java and Maven
+        uses: actions/setup-java@v5.4.0
+        with:
+          java-version: ${{ inputs.JAVA_VERSION }}
+          distribution: ${{ inputs.JDK }}
+          cache: maven
+
+      - name: Check whether any Java code changed
+        id: java-changes
+        uses: rvesse/detect-changes-action@v1
+        with:
+          base: ${{ inputs.MAIN_BRANCH }}
+          pattern: src/|pom.xml
+          flags: -E
+          # Deliberately NOT output-on-base here.  The build job forces this true on the
+          # base branch so that tests always run on main, but there is no equivalent
+          # reason to re-analyse main when nothing under src/ or pom.xml changed.
+          output-on-base: false
+          summary: false
+          notices: false
+
+      - name: Download coverage reports
+        if: ${{ steps.java-changes.outputs.changed == 'true' }}
+        # Tolerated: a project with no JaCoCo output produces no artifact to download.
+        # Missing coverage degrades the analysis, it should not fail the scan.
+        continue-on-error: true
+        uses: actions/download-artifact@v7
+        with:
+          name: jacoco-report
+          path: sonar-coverage
 
       - name: Sonarqube code quality check
         id: code-quality
-        if: ${{ steps.sq-check.outputs.enabled == 'true' && steps.java-changes.outputs.changed == 'true' }}
+        if: ${{ steps.java-changes.outputs.changed == 'true' }}
         uses: telicent-oss/shared-workflows/.github/actions/mvn-sast-scanning@main
         with:
           sonar-host-url: ${{ secrets.SONAR_HOST_URL }}
           sonar-token: ${{ secrets.SONAR_TOKEN }}
-          compile: 'false'
-          maven-args: ${{ inputs.MAVEN_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
+          # This job did not build, so the Java analyser has no bytecode to work from
+          compile: 'true'
+          coverage-report-paths: ${{ github.workspace }}/sonar-coverage/**/jacoco.xml
+          maven-args: ${{ inputs.MAVEN_ARGS }}
           maven-profiles: ${{ inputs.DOCKER_PROFILE }}
-          fail-on-quality-gate: ${{ inputs.SONAR_QUALITY_GATE }}
-      
+          quality-gate: ${{ needs.prepare-sonarqube.outputs.quality-gate-mode }}
+
       - name: Publish SonarQube Dashboard Link
         if: ${{ !cancelled() && steps.code-quality.outputs.dashboard-url != '' }}
         run: |

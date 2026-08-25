@@ -42,10 +42,33 @@ inputs:
       as the scanner's per-module default of target/site/jacoco/jacoco.xml applies.  When
       coverage was produced in other jobs and downloaded as artifacts, pass an absolute glob,
       e.g. "<pwd>/sonar-coverage/**/jacoco.xml"
+  quality-gate:
+    required: false
+    default: ""
+    description: |
+      How the SonarQube Quality Gate is applied:
+      - "enforce": wait for the Quality Gate and fail the build when it fails
+      - "warn":    wait for the Quality Gate and report a failure as a warning and a job
+                   summary entry, without failing the build
+      - "off":     publish the analysis without waiting for the Quality Gate at all, so
+                   no result is observed and nothing is reported
+
+      Defaults to "warn" when neither this nor the deprecated 'fail-on-quality-gate'
+      input is set, so that a caller which has not thought about gating gets the signal
+      without having the build blocked by it.
+
+      Note that "warn" only downgrades a genuine Quality Gate verdict.  A scan that
+      fails before reaching the server (bad credentials, a compilation failure, a
+      network problem) is a tooling failure rather than a verdict, and always fails the
+      build regardless of this setting.
   fail-on-quality-gate:
     required: false
-    default: "true"
-    description: Whether to fail the build when the SonarQube Quality Gate fails.
+    default: ""
+    description: |
+      DEPRECATED - use 'quality-gate' instead.  "true" maps to quality-gate=enforce and
+      "false" maps to quality-gate=off.  Note that "false" therefore means the Quality
+      Gate result is never observed; use quality-gate=warn to keep the result visible
+      without failing the build.
   quality-gate-timeout-seconds:
     required: false
     default: "300"
@@ -65,16 +88,25 @@ outputs:
       URL of the analysis dashboard on the SonarQube server.  Emitted even when the Quality
       Gate fails, so callers can surface it in job summaries or PR comments.
     value: ${{ steps.scan.outputs.dashboard-url }}
+  quality-gate-status:
+    description: |
+      The observed Quality Gate result, one of "PASSED", "FAILED" or "" (not observed,
+      because quality-gate was "off" or the scan never reached the server).  Populated in
+      "warn" mode as well as "enforce", so callers can route a non-blocking failure to a
+      notification, a check run or a tracking issue.
+    value: ${{ steps.scan.outputs.quality-gate-status }}
 
 runs:
   using: composite
   steps:
-    - name: Validate inputs
+    - name: Validate inputs and resolve the Quality Gate mode
+      id: mode
       shell: bash
       env:
         SONAR_TOKEN: ${{ inputs.sonar-token }}
         GATE_TIMEOUT: ${{ inputs.quality-gate-timeout-seconds }}
         COMPILE: ${{ inputs.compile }}
+        GATE_MODE: ${{ inputs.quality-gate }}
         FAIL_ON_GATE: ${{ inputs.fail-on-quality-gate }}
       run: |
         if [ -z "$SONAR_TOKEN" ]; then
@@ -94,13 +126,40 @@ runs:
             exit 1
             ;;
         esac
-        case "$(echo "$FAIL_ON_GATE" | tr '[:upper:]' '[:lower:]')" in
-          true|false) ;;
+        # Resolve the Quality Gate mode.  'quality-gate' wins; the deprecated boolean is
+        # honoured for callers that have not migrated yet; absent both, default to 'warn'
+        # so gating is opt-in but the result is still reported.
+        GATE_MODE="$(echo "$GATE_MODE" | tr '[:upper:]' '[:lower:]')"
+        FAIL_ON_GATE="$(echo "$FAIL_ON_GATE" | tr '[:upper:]' '[:lower:]')"
+
+        if [ -n "$GATE_MODE" ]; then
+          if [ -n "$FAIL_ON_GATE" ]; then
+            echo "::warning::Both 'quality-gate' and the deprecated 'fail-on-quality-gate' were supplied; 'quality-gate=$GATE_MODE' takes precedence."
+          fi
+        elif [ -n "$FAIL_ON_GATE" ]; then
+          case "$FAIL_ON_GATE" in
+            true)  GATE_MODE=enforce ;;
+            false) GATE_MODE=off ;;
+            *)
+              echo "::error::'fail-on-quality-gate' must be 'true' or 'false', got '$FAIL_ON_GATE'."
+              exit 1
+              ;;
+          esac
+          echo "::warning::'fail-on-quality-gate' is deprecated; use 'quality-gate: $GATE_MODE' instead. Note that 'quality-gate: warn' reports a failing gate without blocking the build."
+        else
+          GATE_MODE=warn
+        fi
+
+        case "$GATE_MODE" in
+          enforce|warn|off) ;;
           *)
-            echo "::error::'fail-on-quality-gate' must be 'true' or 'false', got '$FAIL_ON_GATE'."
+            echo "::error::'quality-gate' must be one of 'enforce', 'warn' or 'off', got '$GATE_MODE'."
             exit 1
             ;;
         esac
+
+        echo "Quality Gate mode: $GATE_MODE"
+        echo "mode=$GATE_MODE" >> "$GITHUB_OUTPUT"
 
     - name: Compile project (if needed)
       shell: bash
@@ -142,21 +201,76 @@ runs:
         SONAR_TOKEN: ${{ inputs.sonar-token }}
         SONAR_HOST_URL: ${{ inputs.sonar-host-url }}
         COVERAGE_PATHS: ${{ inputs.coverage-report-paths }}
-        FAIL_ON_GATE: ${{ inputs.fail-on-quality-gate }}
+        GATE_MODE: ${{ steps.mode.outputs.mode }}
         GATE_TIMEOUT: ${{ inputs.quality-gate-timeout-seconds }}
         EXTRA_MAVEN_ARGS: ${{ inputs.maven-args }}
       run: |
+        # Waiting for the verdict is decided by whether we want to observe it, not by
+        # whether we want to fail on it - 'warn' waits too, otherwise there would be
+        # nothing to report.
+        case "$GATE_MODE" in
+          enforce|warn) WAIT=true ;;
+          off)          WAIT=false ;;
+        esac
+
         args=(sonar:sonar --batch-mode
               "-Dsonar.host.url=$SONAR_HOST_URL"
-              "-Dsonar.qualitygate.wait=$(echo "$FAIL_ON_GATE" | tr '[:upper:]' '[:lower:]')"
+              "-Dsonar.qualitygate.wait=$WAIT"
               "-Dsonar.qualitygate.timeout=$GATE_TIMEOUT")
         if [ -n "$COVERAGE_PATHS" ]; then
           args+=("-Dsonar.coverage.jacoco.xmlReportPaths=$COVERAGE_PATHS")
         fi
         status=0
         mvn "${args[@]}" -P${{ inputs.maven-profiles }} $EXTRA_MAVEN_ARGS || status=$?
+
+        # report-task.txt is only written once the scanner has successfully submitted the
+        # analysis, so its presence is what separates a Quality Gate verdict from a
+        # tooling failure below.
         REPORT=$(find . -path '*/target/sonar/report-task.txt' -print -quit)
+        DASHBOARD=""
         if [ -n "$REPORT" ]; then
-          echo "dashboard-url=$(grep '^dashboardUrl=' "$REPORT" | cut -d'=' -f2-)" >> "$GITHUB_OUTPUT"
+          DASHBOARD=$(grep '^dashboardUrl=' "$REPORT" | cut -d'=' -f2-)
+          echo "dashboard-url=$DASHBOARD" >> "$GITHUB_OUTPUT"
         fi
+
+        if [ "$status" -eq 0 ]; then
+          if [ "$WAIT" = "true" ]; then
+            echo "quality-gate-status=PASSED" >> "$GITHUB_OUTPUT"
+            echo "The SonarQube Quality Gate passed."
+          else
+            echo "quality-gate-status=" >> "$GITHUB_OUTPUT"
+            echo "::notice::Analysis published without waiting for the Quality Gate (quality-gate=off)."
+          fi
+          exit 0
+        fi
+
+        # The scan never reached the server, so this is a tooling failure and not a
+        # verdict.  Fail regardless of mode - 'warn' must not hide a broken scan.
+        if [ -z "$REPORT" ]; then
+          echo "quality-gate-status=" >> "$GITHUB_OUTPUT"
+          echo "::error::SonarQube analysis failed before reaching the server, so no Quality Gate result was produced. This is a scan failure rather than a code quality result and fails the build in every mode."
+          exit $status
+        fi
+
+        echo "quality-gate-status=FAILED" >> "$GITHUB_OUTPUT"
+
+        # Note that a Quality Gate that did not resolve within
+        # quality-gate-timeout-seconds is indistinguishable from one that failed at this
+        # point, so a slow analysis queue reports as a failure.  Pre-existing behaviour,
+        # but it is a reason to prefer 'warn' on refs that must not be blocked.
+        if [ "$GATE_MODE" = "warn" ]; then
+          echo "::warning::The SonarQube Quality Gate failed or did not resolve in time. It is not enforced on '${GITHUB_REF_NAME}', so the build has not been failed. $DASHBOARD"
+          {
+            echo "### :warning: SonarQube Quality Gate failed"
+            echo
+            echo "The Quality Gate is reported but not enforced on \`${GITHUB_REF_NAME}\`, so this has not failed the build."
+            if [ -n "$DASHBOARD" ]; then
+              echo
+              echo "[View the analysis]($DASHBOARD)"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+
+        echo "::error::The SonarQube Quality Gate failed. $DASHBOARD"
         exit $status
