@@ -7,11 +7,21 @@ on:
         default: "."
         type: string
         description: directory to run all run commands from
-      yarn-test-command:
+      test-command:
         required: false
         default: "test"
         type: string
-        description: Yarn test command e.g. "test" or "test:ci"
+        description: Test command e.g. "test" or "test:ci"
+      yarn-test-command:
+        required: false
+        default: ""
+        type: string
+        description: "DEPRECATED: use test-command instead"
+      package-manager:
+        required: false
+        default: "auto"
+        type: string
+        description: "Package manager to use: auto (detect from lockfile), yarn, or pnpm"
 
 jobs:
   quality:
@@ -27,44 +37,110 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6.0.2
+
+      - name: Detect package manager
+        id: detect-pm
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          if [ "${{ inputs.package-manager }}" != "auto" ]; then
+            echo "pm=${{ inputs.package-manager }}" >> $GITHUB_OUTPUT
+          elif [ -f pnpm-lock.yaml ]; then
+            echo "pm=pnpm" >> $GITHUB_OUTPUT
+          else
+            echo "pm=yarn" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Resolve test command
+        id: test-cmd
+        run: |
+          if [ -n "${{ inputs.yarn-test-command }}" ] && [ "${{ inputs.yarn-test-command }}" != "test" ]; then
+            echo "cmd=${{ inputs.yarn-test-command }}" >> $GITHUB_OUTPUT
+          else
+            echo "cmd=${{ inputs.test-command }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: configure-node
         uses: actions/setup-node@v6.4.0
         with:
           node-version: 20
+
       - name: Get node version
         id: node
         run: |
           echo "version=$(node -v)" >> $GITHUB_OUTPUT
+
+      # ── pnpm path ──
+      - name: Setup pnpm via corepack
+        if: steps.detect-pm.outputs.pm == 'pnpm'
+        run: |
+          corepack enable
+          PM_VERSION=$(node -p "require('./package.json').packageManager?.split('@')[1] || '11.4.0'")
+          corepack prepare "pnpm@${PM_VERSION}" --activate
+
+      - name: Get pnpm store path
+        if: steps.detect-pm.outputs.pm == 'pnpm'
+        id: pnpm-store
+        run: echo "dir=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Cache pnpm store
+        if: steps.detect-pm.outputs.pm == 'pnpm'
+        uses: actions/cache@v5.0.5
+        with:
+          path: ${{ steps.pnpm-store.outputs.dir }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}-${{ steps.node.outputs.version }}
+
+      - name: Configure registry auth (pnpm)
+        if: steps.detect-pm.outputs.pm == 'pnpm'
+        run: |
+          npm config set "@telicent-oss:registry" "https://www.npmjs.com/"
+          npm config set "//www.npmjs.com//:_authToken" ${{ secrets.NPM_REGISTRY_TOKEN }}
+
+      - name: Install dependencies (pnpm)
+        if: steps.detect-pm.outputs.pm == 'pnpm'
+        run: pnpm install --frozen-lockfile
+
+      # ── yarn path ──
       - name: Get yarn cache directory path
+        if: steps.detect-pm.outputs.pm == 'yarn'
         id: yarn-cache-dir-path
         run: echo "dir=$(yarn cache dir)" >> $GITHUB_OUTPUT
-      - name: Cache node modules
+
+      - name: Cache node modules (yarn)
+        if: steps.detect-pm.outputs.pm == 'yarn'
         uses: actions/cache@v5.0.5
         with:
           path: ${{ steps.yarn-cache-dir-path.outputs.dir }}
           key: ${{ runner.os }}-node_modules-${{ hashFiles('**/yarn.lock') }}-${{ steps.node.outputs.version }}
+
       - name: create .yarnrc file
+        if: steps.detect-pm.outputs.pm == 'yarn'
         run: |
           npm config set "@telicent-oss:registry" "https://www.npmjs.com/"
-          npm config set "//www.npmjs.com//:_authToken" ${{ secrets.NPM_REGISTRY_TOKEN }} 
-      - name: Install dependencies
+          npm config set "//www.npmjs.com//:_authToken" ${{ secrets.NPM_REGISTRY_TOKEN }}
+
+      - name: Install dependencies (yarn)
+        if: steps.detect-pm.outputs.pm == 'yarn'
         run: yarn install
-      - name: yarn tsc --noEmit if needed
+
+      # ── shared steps ──
+      - name: tsc --noEmit if needed
         run: |
+          PM="${{ steps.detect-pm.outputs.pm }}"
           if [ -f tsconfig.json ]; then
             echo "TypeScript config found."
             TSC_IGNORE=$(node -p "require('./package.json').ci?.['shared-workflows/.github/workflows/javascript-test-feature-branch.yml']?.['WARNING: TSC CHECK NO ERROR'] || ''")
             if [ "$TSC_IGNORE" != "" ]; then
               echo "WARNING flag found in package.json. Running tsc --noEmit (errors will be ignored)..."
-              yarn tsc --noEmit || echo "tsc failed but error ignored due to warning flag."
+              $PM tsc --noEmit || echo "tsc failed but error ignored due to warning flag."
             else
               echo "Running tsc --noEmit..."
-              yarn tsc --noEmit
+              $PM tsc --noEmit
             fi
           else
             echo "No TypeScript config found. Skipping tsc..."
           fi
-      - name: run integrated tests
-        run: yarn ${{ inputs.yarn-test-command }}
+
+      - name: Run integrated tests
+        run: ${{ steps.detect-pm.outputs.pm }} ${{ steps.test-cmd.outputs.cmd }}
     env:
       NODE_AUTH_TOKEN: ${{ secrets.NPM_REGISTRY_TOKEN }}
