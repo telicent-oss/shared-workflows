@@ -22,20 +22,42 @@ inputs:
       Path to the pyproject.toml file, relative to the repository root.
       Defaults to `pyproject.toml`.
 
+outputs:
+  pip-extra-index-url:
+    description: |
+      The PIP_EXTRA_INDEX_URL value used to reach AWS CodeArtifact for this run
+      (empty string if no code-artefact-role was supplied). Requirements files
+      generated or installed by this action never have the index URL embedded
+      in them, so later steps needing CodeArtifact access (e.g. `python -m build`)
+      must set this as their own PIP_EXTRA_INDEX_URL env var.
+    value: ${{ steps.code-artifact-login.outputs.token != '' && format('https://aws:{0}@telicent-{1}.d.codeartifact.eu-west-2.amazonaws.com/pypi/telicent-code-artifacts/simple/', steps.code-artifact-login.outputs.token, steps.creds.outputs.aws-account-id) || '' }}
+
 runs:
   using: composite
   steps:
     - name: Checkout
       uses: actions/checkout@v6
+
     - name: Set up Python ${{ inputs.version }}
       uses: actions/setup-python@v5.6.0
       with:
         python-version: ${{ inputs.version }}
-    - name: Prepare pip and install pip-tools
-      shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
+
+    - name: Resolve requirements path
+      shell: bash
       run: |
-        python -m pip install --upgrade "pip<25.3"
-        python -m pip install pip-tools
+        req_dir=$(dirname "${{ inputs.pyproject-toml-path }}")
+        echo "REQUIREMENTS_PATH=$req_dir/requirements.txt" >> "$GITHUB_ENV"
+
+    - name: Prepare pip
+      shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
+      run: python -m pip install --upgrade "pip<25.3"
+
+    - name: Install pip-tools
+      if: hashFiles(env.REQUIREMENTS_PATH) == ''
+      shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
+      run: python -m pip install pip-tools
+
     - name: Configure CodeArtifact AWS credentials
       if: inputs.code-artefact-role != ''
       id: creds
@@ -44,6 +66,7 @@ runs:
         role-to-assume: ${{ inputs.code-artefact-role }}
         aws-region: eu-west-2
         mask-aws-account-id: true
+
     - name: CodeArtifact login
       id: code-artifact-login
       if: inputs.code-artefact-role != ''
@@ -51,12 +74,31 @@ runs:
       with:
         domain: telicent
         owner: "${{ steps.creds.outputs.aws-account-id }}"
+
+    - name: Warn if no committed requirements.txt was found
+      if: hashFiles(env.REQUIREMENTS_PATH) == ''
+      shell: bash
+      run: echo "::warning::No committed $REQUIREMENTS_PATH found - generating one from ${{ inputs.pyproject-toml-path }} on the fly. This project is out of date; commit a hash-pinned requirements.txt (pip-compile --generate-hashes) instead."
+
     - name: Generate requirements
+      if: hashFiles(env.REQUIREMENTS_PATH) == ''
       shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
-      run: python -m piptools compile ${{ inputs.extra-args }} -o requirements.txt ${{ inputs.pyproject-toml-path }}
+      run: python -m piptools compile --generate-hashes --no-emit-index-url ${{ inputs.extra-args }} -o ${{ env.REQUIREMENTS_PATH }} ${{ inputs.pyproject-toml-path }}
       env:
         PIP_EXTRA_INDEX_URL: ${{ steps.code-artifact-login.outputs.token != '' && format('https://aws:{0}@telicent-{1}.d.codeartifact.eu-west-2.amazonaws.com/pypi/telicent-code-artifacts/simple/', steps.code-artifact-login.outputs.token, steps.creds.outputs.aws-account-id) || '' }}
+
+    - name: Verify requirements are hash-pinned
+      if: hashFiles(env.REQUIREMENTS_PATH) != ''
+      shell: bash
+      run: |
+        if ! grep -q -- '--hash=' "$REQUIREMENTS_PATH"; then
+          echo "::error::$REQUIREMENTS_PATH exists but contains no --hash= entries. Committed requirements files must be generated with 'pip-compile --generate-hashes' for supply-chain integrity."
+          exit 1
+        fi
+
     - name: Install requirements
       if: inputs.install-requirements == 'true'
       shell: ${{ runner.os == 'Windows' && 'pwsh' || 'bash' }}
-      run: pip install -r requirements.txt
+      run: pip install --require-hashes -r ${{ env.REQUIREMENTS_PATH }}
+      env:
+        PIP_EXTRA_INDEX_URL: ${{ steps.code-artifact-login.outputs.token != '' && format('https://aws:{0}@telicent-{1}.d.codeartifact.eu-west-2.amazonaws.com/pypi/telicent-code-artifacts/simple/', steps.code-artifact-login.outputs.token, steps.creds.outputs.aws-account-id) || '' }}

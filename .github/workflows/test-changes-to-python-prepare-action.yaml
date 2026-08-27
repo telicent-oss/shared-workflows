@@ -1,0 +1,77 @@
+name: Test Changes to Python Prepare Action
+
+on:
+  push:
+    paths:
+      - .github/actions/python-prepare/**
+      - .github/workflows/test-changes-to-python-prepare-action.yaml
+  workflow_dispatch:
+
+jobs:
+  no-requirements-file-generates-hashed-one:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: Prepare Python
+        uses: ./.github/actions/python-prepare
+        with:
+          version: "3.12"
+          install-requirements: "true"
+          pyproject-toml-path: .github/actions/python-prepare/test-fixtures/generate-only/pyproject.toml
+      - name: "Fail if requirements.txt was not generated"
+        shell: bash
+        run: test -f .github/actions/python-prepare/test-fixtures/generate-only/requirements.txt
+      - name: "Fail if generated requirements.txt has no hashes"
+        shell: bash
+        run: grep -q -- '--hash=' .github/actions/python-prepare/test-fixtures/generate-only/requirements.txt
+
+  committed-hashed-file-is-used-as-is:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: Prepare Python
+        uses: ./.github/actions/python-prepare
+        with:
+          version: "3.12"
+          install-requirements: "true"
+          pyproject-toml-path: .github/actions/python-prepare/test-fixtures/valid-hashes/pyproject.toml
+      - name: "Fail if the committed requirements.txt was regenerated/modified"
+        shell: bash
+        run: git diff --exit-code -- .github/actions/python-prepare/test-fixtures/valid-hashes/requirements.txt
+
+  committed-unhashed-file-is-rejected:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest, macos-latest ]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+      - name: "Prepare Python (expected to fail)"
+        id: prepare
+        continue-on-error: true
+        uses: ./.github/actions/python-prepare
+        with:
+          version: "3.12"
+          install-requirements: "true"
+          pyproject-toml-path: .github/actions/python-prepare/test-fixtures/missing-hashes/pyproject.toml
+      - name: "Fail the job if python-prepare did not reject the un-hashed file"
+        if: steps.prepare.outcome != 'failure'
+        shell: bash
+        run: |
+          echo "Expected python-prepare to fail on a committed requirements.txt with no --hash= entries, but it succeeded"
+          exit 1

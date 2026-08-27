@@ -1,0 +1,6 @@
+#
+# This requirements.txt was committed without hashes (e.g. hand-written or
+# generated with plain `pip-compile`, not `pip-compile --generate-hashes`).
+# It is used as a fixture to verify python-prepare rejects it.
+#
+certifi==2024.8.30
