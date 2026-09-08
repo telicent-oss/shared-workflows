@@ -199,7 +199,7 @@ jobs:
       #      if this is the very first build for that version e.g. just after a version bump
       - name: Quick Maven Build
         run: |
-          mvn install -DskipTests -Dgpg.skip -Dcyclonedx.skip -Dmaven.javadoc.skip -Dmaven.source.skip -Dlombok.delombok.skip -q
+          mvn install -DskipTests -Dmaven.test.skip -Dgpg.skip -Dcyclonedx.skip -Dmaven.javadoc.skip -Dmaven.source.skip -Dlombok.delombok.skip -q
 
       - name: Detect Maven Modules
         id: modules
@@ -288,9 +288,9 @@ jobs:
       - name: Build Required Modules without Tests
         run: |
           if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} -am -DskipTests -Dcyclonedx.skip -Dgpg.skip ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }}
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} -am -DskipTests -Dmaven.test.skip -Dcyclonedx.skip -Dgpg.skip ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }}
           else
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} -am -DskipTests -Dcyclonedx.skip -Dgpg.skip ${{ inputs.MAVEN_ARGS }}
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} -am -DskipTests -Dmaven.test.skip -Dcyclonedx.skip -Dgpg.skip ${{ inputs.MAVEN_ARGS }}
           fi
 
       - name: Determine if Cached Docker Images are needed
@@ -342,9 +342,9 @@ jobs:
         # stage of the workflow, they'll get generated later for security scans and/or release publishing
         run: |
           if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} ${{ case(steps.java-changes.outputs.changed == 'false', '-DskipTests', '') }} -Dcyclonedx.skip -Dgpg.skip ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }}
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} ${{ case(steps.java-changes.outputs.changed == 'false', '-DskipTests -Dmaven.test.skip', '') }} -Dcyclonedx.skip -Dgpg.skip ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }}
           else
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} ${{ case(steps.java-changes.outputs.changed == 'false', '-DskipTests', '') }} -Dcyclonedx.skip -Dgpg.skip ${{ inputs.MAVEN_ARGS }}
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} ${{ case(steps.java-changes.outputs.changed == 'false', '-DskipTests -Dmaven.test.skip', '') }} -Dcyclonedx.skip -Dgpg.skip ${{ inputs.MAVEN_ARGS }}
           fi
 
       - name: Upload JaCoCo Report
