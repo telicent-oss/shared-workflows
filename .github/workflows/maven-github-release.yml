@@ -124,7 +124,7 @@ jobs:
       #      if this is the very first build for that version e.g. release builds
       - name: Quick Maven Build
         run: |
-          mvn install -DskipTests -Dmaven.test.skip -Dgpg.skip -Dcyclonedx.skip -Dmaven.javadoc.skip -Dmaven.source.skip -Dlombok.delombok.skip -q
+          mvn install -DskipTests -Dgpg.skip -Dcyclonedx.skip -Dmaven.javadoc.skip -Dmaven.source.skip -Dlombok.delombok.skip -q
 
       - name: Detect Maven version
         id: project
@@ -145,9 +145,9 @@ jobs:
       - name: Deploy Maven Release
         run: |
           if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
-            mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} -DskipTests -Dmaven.test.skip
+            mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} -DskipTests
           else
-            mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }} -DskipTests -Dmaven.test.skip
+            mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }} -DskipTests
           fi
 
       # If a CHANGELOG file has been provided find the developer curated release notes for 
