@@ -1,0 +1,33 @@
+name: Unit Test Helm Charts
+description: |
+  Run unit tests for a Helm chart, and any sub-charts, in the path given.
+  This action is intended to be used in a workflow that runs on pushes to validate that changes to Helm charts behave as expected.
+author: Telicent
+
+inputs:
+  chart:
+    required: true
+    description: Path to the Helm chart to test.
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout Helm chart
+      uses: actions/checkout@v6
+      with:
+        sparse-checkout: ${{ inputs.chart }}
+        sparse-checkout-cone-mode: false
+
+    - name: Install Helm
+      uses: azure/setup-helm@v4
+      with:
+        version: "latest"
+
+    - name: Install helm-unittest
+      shell: bash
+      run: |
+        helm plugin install https://github.com/helm-unittest/helm-unittest.git --verify=false
+
+    - name: Test Helm charts
+      shell: bash
+      run: helm unittest ${{ inputs.chart }}
