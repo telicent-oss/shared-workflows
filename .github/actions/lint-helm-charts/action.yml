@@ -1,4 +1,4 @@
-name: Lint Helm Charts
+name: Lint And Unit Tests Helm Charts
 description: |
   Lint a Helm chart, and any sub-charts, in the given path using `helm lint`.
   This action is intended to be used in a workflow that runs on pull requests to
@@ -9,6 +9,10 @@ inputs:
   chart:
     required: true
     description: Path to the Helm chart to lint, relative to the repository root.
+  test-mode:
+    required: false
+    default: union
+    description: One of "local-only", "shared-only", or "union".
 
 runs:
   using: composite
@@ -25,3 +29,14 @@ runs:
     - name: Lint Helm charts
       shell: bash
       run: helm lint ${{ inputs.chart }}
+    - name: Install helm-unittest
+      shell: bash
+      run: |
+        helm plugin install https://github.com/helm-unittest/helm-unittest.git --verify=false
+    - name: Run Helm chart tests
+      shell: bash
+      run: |
+        "${{ github.action_path }}/run-helm-tests.sh" \
+          "${{ inputs.chart }}" \
+          "${{ inputs.test-mode }}" \
+          "${{ github.action_path }}"
