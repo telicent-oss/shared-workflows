@@ -33,13 +33,6 @@ runs:
       shell: bash
       run: |
         helm plugin install https://github.com/helm-unittest/helm-unittest.git --verify=false
-    - name: DEBUG - inspect action path
-      shell: bash
-      run: |
-        echo "action_path is: ${{ github.action_path }}"
-        ls -la "${{ github.action_path }}"
-        echo "---"
-        ls -la "${{ github.action_path }}/shared-tests" || echo "shared-tests directory does not exist"
     - name: Run Helm chart tests
       shell: bash
       run: |
