@@ -355,6 +355,21 @@ jobs:
           path: |
             target/site/jacoco/
             **/target/site/jacoco/
+          # Modules without tests have no JaCoCo report
+          if-no-files-found: ignore
+
+      # When Surefire/Failsafe has to kill a forked test JVM (e.g. "Surefire is going to kill self fork JVM") it writes a
+      # thread dump to *.dumpstream, which is the only way to see what blocked the JVM from exiting
+      - name: Upload Surefire/Failsafe dump files
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: surefire-dumps-${{ matrix.module }}
+          path: |
+            **/target/surefire-reports/*.dump*
+            **/target/failsafe-reports/*.dump*
+          if-no-files-found: ignore
+          retention-days: 7
   
   sonarqube-code-scan:
     name: Scan code with sonarqube
