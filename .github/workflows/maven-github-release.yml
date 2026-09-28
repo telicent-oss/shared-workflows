@@ -9,6 +9,8 @@ on:
         default: docker
         description: |
           Specifies the name of the profile that enables/disables Docker based tests.
+          Set to an empty string for projects with no such profile, otherwise Maven warns that the requested
+          profile could not be activated.
       MAVEN_ARGS:
         required: false
         type: string
@@ -145,9 +147,9 @@ jobs:
       - name: Deploy Maven Release
         run: |
           if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
-            mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} -DskipTests
+            mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode ${{ inputs.DOCKER_PROFILE != '' && format('-P{0}', inputs.DOCKER_PROFILE) || '' }} ${{ inputs.MAVEN_ARGS }} -DskipTests
           else
-            mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }} -DskipTests
+            mvn ${{ inputs.MAVEN_DEPLOY_GOALS }} --batch-mode ${{ inputs.DOCKER_PROFILE != '' && format('-P{0}', inputs.DOCKER_PROFILE) || '' }} ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }} -DskipTests
           fi
 
       # If a CHANGELOG file has been provided find the developer curated release notes for 
