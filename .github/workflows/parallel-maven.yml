@@ -9,6 +9,8 @@ on:
         default: docker
         description: |
           Specifies the name of the profile that enables/disables Docker based tests.
+          Set to an empty string for projects with no such profile, otherwise Maven warns that the requested
+          profile could not be activated.
       USES_DOCKERHUB_IMAGES:
         required: false
         type: boolean
@@ -288,9 +290,9 @@ jobs:
       - name: Build Required Modules without Tests
         run: |
           if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} -am -DskipTests -Dcyclonedx.skip -Dgpg.skip ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }}
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U ${{ inputs.DOCKER_PROFILE != '' && format('-P{0}', inputs.DOCKER_PROFILE) || '' }} -pl :${{ matrix.module }} -am -DskipTests -Dcyclonedx.skip -Dgpg.skip ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }}
           else
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} -am -DskipTests -Dcyclonedx.skip -Dgpg.skip ${{ inputs.MAVEN_ARGS }}
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U ${{ inputs.DOCKER_PROFILE != '' && format('-P{0}', inputs.DOCKER_PROFILE) || '' }} -pl :${{ matrix.module }} -am -DskipTests -Dcyclonedx.skip -Dgpg.skip ${{ inputs.MAVEN_ARGS }}
           fi
 
       - name: Determine if Cached Docker Images are needed
@@ -300,7 +302,7 @@ jobs:
           # Basically check whether we have the docker profile in our active profiles for the module we
           # are going to build
           mvn help:active-profiles -q -Doutput="$PWD/.active-profiles" -pl :${{ matrix.module }}
-          if grep "${{ inputs.DOCKER_PROFILE }}" "$PWD/.active-profiles" >/dev/null 2>&1; then
+          if [ -n "${{ inputs.DOCKER_PROFILE }}" ] && grep "${{ inputs.DOCKER_PROFILE }}" "$PWD/.active-profiles" >/dev/null 2>&1; then
             echo "docker=true" >> ${GITHUB_OUTPUT}
           else
             echo "docker=false" >> ${GITHUB_OUTPUT}
@@ -342,9 +344,9 @@ jobs:
         # stage of the workflow, they'll get generated later for security scans and/or release publishing
         run: |
           if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} ${{ case(steps.java-changes.outputs.changed == 'false', '-DskipTests', '') }} -Dcyclonedx.skip -Dgpg.skip ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }}
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U ${{ inputs.DOCKER_PROFILE != '' && format('-P{0}', inputs.DOCKER_PROFILE) || '' }} -pl :${{ matrix.module }} ${{ case(steps.java-changes.outputs.changed == 'false', '-DskipTests', '') }} -Dcyclonedx.skip -Dgpg.skip ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }}
           else
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U -P${{ inputs.DOCKER_PROFILE }} -pl :${{ matrix.module }} ${{ case(steps.java-changes.outputs.changed == 'false', '-DskipTests', '') }} -Dcyclonedx.skip -Dgpg.skip ${{ inputs.MAVEN_ARGS }}
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -U ${{ inputs.DOCKER_PROFILE != '' && format('-P{0}', inputs.DOCKER_PROFILE) || '' }} -pl :${{ matrix.module }} ${{ case(steps.java-changes.outputs.changed == 'false', '-DskipTests', '') }} -Dcyclonedx.skip -Dgpg.skip ${{ inputs.MAVEN_ARGS }}
           fi
 
       - name: Upload JaCoCo Report

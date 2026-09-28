@@ -9,6 +9,8 @@ on:
         default: docker
         description: |
           Specifies the name of the profile that enables/disables Docker based tests.
+          Set to an empty string for projects with no such profile, otherwise Maven warns that the requested
+          profile could not be activated.
       USES_DOCKERHUB_IMAGES:
         required: false
         type: boolean
@@ -307,9 +309,9 @@ jobs:
         # stage of the workflow, they'll get generated later for security scans and/or release publishing
         run: |
           if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ case(steps.java-changes.outputs.changed == 'false', '-DskipTests', '') }} -Dcyclonedx.skip ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode ${{ inputs.DOCKER_PROFILE != '' && format('-P{0}', inputs.DOCKER_PROFILE) || '' }} ${{ case(steps.java-changes.outputs.changed == 'false', '-DskipTests', '') }} -Dcyclonedx.skip ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
           else
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ case(steps.java-changes.outputs.changed == 'false', '-DskipTests', '') }} -Dcyclonedx.skip ${{ inputs.MAVEN_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode ${{ inputs.DOCKER_PROFILE != '' && format('-P{0}', inputs.DOCKER_PROFILE) || '' }} ${{ case(steps.java-changes.outputs.changed == 'false', '-DskipTests', '') }} -Dcyclonedx.skip ${{ inputs.MAVEN_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
           fi
 
       - name: Trivy Vulnerability Scanning
