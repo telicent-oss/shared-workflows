@@ -18,11 +18,17 @@ runs:
           exit 0
         fi
 
-        REVIEWER="${OWNER}/releaseapprovers"
-
         echo "Release Please PR detected."
-        echo "Adding reviewer: $REVIEWER"
+        echo "Repository: $REPOSITORY"
+        echo "Team: $OWNER/releaseapprovers"
 
-        gh pr edit "$PR_NUMBER" \
+        gh api \
+          --method POST \
+          "/repos/$REPOSITORY/pulls/$PR_NUMBER/requested_reviewers" \
+          -f "team_reviewers[]=releaseapprovers"
+
+        echo "Reviewers after request:"
+        gh pr view "$PR_NUMBER" \
           --repo "$REPOSITORY" \
-          --add-reviewer "$REVIEWER"
+          --json reviewRequests \
+          --jq '.reviewRequests[] | "\(.login)"'
