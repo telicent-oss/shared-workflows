@@ -1,0 +1,28 @@
+name: Add Release Please Reviewers
+description: Add the organisation's release approvers team
+
+runs:
+  using: composite
+  steps:
+    - name: Add Release Approvers
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPOSITORY: ${{ github.repository }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        OWNER: ${{ github.repository_owner }}
+        HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+      run: |
+        if [[ "$HEAD_BRANCH" != release-please--branches--* ]]; then
+          echo "Not a Release Please PR. Nothing to do."
+          exit 0
+        fi
+
+        REVIEWER="${OWNER}/releaseapprovers"
+
+        echo "Release Please PR detected."
+        echo "Adding reviewer: $REVIEWER"
+
+        gh pr edit "$PR_NUMBER" \
+          --repo "$REPOSITORY" \
+          --add-reviewer "$REVIEWER"
