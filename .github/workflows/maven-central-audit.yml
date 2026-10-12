@@ -54,11 +54,49 @@ on:
   workflow_dispatch:
 
 jobs:
-  maven-central-audit:
+  detect-pom-changes:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    name: Maven Central Audit
+    name: Detect POM Changes
+    outputs: 
+      changed: ${{ steps.pom-changes.outputs.changed }}
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v6.0.2
+      
+      # Only changes to pom.xml files are likely to have significant changes on release size
+      # While code changes will change release size marginally its only actual POM changes, e.g.,
+      # introducing new modules, reconfiguring plugins etc. that are likely to cause substantial
+      # changes in the release size
+      #
+      # Therefore by checking whether the POM files have changed we can avoid running the audit
+      # on branches that don't affect this
+      #
+      # Note that we always run the audit on main branch builds as an ongoing sanity check.  There
+      # are some non-POM changes that could cause substantial changes in the release size, e.g., a 
+      # large resource file added to a module, but we expect those to be rare and generally developers
+      # would spot those and query them during the PR reviews.
+      - name: Check whether any POM files changed
+        id: pom-changes
+        uses: rvesse/detect-changes-action@v1
+        with:
+          base: ${{ inputs.MAIN_BRANCH }}
+          pattern: pom.xml
+          flags: -F
+          # Ensures we always run audit when building on main
+          output-on-base: true
+          summary: false
+          notices: false
+
+  maven-central-size-audit:
+    needs:
+      - detect-pom-changes
+    if: ${{ needs.detect-pom-changes.outputs.changed == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    name: Maven Central Release Size Audit
     env:
       # These have to be exported into the environment due to how the setup-java action configures the Maven
       # settings.xml file to avoid directly embedding credentials into it.
@@ -86,34 +124,91 @@ jobs:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
-      # Only changes to pom.xml files are likely to have significant changes on release size
-      # While code changes will change release size marginally its only actual POM changes, e.g.,
-      # introducing new modules, reconfiguring plugins etc. that are likely to cause substantial
-      # changes in the release size
-      #
-      # Therefore by checking whether the POM files have changed we can avoid running the audit
-      # on branches that don't affect this
-      #
-      # Note that we always run the audit on main branch builds as an ongoing sanity check.  There
-      # are some non-POM changes that could cause substantial changes in the release size, e.g., a 
-      # large resource file added to a module, but we expect those to be rare and generally developers
-      # would spot those and query them during the PR reviews.
-      - name: Check whether any POM files changed
-        id: pom-changes
-        uses: rvesse/detect-changes-action@v1
-        with:
-          base: ${{ inputs.MAIN_BRANCH }}
-          pattern: pom.xml
-          flags: -F
-          # Ensures we always run audit when building on main
-          output-on-base: true
-          summary: false
-          notices: false
-
-      - name: Run Maven Central Audit
-        if: ${{ steps.pom-changes.outputs.changed == 'true' }}
+      - name: Run Maven Central Release Size Audit
         uses: telicent-oss/mvn-central-audit@v1
         with:
           # Specify limits, if a release would be above this size then the build will be failed
           max-files: 600
           max-size: 16000000 # 16MB
+
+  maven-central-requirements-audit:
+    needs:
+      - detect-pom-changes
+    if: ${{ needs.detect-pom-changes.outputs.changed == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    name: Maven Central Release Requirements Audit
+    env:
+      # These have to be exported into the environment due to how the setup-java action configures the Maven
+      # settings.xml file to avoid directly embedding credentials into it.
+      MAVEN_USERNAME: ${{ secrets.MVN_USER_NAME }}
+      MAVEN_PASSWORD: ${{ secrets.MVN_USER_PWD }}
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v6.0.2
+
+      - name: Install Java and Maven
+        uses: actions/setup-java@v5.3.0
+        with:
+          java-version: ${{ inputs.JAVA_VERSION }}
+          distribution: ${{ inputs.JDK }}
+          cache: maven
+          server-id: ${{ inputs.MAVEN_REPOSITORY_ID }}
+          # Forced to use indirection here, the setup-java action configures the Maven settings.xml to reference
+          # the credentials via environment variables
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+
+      - name: Install xidel
+        uses: jaxxstorm/action-install-gh-release@v3.0.0
+        with: 
+          repo: benibela/xidel
+          tag: Xidel_0.9.8
+          cache: enable
+          platform: linux
+          arch: 64
+
+      - name: Import GPG key
+        uses: crazy-max/ghaction-import-gpg@v7.0.0
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Checkout Maven Central Requirements Audit script
+        uses: actions/checkout@v6.0.2
+        with:
+          sparse-checkout: |
+            isMavenCentralReady.sh
+          sparse-checkout-cone-mode: false
+          repository: telicent-oss/shared-workflows
+          path: mvn-central-audit/
+          ref: mvn-central-audit-pt2
+
+      # NB - actions/checkout only allows us to checkout into the workspace directory not the temp directory so have to
+      #      manually move the directory
+      #      We move the checked out script because it could be flagged by various linters that a Maven project might be
+      #      using so moving it into the runner temporary directory avoids that possibility
+      - name: Move Audit Script to Runner Temp Directory
+        shell: bash
+        run: |
+          mv mvn-central-audit ${{ runner.temp }}
+          ls -l ${{ runner.temp }}
+
+      - name: Maven Central Audit
+        shell: bash
+        env:
+          # This causes the script to find and report all errors, it is NOT the same thing as the GitHub Actions
+          # continue-on-error spec on a job.
+          # If the audit scripts finds any errors it will fail the job.  Setting this variable just ensures all errors 
+          # are reported at once rather than having a developer play whack-a-mole with fixing one error for the audit to 
+          # simply fail on the next previously unreported error.
+          CONTINUE_ON_ERROR: true
+        run: |
+          ${{ runner.temp }}/mvn-central-audit/isMavenCentralReady.sh
+
+      - name: Remove Temporary Directory
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          rm -Rf "${{ runner.temp }}/mvn-central-audit/" >/dev/null 2>&1
