@@ -502,8 +502,8 @@ jobs:
 
   github-release:
     needs: scan-and-publish
-    if: ${{ github.ref_type == 'tag' && needs.scan-and-publish.outputs.version != '' && !contains(needs.scan-and-publish.outputs.version, 'SNAPSHOT') }}
-    uses: telicent-oss/shared-workflows/.github/workflows/maven-github-release.yml@main
+    if: ${{ github.ref_type == 'tag' && needs.scan-and-publish.outputs.version != '' || (contains(needs.scan-and-publish.outputs.version, 'SNAPSHOT') && inputs.PUBLISH_SNAPSHOTS == 'true') }}
+    uses: telicent-oss/shared-workflows/.github/workflows/maven-github-release.yml@codeartifact-snapshots
     with:
       CHANGELOG_FILE: ${{ inputs.CHANGELOG_FILE }}
       DOCKER_PROFILE: ${{ inputs.DOCKER_PROFILE }}
@@ -512,4 +512,5 @@ jobs:
       MAVEN_ARGS: ${{ inputs.MAVEN_ARGS }}
       MAVEN_DEBUG_ARGS: ${{ inputs.MAVEN_DEBUG_ARGS }}
       MAVEN_DEPLOY_GOALS: ${{ inputs.MAVEN_DEPLOY_GOALS }}
+      MAIN_BRANCH: ${{ inputs.MAIN_BRANCH }}
     secrets: inherit

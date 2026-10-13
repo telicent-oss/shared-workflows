@@ -1,4 +1,4 @@
-name: Maven GitHub Release
+name: Maven Publish and Release
 
 on:
   workflow_call:
@@ -64,6 +64,14 @@ on:
           Specifies the release files that should be attached to the GitHub release.  For example a 
           downloadable package that is generated from the repository.  Regardless of this value we 
           will always attach the SBOMs to the release.
+      MAIN_BRANCH:
+        required: false
+        type: string
+        default: main
+        description: |
+          Specifies the main branch for the repository.
+
+          Used in determining whether to publish SNAPSHOT builds to our internal AWS CodeArtifact repository
     secrets:
       MVN_USER_NAME:
         required: false
@@ -87,9 +95,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  codeartifact-release:
+  codeartifact-publish:
+    name: Publish to AWS CodeArtifact
     runs-on: ubuntu-latest
-    if: ${{ github.ref_type == 'tag' }}
+    if: ${{ github.ref_type == 'tag' || github.ref_name == inputs.MAIN_BRANCH }}
     permissions:
       id-token: write
       contents: read
