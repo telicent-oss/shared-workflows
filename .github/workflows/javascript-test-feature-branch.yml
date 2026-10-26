@@ -12,6 +12,11 @@ on:
         default: "test"
         type: string
         description: Yarn test command e.g. "test" or "test:ci"
+      node-version:
+        required: false
+        default: "^22.23.4"
+        type: string
+        description: Node version or semver range to install
 
 jobs:
   quality:
@@ -30,7 +35,7 @@ jobs:
       - name: configure-node
         uses: actions/setup-node@v6.4.0
         with:
-          node-version: 20
+          node-version: ${{ inputs.node-version }}
       - name: Get node version
         id: node
         run: |
