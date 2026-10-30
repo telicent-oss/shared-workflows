@@ -1,0 +1,407 @@
+name: Standalone main-branch SonarQube analysis
+
+on:
+  workflow_call:
+    inputs:
+      scanner:
+        type: string
+        default: maven
+        description: Maven or CLI scanner (maven/cli).
+      main-branch:
+        type: string
+        default: ''
+        description: Branch to analyse; defaults to the caller repository default branch.
+      working-directory:
+        type: string
+        default: '.'
+      preparation-script:
+        type: string
+        default: ''
+        description: Trusted bash script relative to working-directory; required for CLI. Prepare dependencies/tests/coverage only.
+      coverage-paths:
+        type: string
+        default: '**/target/site/jacoco/jacoco.xml'
+        description: Newline-separated coverage globs relative to working-directory. All patterns must match nonempty files.
+      java-version:
+        type: string
+        default: '21'
+      java-distribution:
+        type: string
+        default: temurin
+      node-version:
+        type: string
+        default: '22'
+      python-version:
+        type: string
+        default: '3.12'
+      maven-args:
+        type: string
+        default: ''
+        description: Whitespace-separated arguments (no shell quoting/evaluation). Must not skip tests/coverage or publish.
+      maven-profiles:
+        type: string
+        default: ''
+      sonar-host-url:
+        type: string
+        default: ''
+      sonar-project-key:
+        type: string
+        default: ''
+        description: CLI project key; Maven declares its project identity in pom.xml.
+      sonar-organization:
+        type: string
+        default: ''
+      sonar-args:
+        type: string
+        default: ''
+        description: Additional CLI scanner properties; coverage report properties belong in sonar-project.properties or here.
+      fail-on-quality-gate:
+        type: boolean
+        default: true
+      quality-gate-timeout-seconds:
+        type: number
+        default: 300
+      codeartifact-role:
+        type: string
+        default: ''
+        description: Optional AWS role for private Maven dependencies; caller must grant id-token write.
+      aws-region:
+        type: string
+        default: eu-west-2
+      codeartifact-domain:
+        type: string
+        default: telicent
+      codeartifact-owner:
+        type: string
+        default: '098669589541'
+      maven-repository-id:
+        type: string
+        default: aws-codeartifact-telicent
+      notify-teams:
+        type: boolean
+        default: true
+    secrets:
+      SONAR_HOST_URL:
+        required: false
+      SONAR_TOKEN:
+        required: true
+      TEAMS_WEBHOOK_URL:
+        required: false
+      MAVEN_USERNAME:
+        required: false
+      MAVEN_PASSWORD:
+        required: false
+      PACKAGE_PAT:
+        required: false
+      FONT_AWESOME_KEY:
+        required: false
+      NPM_REGISTRY_TOKEN:
+        required: false
+    outputs:
+      source-sha:
+        value: ${{ jobs.analysis.outputs.source-sha }}
+        description: Exact caller source commit analysed.
+      dashboard-url:
+        value: ${{ jobs.analysis.outputs.dashboard-url }}
+        description: Dashboard URL from Sonar analysis metadata, when available.
+
+permissions:
+  contents: read
+
+jobs:
+  analysis:
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      source-sha: ${{ steps.source.outputs.sha }}
+      dashboard-url: ${{ steps.metadata.outputs.dashboard-url }}
+      failure-stage: ${{ steps.metadata.outputs.failure-stage }}
+    steps:
+      - name: Validate configuration
+        env:
+          SCANNER: ${{ inputs.scanner }}
+          TARGET_BRANCH: ${{ inputs.main-branch || github.event.repository.default_branch }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ inputs.sonar-host-url || secrets.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+          NOTIFY_TEAMS: ${{ inputs.notify-teams }}
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          PREPARATION_SCRIPT: ${{ inputs.preparation-script }}
+          GATE_TIMEOUT: ${{ inputs.quality-gate-timeout-seconds }}
+          COVERAGE_PATHS: ${{ inputs.coverage-paths }}
+        run: |
+          case "$GITHUB_EVENT_NAME" in
+            schedule|workflow_dispatch) ;;
+            push) test "$GITHUB_REF" = "refs/heads/$TARGET_BRANCH" || { echo "::error::Only target-branch pushes are supported"; exit 1; } ;;
+            *) echo "::error::Use schedule, workflow_dispatch or a target-branch push"; exit 1 ;;
+          esac
+          case "$SCANNER" in maven|cli) ;; *) echo "::error::scanner must be maven or cli"; exit 1 ;; esac
+          test -n "$SONAR_TOKEN" || { echo "::error::SONAR_TOKEN is required"; exit 1; }
+          test -n "$SONAR_HOST_URL" || { echo "::error::sonar-host-url is required"; exit 1; }
+          if [[ "$NOTIFY_TEAMS" == true && -z "$TEAMS_WEBHOOK_URL" ]]; then
+            echo "::error::TEAMS_WEBHOOK_URL is required when notify-teams is true"; exit 1
+          fi
+          if [[ "$SCANNER" == cli && -z "$PREPARATION_SCRIPT" ]]; then
+            echo "::error::CLI requires preparation-script to generate fresh coverage"; exit 1
+          fi
+          [[ "$GATE_TIMEOUT" =~ ^[1-9][0-9]*$ ]] || { echo "::error::quality-gate-timeout-seconds must be a positive integer"; exit 1; }
+          test -n "$COVERAGE_PATHS" || { echo "::error::coverage-paths is required"; exit 1; }
+
+      - name: Check out main branch with full history
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: ${{ inputs.main-branch || github.event.repository.default_branch }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Record source and validate paths
+        id: source
+        env:
+          PROJECT_DIR: ${{ inputs.working-directory }}
+          PREPARATION_SCRIPT: ${{ inputs.preparation-script }}
+          TARGET_BRANCH: ${{ inputs.main-branch || github.event.repository.default_branch }}
+        run: |
+          git check-ref-format "refs/heads/$TARGET_BRANCH"
+          # A tag/SHA input must not masquerade as a main branch.
+          test "$(git rev-parse HEAD)" = "$(git rev-parse "refs/remotes/origin/$TARGET_BRANCH")"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          project=$(realpath "$PROJECT_DIR")
+          test -d "$project"
+          case "$project/" in "$GITHUB_WORKSPACE/"*) ;; *) echo "::error::working-directory must be inside the checkout"; exit 1 ;; esac
+          if [[ -n "$PREPARATION_SCRIPT" ]]; then
+            script=$(realpath "$project/$PREPARATION_SCRIPT")
+            case "$script" in "$project/"*) ;; *) echo "::error::preparation-script must be inside working-directory"; exit 1 ;; esac
+            test -f "$script"
+          fi
+          {
+            echo '### Standalone SonarQube analysis'
+            echo "Repository: $GITHUB_REPOSITORY"
+            echo "Branch: $TARGET_BRANCH"
+            echo "Source SHA: $(git rev-parse HEAD)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Configure private Maven access
+        if: inputs.codeartifact-role != ''
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ inputs.codeartifact-role }}
+          aws-region: ${{ inputs.aws-region }}
+
+      - name: Obtain CodeArtifact dependency token
+        if: inputs.codeartifact-role != ''
+        env:
+          DOMAIN: ${{ inputs.codeartifact-domain }}
+          OWNER: ${{ inputs.codeartifact-owner }}
+        run: |
+          token=$(aws codeartifact get-authorization-token --domain "$DOMAIN" --domain-owner "$OWNER" --duration-seconds 43200 --query authorizationToken --output text)
+          echo "::add-mask::$token"
+          echo "MAVEN_USERNAME=aws" >> "$GITHUB_ENV"
+          echo "MAVEN_PASSWORD=$token" >> "$GITHUB_ENV"
+          # Existing private poms/preparation scripts may reference these names.
+          echo "AWS_CODEARTIFACT_USER=aws" >> "$GITHUB_ENV"
+          echo "AWS_CODEARTIFACT_TOKEN=$token" >> "$GITHUB_ENV"
+
+      - name: Install Java
+        uses: actions/setup-java@v5.4.0
+        with:
+          java-version: ${{ inputs.java-version }}
+          distribution: ${{ inputs.java-distribution }}
+          server-id: ${{ inputs.maven-repository-id }}
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+
+      - name: Install Node for CLI preparation
+        if: inputs.scanner == 'cli'
+        uses: actions/setup-node@v6.4.0
+        with:
+          node-version: ${{ inputs.node-version }}
+
+      - name: Install Python for CLI preparation
+        if: inputs.scanner == 'cli'
+        uses: actions/setup-python@v6.3.0
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Remove pre-existing coverage reports
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          COVERAGE_PATHS: ${{ inputs.coverage-paths }}
+        run: |
+          python3 - <<'PYTHON'
+          import glob, os
+          from pathlib import Path
+          base = Path.cwd().resolve()
+          for pattern in os.environ['COVERAGE_PATHS'].splitlines():
+              if not pattern.strip():
+                  continue
+              if Path(pattern).is_absolute() or '..' in Path(pattern).parts:
+                  raise SystemExit('Coverage patterns must stay inside working-directory')
+              for match in glob.glob(pattern.strip(), recursive=True):
+                  path = Path(match)
+                  if not path.resolve().is_relative_to(base):
+                      raise SystemExit('Coverage path escapes working-directory')
+                  if path.is_file():
+                      path.unlink()
+          PYTHON
+
+      - name: Prepare dependencies and fresh coverage
+        id: prepare
+        if: inputs.preparation-script != ''
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          PREPARATION_SCRIPT: ${{ inputs.preparation-script }}
+          PACKAGE_PAT: ${{ secrets.PACKAGE_PAT }}
+          FONT_AWESOME_KEY: ${{ secrets.FONT_AWESOME_KEY }}
+          NPM_REGISTRY_TOKEN: ${{ secrets.NPM_REGISTRY_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_REGISTRY_TOKEN }}
+        run: bash -- "$PREPARATION_SCRIPT"
+
+      - name: Build Maven reactor and generate coverage
+        id: build
+        if: inputs.scanner == 'maven'
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          MAVEN_ARGS: ${{ inputs.maven-args }}
+          MAVEN_PROFILES: ${{ inputs.maven-profiles }}
+        run: |
+          # Split flags without evaluating caller text as shell code.
+          read -r -a extra <<< "${MAVEN_ARGS//$'\n'/ }"
+          profiles=()
+          if [[ -n "$MAVEN_PROFILES" ]]; then profiles=("-P$MAVEN_PROFILES"); fi
+          # install is local only and supports reactor dependencies for the separate scanner invocation.
+          mvn --batch-mode clean install "${profiles[@]}" "${extra[@]}" -Dgpg.skip -Dcyclonedx.skip
+
+      - name: Require fresh coverage reports
+        id: coverage
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          COVERAGE_PATHS: ${{ inputs.coverage-paths }}
+        run: |
+          python3 - <<'PYTHON'
+          import glob, os
+          patterns = [p.strip() for p in os.environ['COVERAGE_PATHS'].splitlines() if p.strip()]
+          if not patterns:
+              raise SystemExit('No coverage patterns configured')
+          for pattern in patterns:
+              matches = [p for p in glob.glob(pattern, recursive=True) if os.path.isfile(p) and os.path.getsize(p)]
+              if not matches:
+                  raise SystemExit(f'Missing nonempty coverage report: {pattern}')
+              print(f'Coverage pattern {pattern}: {len(matches)} report(s)')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write('sonar-paths=' + ','.join(patterns) + '\n')
+          PYTHON
+
+      - name: Maven SonarQube analysis
+        id: maven-scan
+        if: inputs.scanner == 'maven'
+        uses: telicent-oss/shared-workflows/.github/actions/mvn-sast-scanning@main
+        with:
+          working-directory: ${{ inputs.working-directory }}
+          sonar-host-url: ${{ inputs.sonar-host-url || secrets.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+          sonar-token: ${{ secrets.SONAR_TOKEN }}
+          compile: 'false'
+          maven-args: >-
+            ${{ inputs.maven-args }}
+            -Dsonar.branch.name=${{ inputs.main-branch || github.event.repository.default_branch }}
+            -Dsonar.scm.revision=${{ steps.source.outputs.sha }}
+          maven-profiles: ${{ inputs.maven-profiles }}
+          coverage-report-paths: ${{ steps.coverage.outputs.sonar-paths }}
+          fail-on-quality-gate: ${{ inputs.fail-on-quality-gate }}
+          quality-gate-timeout-seconds: ${{ inputs.quality-gate-timeout-seconds }}
+
+      - name: CLI SonarQube analysis
+        id: cli-scan
+        if: inputs.scanner == 'cli'
+        uses: telicent-oss/shared-workflows/.github/actions/sast-scanning@main
+        with:
+          sonar-host-url: ${{ inputs.sonar-host-url || secrets.SONAR_HOST_URL || 'https://sonarcloud.io' }}
+          sonar-token: ${{ secrets.SONAR_TOKEN }}
+          sonar-project-key: ${{ inputs.sonar-project-key }}
+          sonar-organization: ${{ inputs.sonar-organization }}
+          project-base-dir: ${{ inputs.working-directory }}
+          args: >-
+            ${{ inputs.sonar-args }}
+            -Dsonar.branch.name=${{ inputs.main-branch || github.event.repository.default_branch }}
+            -Dsonar.scm.revision=${{ steps.source.outputs.sha }}
+          sonar-fail-on-quality-gate: ${{ inputs.fail-on-quality-gate }}
+          sonar-polling-timeout-seconds: ${{ inputs.quality-gate-timeout-seconds }}
+
+      - name: Capture analysis links even after a failed gate
+        id: metadata
+        if: ${{ always() && steps.source.outputs.sha != '' }}
+        working-directory: ${{ inputs.working-directory }}
+        env:
+          PREPARE_OUTCOME: ${{ steps.prepare.outcome }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          COVERAGE_OUTCOME: ${{ steps.coverage.outcome }}
+          MAVEN_SCAN_OUTCOME: ${{ steps.maven-scan.outcome }}
+          CLI_SCAN_OUTCOME: ${{ steps.cli-scan.outcome }}
+        run: |
+          python3 - <<'PYTHON'
+          import glob, os
+          stages = [('preparation', 'PREPARE_OUTCOME'), ('build/tests', 'BUILD_OUTCOME'),
+                    ('coverage validation', 'COVERAGE_OUTCOME'), ('analysis/quality gate', 'MAVEN_SCAN_OUTCOME'),
+                    ('analysis/quality gate', 'CLI_SCAN_OUTCOME')]
+          stage = next((label for label, key in stages if os.environ.get(key) == 'failure'), 'setup/configuration')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'failure-stage={stage}\n')
+          for path in glob.glob('**/report-task.txt', recursive=True) + glob.glob('.scannerwork/report-task.txt'):
+              values = dict(line.rstrip().split('=', 1) for line in open(path) if '=' in line)
+              url = values.get('dashboardUrl', '')
+              if url:
+                  with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                      f.write(f'dashboard-url={url}\n')
+                  with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as f:
+                      f.write(f'\nSonarQube dashboard: {url}\n')
+                  break
+          PYTHON
+
+      - name: Retain analysis metadata even after failure
+        if: ${{ always() && steps.source.outputs.sha != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: standalone-sonarqube-${{ inputs.scanner }}-${{ github.job }}
+          include-hidden-files: true
+          path: |
+            ${{ inputs.working-directory }}/**/report-task.txt
+            ${{ inputs.working-directory }}/.scannerwork/report-task.txt
+          if-no-files-found: ignore
+          retention-days: 14
+    env:
+      MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+      MAVEN_PASSWORD: ${{ secrets.MAVEN_PASSWORD }}
+
+  notify-teams:
+    needs: analysis
+    if: ${{ always() && inputs.notify-teams && needs.analysis.result == 'failure' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Send SonarQube failure to Teams
+        env:
+          TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
+          REPOSITORY: ${{ github.repository }}
+          TARGET_BRANCH: ${{ inputs.main-branch || github.event.repository.default_branch }}
+          SOURCE_SHA: ${{ needs.analysis.outputs.source-sha }}
+          DASHBOARD_URL: ${{ needs.analysis.outputs.dashboard-url }}
+          SCANNER: ${{ inputs.scanner }}
+          FAILURE_STAGE: ${{ needs.analysis.outputs.failure-stage }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          test -n "$TEAMS_WEBHOOK_URL" || { echo "::error::TEAMS_WEBHOOK_URL is missing; notification could not be delivered"; exit 1; }
+          jq -n --arg repo "$REPOSITORY" --arg branch "$TARGET_BRANCH" --arg sha "${SOURCE_SHA:-checkout unavailable}" \
+            --arg scanner "$SCANNER" --arg stage "${FAILURE_STAGE:-setup/configuration}" --arg run "$RUN_URL" --arg dashboard "$DASHBOARD_URL" \
+            '{type: "message", attachments: [{contentType: "application/vnd.microsoft.card.adaptive", contentUrl: null, content: {
+              type: "AdaptiveCard", "$schema": "http://adaptivecards.io/schemas/adaptive-card.json", version: "1.4",
+              body: [{type: "TextBlock", text: "SonarQube analysis failed", weight: "Bolder", size: "Large"},
+                {type: "TextBlock", text: "Preparation, analysis or quality gate failed. See the workflow for the failing step.", wrap: true},
+                {type: "FactSet", facts: [{title: "Repository", value: $repo}, {title: "Branch", value: $branch},
+                  {title: "Source SHA", value: $sha}, {title: "Scanner", value: $scanner}, {title: "Failure stage", value: $stage}]}],
+              actions: ([{type: "Action.OpenUrl", title: "View workflow and reports", url: $run}] +
+                if $dashboard == "" then [] else [{type: "Action.OpenUrl", title: "SonarQube dashboard", url: $dashboard}] end)
+            }}]}' > "$RUNNER_TEMP/sonarqube-teams.json"
+          # Avoid verbose curl output: the webhook URL is a secret. Never retry a delivered POST.
+          curl --fail --silent --output /dev/null --connect-timeout 10 --max-time 30 \
+            -H 'Content-Type: application/json' --data-binary "@$RUNNER_TEMP/sonarqube-teams.json" "$TEAMS_WEBHOOK_URL"
