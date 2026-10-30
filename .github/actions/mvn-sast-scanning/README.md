@@ -113,6 +113,7 @@ whether the action produces them itself (via `mvn test-compile`):
 
 | Name | Default | Required | Description |
 | :--- | :--- | :--- | :--- |
+| `working-directory` | `.` | No | Maven project directory relative to the workspace. |
 | `sonar-host-url` | `https://sonarcloud.io` | No | Base URL of the SonarQube server used for the scan. |
 | `sonar-token` | | Yes | A SonarQube token with permission to analyse the project. |
 | `compile` | `auto` | No | Whether to compile before scanning: `true`, `false` or `auto`. See [Compilation](#compilation). |

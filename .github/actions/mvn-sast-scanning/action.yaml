@@ -16,6 +16,10 @@ branding:
   color: 'blue'
 
 inputs:
+  working-directory:
+    required: false
+    default: "."
+    description: Maven project directory, relative to the workspace.
   sonar-host-url:
     required: false
     default: https://sonarcloud.io
@@ -71,6 +75,7 @@ runs:
   steps:
     - name: Validate inputs
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       env:
         SONAR_TOKEN: ${{ inputs.sonar-token }}
         GATE_TIMEOUT: ${{ inputs.quality-gate-timeout-seconds }}
@@ -104,6 +109,7 @@ runs:
 
     - name: Compile project (if needed)
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       env:
         COMPILE: ${{ inputs.compile }}
         EXTRA_MAVEN_ARGS: ${{ inputs.maven-args }}
@@ -138,6 +144,7 @@ runs:
     - name: SonarQube Analysis
       id: scan
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       env:
         SONAR_TOKEN: ${{ inputs.sonar-token }}
         SONAR_HOST_URL: ${{ inputs.sonar-host-url }}

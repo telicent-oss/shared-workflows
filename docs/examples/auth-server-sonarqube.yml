@@ -1,0 +1,28 @@
+# Copy to auth-server/.github/workflows/sonarqube-main.yml after publishing TC-615
+name: Auth Server main SonarQube analysis
+on:
+  schedule:
+    - cron: '23 3 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: auth-server-standalone-sonar-main
+  cancel-in-progress: false
+jobs:
+  sonar:
+    uses: telicent-oss/shared-workflows/.github/workflows/main-sonarqube-scan.yml@main
+    with:
+      scanner: maven
+      main-branch: main
+      java-version: '21'
+      coverage-paths: target/site/jacoco/jacoco.xml
+      codeartifact-role: arn:aws:iam::098669589541:role/AWSDeployCodeArtifact
+      maven-repository-id: aws-codeartifact-telicent
+      fail-on-quality-gate: true
+      notify-teams: true
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+      TEAMS_WEBHOOK_URL: ${{ secrets.TEAMS_WEBHOOK_URL }}
