@@ -1,7 +1,7 @@
 [project]
 name = "test-fixture-missing-hashes"
 version = "0.0.1"
-dependencies = ["certifi==2024.8.30"]
+dependencies = ["certifi==2026.10.18"]
 
 [build-system]
 requires = ["setuptools"]

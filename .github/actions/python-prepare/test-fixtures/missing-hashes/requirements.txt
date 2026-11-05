@@ -3,4 +3,4 @@
 # generated with plain `pip-compile`, not `pip-compile --generate-hashes`).
 # It is used as a fixture to verify python-prepare rejects it.
 #
-certifi==2024.8.30
+certifi==2026.10.18
