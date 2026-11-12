@@ -74,12 +74,12 @@ runs:
         package-pat: ${{ inputs.package-pat }}
     - name: Add CycloneDX tool
       if: ${{ inputs.package-manager == 'yarn' }}
-      run: yarn global add @cyclonedx/cyclonedx-npm
+      run: yarn global add @cyclonedx/cyclonedx-npm@6.0.1
       shell: bash
     # RE: --ignore-npm-errors below: See https://github.com/CycloneDX/cyclonedx-node-npm/issues/810#issuecomment-1594252293
     - name: Generate SBOM (yarn)
       if: ${{ inputs.package-manager == 'yarn' }}
-      run: cyclonedx-npm --ignore-npm-errors --output-file ${{ steps.globals.outputs.bom-file-name }}
+      run: cyclonedx-npm --ignore-npm-errors --spec-version 1.6 --output-file ${{ steps.globals.outputs.bom-file-name }}
       shell: bash
 
     # ---- pnpm branch ----
