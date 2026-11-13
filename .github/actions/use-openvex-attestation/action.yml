@@ -12,7 +12,7 @@ inputs:
     description: The image to be scanned, by tag or digest. The registry must already be logged in.
   certificate-identity-regexp:
     required: false
-    default: ^https://github\.com/telicent-oss/
+    default: ^https://github\.com/(?i:telicent-oss|telicent-io)/
     description: Trusted signer identities, matched against the URL of the workflow that signed the attestation.
 
 outputs:
