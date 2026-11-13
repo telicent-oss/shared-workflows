@@ -62,15 +62,17 @@ test("a statement for a package in the image is re-scoped to every image digest"
     ["pkg:rpm/redhat/gnupg2@2.3.3-5.el9_7?arch=x86_64&distro=rhel-9.8"],
   );
   assert.equal(doc.statements.length, 1);
+  const [index, amd64, ...rest] = doc.statements[0].products;
   assert.deepEqual(
-    doc.statements[0].products.map((product) => product["@id"]),
+    [index["@id"], amd64["@id"]],
     [imageProductId(REPOSITORY, INDEX), imageProductId(REPOSITORY, AMD64)],
   );
-  for (const product of doc.statements[0].products) {
+  for (const product of [index, amd64]) {
     assert.deepEqual(product.subcomponents, [
       { "@id": "pkg:rpm/redhat/gnupg2@2.3.3-5.el9_7" },
     ]);
   }
+  assert.deepEqual(rest, [{ "@id": "pkg:rpm/redhat/gnupg2@2.3.3-5.el9_7" }]);
   assert.equal(doc.statements[0].impact_statement, "CVE-1 is not reachable");
 });
 

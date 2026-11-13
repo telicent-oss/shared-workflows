@@ -49,14 +49,22 @@ export function buildAttestation({
     }
   }
 
-  const statements = [...merged.values()].map(({ statement, packages, impacts }) => ({
-    ...statement,
-    ...(impacts.size > 0 && { impact_statement: [...impacts].join("\n\n") }),
-    products: products.map((id) => ({
-      "@id": id,
-      subcomponents: [...packages].sort().map((purl) => ({ "@id": purl })),
-    })),
-  }));
+  // The packages are also listed as products in their own right: Trivy gives up on
+  // image-scoped statements when a dependency cycle sits between package and root.
+  const statements = [...merged.values()].map(({ statement, packages, impacts }) => {
+    const sorted = [...packages].sort();
+    return {
+      ...statement,
+      ...(impacts.size > 0 && { impact_statement: [...impacts].join("\n\n") }),
+      products: [
+        ...products.map((id) => ({
+          "@id": id,
+          subcomponents: sorted.map((purl) => ({ "@id": purl })),
+        })),
+        ...sorted.map((purl) => ({ "@id": purl })),
+      ],
+    };
+  });
 
   return {
     "@context": "https://openvex.dev/ns/v0.2.0",
