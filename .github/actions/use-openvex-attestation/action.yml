@@ -1,0 +1,61 @@
+name: Use OpenVEX Attestation
+description: |
+  Fetch the OpenVEX attestation that attest-openvex attached to an image, verify its signature, and stage it as the
+  only file in the workspace `.vex/` directory, so a following Trivy or Grype scan applies exactly what is attested.
+  An existing `.vex/` is moved to `stash` for the caller to restore. When the image has no verifiable attestation
+  nothing is changed and `found` is false, so the scan can fall back to the raw statement sources.
+author: Telicent
+
+inputs:
+  image:
+    required: true
+    description: The image to be scanned, by tag or digest. The registry must already be logged in.
+  certificate-identity-regexp:
+    required: false
+    default: ^https://github\.com/telicent-oss/
+    description: Trusted signer identities, matched against the URL of the workflow that signed the attestation.
+
+outputs:
+  found:
+    description: Whether a verified attestation was staged in `.vex/`.
+    value: ${{ steps.stage.outputs.found }}
+  stash:
+    description: Where the original `.vex/` was moved, if it existed. Empty when nothing was staged.
+    value: ${{ steps.stage.outputs.stash }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install Cosign
+      uses: sigstore/cosign-installer@v3
+
+    - name: Fetch and stage OpenVEX attestation
+      id: stage
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+        IDENTITY: ${{ inputs.certificate-identity-regexp }}
+      run: |
+        work=$(mktemp -d -p "$RUNNER_TEMP" openvex-attestation.XXXXXX)
+        if ! cosign verify-attestation --type openvex \
+          --certificate-identity-regexp "$IDENTITY" \
+          --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+          "$IMAGE" > "$work/envelopes.jsonl" 2> "$work/cosign.log"; then
+          cat "$work/cosign.log"
+          echo "::notice title=No OpenVEX attestation::No verified OpenVEX attestation on $IMAGE; scanning with the raw VEX sources."
+          echo "found=false" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        # A re-run attests the same digest again, so take the newest attestation.
+        jq -r .payload "$work/envelopes.jsonl" \
+          | while read -r payload; do base64 -d <<< "$payload"; echo; done \
+          | jq -s 'map(.predicate) | max_by(.timestamp)' > "$work/attested.openvex.json"
+
+        [[ -d .vex ]] && mv .vex "$work/vex"
+        mkdir .vex
+        cp "$work/attested.openvex.json" .vex/
+        echo "found=true" >> "$GITHUB_OUTPUT"
+        echo "stash=$work/vex" >> "$GITHUB_OUTPUT"
+        statements=$(jq '.statements | length' .vex/attested.openvex.json)
+        echo "Scanning \`$IMAGE\` with the $statements statement(s) in its OpenVEX attestation." >> "$GITHUB_STEP_SUMMARY"

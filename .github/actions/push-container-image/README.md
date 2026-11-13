@@ -17,6 +17,10 @@ based on the value of inputs.
 * Sign the container image if the `registry` is `quay`. Signing is not required
 where the `registry` is `ecr`, as ECR uses an AWS Signer profile to
 automatically sign container images that are pushed to it.
+* Attach the OpenVEX statements that apply to the image as a signed cosign attestation (Quay and ECR).
+Statements come from the local `.vex/`, `telicent-oss/telicent-base-images` and any `remote-vex`
+repositories; only those for package versions a Syft scan finds in the image are kept. See
+[attest-openvex](../attest-openvex/action.yml).
 * Execute a Trivy dockerfile scan when `trivy-scan-dockerfile` is `true`.
 * Execute a Trivy image scan when `trivy-scan-image` is `true`.
 * Execute a Grype image scan when `grype-scan-image` is `true`.

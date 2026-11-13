@@ -108,6 +108,13 @@ runs:
       run: docker load --input ${{ inputs.scan-name }}.tar
       shell: bash
 
+    - name: Use the image's OpenVEX attestation
+      id: attestation
+      if: ${{ inputs.image-from-artefact == 'false' }}
+      uses: telicent-oss/shared-workflows/.github/actions/use-openvex-attestation@chore/cve-attestions
+      with:
+        image: ${{ inputs.image-ref }}
+
     - name: Trivy vulnerability scan
       id: trivy-scan
       uses: telicent-oss/trivy-action@v1
@@ -121,9 +128,18 @@ runs:
         uses-java: ${{ inputs.uses-java }}
         allow-unfixed: ${{ inputs.fail-on-unfixed == 'false' }}
         remote-vex: |
-          telicent-oss/telicent-base-images
-          ${{ inputs.remote-vex }}
+          ${{ steps.attestation.outputs.found != 'true' && 'telicent-oss/telicent-base-images' || '' }}
+          ${{ steps.attestation.outputs.found != 'true' && inputs.remote-vex || '' }}
         output-sbom: ${{ startsWith(github.ref, 'refs/tags/') && 'release' || '' }}
+
+    - name: Restore VEX statements
+      if: ${{ always() && steps.attestation.outputs.found == 'true' }}
+      shell: bash
+      env:
+        STASH: ${{ steps.attestation.outputs.stash }}
+      run: |
+        rm -rf .vex
+        if [[ -d $STASH ]]; then mv "$STASH" .vex; fi
 
     - name: Release SBOM for image (If has tags for release)
       if: startsWith(github.ref, 'refs/tags/')

@@ -250,6 +250,13 @@ jobs:
           build-args: |
             ${{ inputs.BUILD_ARGS }}
 
+      - name: Attest OpenVEX statements on Docker Hub
+        if: ${{ !inputs.DRY_RUN && github.actor != 'dependabot[bot]' }}
+        uses: telicent-oss/shared-workflows/.github/actions/attest-openvex@main
+        with:
+          image: docker.io/telicent/${{ inputs.APP_NAME_PREFIX }}${{ inputs.APP_NAME }}${{ inputs.IMAGE_SUFFIX }}@${{ steps.build-images.outputs.digest }}
+          remote-vex: ${{ inputs.REMOTE_VEX }}
+
       - name: Build Docker Tarball
         uses: docker/build-push-action@v7.2.0
         id: build-local-image
