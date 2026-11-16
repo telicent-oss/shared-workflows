@@ -503,7 +503,8 @@ runs:
 
     - name: Attest OpenVEX statements
       if: inputs.dry-run == 'false' && github.actor != 'dependabot[bot]'
-      uses: telicent-oss/shared-workflows/.github/actions/attest-openvex@chore/cve-attestions
+      continue-on-error: true
+      uses: telicent-oss/shared-workflows/.github/actions/attest-openvex@main
       with:
         image: ${{ inputs.registry == 'aws' && steps.login-ecr.outputs.registry || 'quay.io/telicent' }}/${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}@${{ steps.build-images.outputs.digest }}
         remote-vex: ${{ inputs.remote-vex }}
@@ -546,7 +547,7 @@ runs:
     - name: Trivy image scan
       # Only run if Trivy image scan is explicitly set to 'true' AND (is a dry run OR (is not a dry run AND user is not dependabot))
       if: inputs.trivy-scan-image == 'true' && (inputs.dry-run != 'false' || (inputs.dry-run == 'false' && github.actor != 'dependabot[bot]'))
-      uses: telicent-oss/shared-workflows/.github/actions/trivy-image-scan@chore/cve-attestions
+      uses: telicent-oss/shared-workflows/.github/actions/trivy-image-scan@main
       with:
         github-token: ${{ inputs.github-token }}
         # Indicates that the image should be imported from a tarball artefact and scanned locally
@@ -564,7 +565,7 @@ runs:
     - name: Grype image scan
       # Only run if Grype image scan is explicitly set to 'true' AND (is a dry run OR (is not a dry run AND user is not dependabot))
       if: inputs.grype-scan-image == 'true' && (inputs.dry-run != 'false' || (inputs.dry-run == 'false' && github.actor != 'dependabot[bot]'))
-      uses: telicent-oss/shared-workflows/.github/actions/grype-image-scan@chore/cve-attestions
+      uses: telicent-oss/shared-workflows/.github/actions/grype-image-scan@main
       with:
         github-token: ${{ inputs.github-token }}
         # Indicates that the image should be imported from a tarball artefact and scanned locally

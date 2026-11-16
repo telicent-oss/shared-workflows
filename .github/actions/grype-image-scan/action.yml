@@ -103,7 +103,7 @@ runs:
     - name: Use the image's OpenVEX attestation
       id: attestation
       if: ${{ inputs.image-from-artefact == 'false' }}
-      uses: telicent-oss/shared-workflows/.github/actions/use-openvex-attestation@chore/cve-attestions
+      uses: telicent-oss/shared-workflows/.github/actions/use-openvex-attestation@main
       with:
         image: ${{ inputs.image-ref }}
 
