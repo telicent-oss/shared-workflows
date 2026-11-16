@@ -1,0 +1,233 @@
+name: Dependabot auto-merge
+
+# Merges Dependabot minor/patch PRs once every workflow run on the PR head has
+# passed. Call it from a workflow triggered on both `pull_request` and
+# `workflow_run` (listing every CI workflow that runs on Dependabot PRs).
+# Two halves, because the information they need arrives separately:
+#
+#   label  (pull_request)  fetch-metadata only works on Dependabot's own PR
+#                          event, so it records the verdict as an `automerge`
+#                          label when the PR opens. Remove the label by hand to
+#                          hold a PR back; rebases don't add it again.
+#   merge  (workflow_run)  fires as each CI workflow finishes; whichever
+#                          finishes last sees everything green and merges. It
+#                          skips any branch that someone other than Dependabot
+#                          or the mergebot has pushed to.
+#
+# The vulnerability scan fails on any HIGH/CRITICAL in the tree, including ones
+# already on the default branch that this PR doesn't touch. So a failed scan
+# alone doesn't block: the merge goes ahead if the PR adds no HIGH/CRITICAL
+# beyond the latest scan of the default branch.
+#
+# The merge goes through telicent-mergebot, which is on the org ruleset's bypass
+# list. Auto-merge (`gh pr merge --auto`) can't be used: it never applies a
+# bypass, so it would wait forever on the code-owner review. A bypass merge also
+# skips required checks, which is why the gate below checks runs itself.
+#
+# Workflows triggered by Dependabot see only Dependabot secrets, so
+# the MERGEBOT_* secrets must exist in both the Actions and Dependabot stores.
+
+on:
+  workflow_call:
+    inputs:
+      vulnerability-workflow:
+        description: Name of the vulnerability scanning workflow whose failure is tolerated if the PR adds no new HIGH/CRITICAL findings.
+        type: string
+        default: Vulnerability Scanning
+      vulnerability-job-prefix:
+        description: Name prefix of the scan jobs in that workflow; each must upload a Trivy report.
+        type: string
+        default: "Vulnerability scanning ("
+      trivy-report-artifact:
+        description: Name of the artifact holding each scan job's Trivy JSON report.
+        type: string
+        default: repo-scan-trivy-report
+    secrets:
+      MERGEBOT_CLIENT_ID:
+        required: true
+      MERGEBOT_PRIVATE_KEY:
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependabot-automerge-${{ github.head_ref || github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  label:
+    if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Fetch Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@v3
+
+      # Docker tags that aren't semver report no update-type, so they stay manual.
+      # Adds only on `opened`, so a hand-removed label survives rebases.
+      - name: Label minor and patch updates
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.html_url }}
+          ACTION: ${{ github.event.action }}
+          UPDATE_TYPE: ${{ steps.meta.outputs.update-type }}
+        run: |
+          case "$UPDATE_TYPE" in
+            version-update:semver-minor|version-update:semver-patch)
+              if [ "$ACTION" = "opened" ]; then
+                gh pr edit "$PR" --add-label automerge
+              fi ;;
+            *)
+              gh pr edit "$PR" --remove-label automerge ;;
+          esac
+
+  merge:
+    if: >-
+      github.event_name == 'workflow_run' &&
+      (github.event.workflow_run.conclusion == 'success' ||
+       github.event.workflow_run.name == inputs.vulnerability-workflow) &&
+      startsWith(github.event.workflow_run.head_branch, 'dependabot/')
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check the PR is ready
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          SELF: ${{ github.workflow }}
+          VULN_WORKFLOW: ${{ inputs.vulnerability-workflow }}
+        run: |
+          set -o pipefail
+          pr=$(gh pr view "$BRANCH" --repo "$REPO" --json number,state,headRefOid,author,labels)
+
+          if [ "$(jq -r '.state' <<<"$pr")" != "OPEN" ] ||
+             [ "$(jq -r '.author.login' <<<"$pr")" != "app/dependabot" ] ||
+             ! jq -e '.labels | any(.name == "automerge")' <<<"$pr" >/dev/null; then
+            echo "Not an open Dependabot PR labelled automerge - skipping."
+            exit 0
+          fi
+
+          # A later push (e.g. a lockfile sync) makes this run stale; the
+          # runs on the new head will trigger this workflow again.
+          if [ "$(jq -r '.headRefOid' <<<"$pr")" != "$SHA" ]; then
+            echo "Run is for $SHA but the PR head has moved - skipping."
+            exit 0
+          fi
+
+          # The admin merge skips code-owner review, so only merge what the bots
+          # pushed. Pushers, not commit authors: anyone can set a git author.
+          others=$(gh api "repos/$REPO/activity?ref=refs/heads/$BRANCH" --paginate \
+            --jq '.[].actor.login | select(. != "dependabot[bot]" and . != "telicent-mergebot[bot]")' |
+            sort -u | paste -sd, -)
+          if [ -n "$others" ]; then
+            echo "Branch has pushes from $others - leaving it for normal review."
+            exit 0
+          fi
+
+          runs=$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&per_page=100" \
+            --jq "[.workflow_runs[] | select(.name != \"$SELF\")]")
+          pending=$(jq '[.[] | select(.status != "completed")] | length' <<<"$runs")
+          failures=$(jq '[.[] | select(.status == "completed" and
+            (.conclusion | IN("success", "skipped", "neutral") | not))]' <<<"$runs")
+          failed=$(jq -r --arg vuln "$VULN_WORKFLOW" '[.[] | select(.name != $vuln) | .name] | join(", ")' <<<"$failures")
+
+          if [ -n "$failed" ]; then
+            echo "Not merging - failed: $failed"
+            exit 0
+          fi
+          if [ "$pending" -gt 0 ]; then
+            echo "$pending run(s) still in progress - the last to finish will merge."
+            exit 0
+          fi
+
+          echo "number=$(jq -r '.number' <<<"$pr")" >> "$GITHUB_OUTPUT"
+          echo "vuln-runs=$(jq -r '[.[].id] | join(" ")' <<<"$failures")" >> "$GITHUB_OUTPUT"
+
+      # Each scan job uploads its report before failing, so a missing report
+      # means the job broke for some other reason and the PR is left alone.
+      # Findings are keyed on package name, not version, so a bump that leaves a
+      # CVE open isn't "new".
+      - name: Check the PR adds no HIGH/CRITICAL vulnerabilities
+        if: steps.gate.outputs.vuln-runs
+        id: vulns
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          VULN_RUNS: ${{ steps.gate.outputs.vuln-runs }}
+          JOB_PREFIX: ${{ inputs.vulnerability-job-prefix }}
+          ARTIFACT: ${{ inputs.trivy-report-artifact }}
+        run: |
+          set -o pipefail
+          reports() {
+            local expected
+            expected=$(gh api "repos/$REPO/actions/runs/$1/jobs?per_page=100" \
+              --jq "[.jobs[] | select(.name | startswith(\"$JOB_PREFIX\"))] | length")
+            mkdir -p "$2"
+            gh api "repos/$REPO/actions/runs/$1/artifacts?per_page=100" \
+              --jq ".artifacts[] | select(.name == \"$ARTIFACT\") | .id" |
+              while read -r id; do
+                gh api "repos/$REPO/actions/artifacts/$id/zip" > "$RUNNER_TEMP/$id.zip"
+                unzip -q -o "$RUNNER_TEMP/$id.zip" -d "$2/$id"
+              done
+            local found
+            found=$(find "$2" -name '*.json' | wc -l)
+            if [ "$found" -lt "$expected" ] || [ "$expected" -eq 0 ]; then
+              echo "Run $1 has $found report(s) for $expected scan job(s) - not merging."
+              return 1
+            fi
+          }
+          gating() {
+            find "$1" -name '*.json' -exec jq -r '.Results[]?.Vulnerabilities[]?
+              | select(.Severity == "HIGH" or .Severity == "CRITICAL")
+              | "\(.VulnerabilityID) \(.PkgName)"' {} + | sort -u
+          }
+
+          read -r first _ <<<"$VULN_RUNS"
+          workflow=$(gh api "repos/$REPO/actions/runs/$first" --jq '.workflow_id')
+          base=$(gh api "repos/$REPO/actions/workflows/$workflow/runs?branch=$DEFAULT_BRANCH&status=completed&per_page=1" \
+            --jq '.workflow_runs[0].id')
+          echo "Baseline: run $base on $DEFAULT_BRANCH"
+          reports "$base" "$RUNNER_TEMP/base" || exit 0
+          for run in $VULN_RUNS; do
+            reports "$run" "$RUNNER_TEMP/head" || exit 0
+          done
+
+          added=$(comm -13 <(gating "$RUNNER_TEMP/base") <(gating "$RUNNER_TEMP/head"))
+          if [ -n "$added" ]; then
+            printf 'New HIGH/CRITICAL findings:\n%s\n' "$added"
+            exit 0
+          fi
+          echo "No HIGH/CRITICAL findings beyond those already on $DEFAULT_BRANCH."
+          echo "ok=true" >> "$GITHUB_OUTPUT"
+
+      - name: Create telicent-mergebot token
+        if: steps.gate.outputs.number && (!steps.gate.outputs.vuln-runs || steps.vulns.outputs.ok)
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ secrets.MERGEBOT_CLIENT_ID }}
+          private-key: ${{ secrets.MERGEBOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+
+      # --admin merges via the ruleset bypass; --match-head-commit refuses if a
+      # push landed since the gate ran.
+      - name: Merge
+        if: steps.gate.outputs.number && (!steps.gate.outputs.vuln-runs || steps.vulns.outputs.ok)
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ steps.gate.outputs.number }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: gh pr merge "$PR" --repo "$REPO" --squash --admin --match-head-commit "$SHA"
