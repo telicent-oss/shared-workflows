@@ -1,0 +1,126 @@
+name: Attest OpenVEX
+description: |
+  Attach the OpenVEX statements that apply to a pushed image as a signed cosign attestation, so scanners that
+  discover attestations (Grype, Trivy with `--vex oci`) see our false-positive assessments.
+  Statements are gathered from the repository's own `.vex/` directory, `telicent-oss/telicent-base-images` and any
+  `remote-vex` repositories. Only those whose package versions a Syft scan finds in the image are kept, re-scoped
+  to the image's digests.
+author: Telicent
+
+inputs:
+  image:
+    required: true
+    description: |
+      The pushed image, by digest or tag, e.g. quay.io/telicent/telicent-search@sha256:... The registry must already
+      be logged in, and the job needs `id-token: write` for keyless signing.
+  remote-vex:
+    required: false
+    default: ""
+    description: |
+      Additional repositories, one per line and optionally as `owner/repo@ref`, whose `.vex/` statements should be
+      considered. `telicent-oss/telicent-base-images` is always included.
+  github-token:
+    required: false
+    default: ${{ github.token }}
+    description: GitHub token used to fetch the `remote-vex` repositories.
+
+outputs:
+  statements:
+    description: The number of statements attested. Zero means nothing applied to the image and no attestation was pushed.
+    value: ${{ steps.build.outputs.statements }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve image digests
+      id: digests
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.image }}
+      run: |
+        repository=${IMAGE%%@*}
+        [[ ${repository##*/} == *:* ]] && repository=${repository%:*}
+        index=$(docker buildx imagetools inspect "$IMAGE" --format '{{json .Manifest}}' | jq -r .digest)
+        # Platform "unknown" entries are the buildx provenance/SBOM manifests, not runnable images.
+        platforms=$(docker buildx imagetools inspect "$IMAGE" --raw \
+          | jq -r '.manifests[]? | select(.platform.os != "unknown") | .digest' | xargs)
+        name=${repository##*/}
+        echo "repository=$repository" >> "$GITHUB_OUTPUT"
+        echo "name=$name" >> "$GITHUB_OUTPUT"
+        echo "id=$name-${index:7:12}" >> "$GITHUB_OUTPUT"
+        echo "index=$index" >> "$GITHUB_OUTPUT"
+        echo "platforms=$platforms" >> "$GITHUB_OUTPUT"
+        echo "repository=$repository index=$index platforms=$platforms"
+
+    - name: Gather OpenVEX statements
+      id: vex
+      uses: telicent-oss/merge-vex-action@v1
+      with:
+        name: attest-${{ steps.digests.outputs.id }}
+        gh-token: ${{ inputs.github-token }}
+        remote-vex: |
+          telicent-oss/telicent-base-images
+          ${{ inputs.remote-vex }}
+
+    - name: Install Syft
+      if: steps.vex.outputs.prepared == 'true'
+      uses: anchore/sbom-action/download-syft@v0
+
+    - name: Build OpenVEX attestation
+      id: build
+      shell: bash
+      env:
+        REPOSITORY: ${{ steps.digests.outputs.repository }}
+        INDEX: ${{ steps.digests.outputs.index }}
+        PLATFORMS: ${{ steps.digests.outputs.platforms }}
+        VEX_FILE: ${{ steps.vex.outputs.vex-file }}
+        SCRIPT: ${{ github.action_path }}/openvex-attestation.mjs
+        OUT_DIR: ${{ runner.temp }}/attest-openvex-${{ steps.digests.outputs.id }}
+      run: |
+        mkdir -p "$OUT_DIR"
+        if [[ -z $VEX_FILE ]]; then
+          echo "statements=0" >> "$GITHUB_OUTPUT"
+          echo "No OpenVEX statements found; nothing attested to \`$REPOSITORY@$INDEX\`." >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+        : > "$OUT_DIR/purls.txt"
+        for digest in ${PLATFORMS:-$INDEX}; do
+          syft scan "registry:$REPOSITORY@$digest" -q -o json | jq -r '.artifacts[].purl // empty' >> "$OUT_DIR/purls.txt"
+        done
+        sort -u -o "$OUT_DIR/purls.txt" "$OUT_DIR/purls.txt"
+        node "$SCRIPT" "$VEX_FILE" "$OUT_DIR/purls.txt" "$REPOSITORY" $INDEX $PLATFORMS > "$OUT_DIR/openvex.json"
+        statements=$(jq '.statements | length' "$OUT_DIR/openvex.json")
+        echo "statements=$statements" >> "$GITHUB_OUTPUT"
+        echo "file=$OUT_DIR/openvex.json" >> "$GITHUB_OUTPUT"
+        {
+          echo "## OpenVEX attestation for \`$REPOSITORY@$INDEX\`"
+          echo
+          if [[ $statements -eq 0 ]]; then
+            echo "None of the gathered statements apply to this image; nothing attested."
+          else
+            jq -r '.statements[] | "- \(.vulnerability.name) (\(.status)): \([.products[0].subcomponents[]["@id"]] | join(", "))"' "$OUT_DIR/openvex.json"
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Install Cosign
+      if: steps.build.outputs.statements != '0'
+      uses: sigstore/cosign-installer@v3
+
+    - name: Attest OpenVEX to the image
+      if: steps.build.outputs.statements != '0'
+      shell: bash
+      env:
+        REPOSITORY: ${{ steps.digests.outputs.repository }}
+        DIGESTS: ${{ steps.digests.outputs.index }} ${{ steps.digests.outputs.platforms }}
+        PREDICATE: ${{ steps.build.outputs.file }}
+      run: |
+        for digest in $DIGESTS; do
+          cosign attest --yes --type openvex --predicate "$PREDICATE" "$REPOSITORY@$digest"
+        done
+
+    - name: Upload OpenVEX attestation
+      if: steps.build.outputs.statements != '0'
+      uses: actions/upload-artifact@v7
+      with:
+        name: openvex-${{ steps.digests.outputs.id }}
+        path: ${{ steps.build.outputs.file }}
