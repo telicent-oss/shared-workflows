@@ -456,7 +456,7 @@ jobs:
           # Deliberately NOT output-on-base here.  The build job forces this true on the
           # base branch so that tests always run on main, but there is no equivalent
           # reason to re-analyse main when nothing under src/ or pom.xml changed.
-          output-on-base: false
+          output-on-base: true
           summary: false
           notices: false
 

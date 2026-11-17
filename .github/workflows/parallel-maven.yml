@@ -282,7 +282,7 @@ jobs:
         id: sq-mode
         run: |
           if [ "$GATE_ENABLED" != "true" ]; then
-            MODE=off
+            MODE=warn
             REASON="SONAR_QUALITY_GATE is false"
           elif [ -n "$MODE_OVERRIDE" ]; then
             MODE="$MODE_OVERRIDE"
