@@ -78,6 +78,13 @@ jobs:
         if: ${{ inputs.IMAGE_FROM_ARTIFACT }}
         run: docker load --input ${{ inputs.SCAN_NAME }}.tar
 
+      - name: Use the image's OpenVEX attestation
+        id: attestation
+        if: ${{ !inputs.IMAGE_FROM_ARTIFACT }}
+        uses: telicent-oss/shared-workflows/.github/actions/use-openvex-attestation@main
+        with:
+          image: ${{ inputs.IMAGE_REF }}
+
       - name: Trivy Vulnerability Scanning
         id: trivy-scan
         uses: telicent-oss/trivy-action@v1
@@ -91,8 +98,8 @@ jobs:
           uses-java: ${{ inputs.USES_JAVA }}
           allow-unfixed: ${{ inputs.SECURITY_ISSUES_BLOCK_ONLY_IF_FIX_AVAILABLE }}
           remote-vex: |
-            telicent-oss/telicent-base-images
-            ${{ inputs.REMOTE_VEX }}
+            ${{ steps.attestation.outputs.found != 'true' && 'telicent-oss/telicent-base-images' || '' }}
+            ${{ steps.attestation.outputs.found != 'true' && inputs.REMOTE_VEX || '' }}
           output-sbom: ${{ startsWith(github.ref, 'refs/tags/') && 'release' || '' }}
 
       - name: Release SBOM for image (IF has tags for release)

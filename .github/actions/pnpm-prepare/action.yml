@@ -52,6 +52,9 @@ runs:
         # ignored (empty node-version-file is treated as unset by setup-node).
         node-version: ${{ inputs.node-version }}
         node-version-file: ${{ inputs.node-version == '' && '.nvmrc' || '' }}
+        # Resolve the newest release matching .nvmrc, not the runner's cached
+        # copy, so a major-only .nvmrc ("22") always meets the engines floor.
+        check-latest: true
         cache: 'pnpm'
     # Append the private-registry auth tokens to the user-level ~/.npmrc. The
     # committed project .npmrc (scope→registry mappings + engine-strict) is left

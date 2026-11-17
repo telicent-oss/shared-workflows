@@ -16,6 +16,10 @@ branding:
   color: 'blue'
 
 inputs:
+  working-directory:
+    required: false
+    default: "."
+    description: Maven project directory, relative to the workspace.
   sonar-host-url:
     required: false
     default: https://sonarcloud.io
@@ -102,6 +106,7 @@ runs:
     - name: Validate inputs and resolve the Quality Gate mode
       id: mode
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       env:
         SONAR_TOKEN: ${{ inputs.sonar-token }}
         GATE_TIMEOUT: ${{ inputs.quality-gate-timeout-seconds }}
@@ -163,6 +168,7 @@ runs:
 
     - name: Compile project (if needed)
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       env:
         COMPILE: ${{ inputs.compile }}
         EXTRA_MAVEN_ARGS: ${{ inputs.maven-args }}
@@ -190,13 +196,14 @@ runs:
           # must be supplied via the coverage-report-paths input in this scenario
           # Need to do a full package as some projects only build supplementary artifacts (which are also test 
           # dependencies) in the package phase
-          mvn package -P${{ inputs.maven-profiles }} --batch-mode -DskipTests -Dgpg.skip -Dcyclonedx.skip \
+          mvn package ${{ inputs.maven-profiles != '' && format('-P{0}', inputs.maven-profiles) || '' }} --batch-mode -DskipTests -Dgpg.skip -Dcyclonedx.skip \
             -Dmaven.javadoc.skip -Dmaven.source.skip -q $EXTRA_MAVEN_ARGS
         fi
 
     - name: SonarQube Analysis
       id: scan
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       env:
         SONAR_TOKEN: ${{ inputs.sonar-token }}
         SONAR_HOST_URL: ${{ inputs.sonar-host-url }}
@@ -221,11 +228,7 @@ runs:
           args+=("-Dsonar.coverage.jacoco.xmlReportPaths=$COVERAGE_PATHS")
         fi
         status=0
-        mvn "${args[@]}" -P${{ inputs.maven-profiles }} $EXTRA_MAVEN_ARGS || status=$?
-
-        # report-task.txt is only written once the scanner has successfully submitted the
-        # analysis, so its presence is what separates a Quality Gate verdict from a
-        # tooling failure below.
+        mvn "${args[@]}" ${{ inputs.maven-profiles != '' && format('-P{0}', inputs.maven-profiles) || '' }} $EXTRA_MAVEN_ARGS || status=$?
         REPORT=$(find . -path '*/target/sonar/report-task.txt' -print -quit)
         DASHBOARD=""
         if [ -n "$REPORT" ]; then

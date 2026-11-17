@@ -1,0 +1,8 @@
+[project]
+name = "test-fixture-valid-hashes"
+version = "0.0.1"
+dependencies = ["certifi==2024.8.30"]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"

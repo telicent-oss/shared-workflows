@@ -345,14 +345,6 @@ runs:
         restore-keys: |
           ${{ runner.os }}-buildkit-
 
-    - name: Load buildkit state from cache
-      uses: dashevo/gh-action-cache-buildkit-state@v1.0.3
-      if: inputs.enable-buildkit-cache == 'true'
-      with:
-        builder: buildx_buildkit_${{ steps.buildx.outputs.name }}0
-        cache-path: /tmp/buildkit-cache
-        cache-max-size: 3g
-
     - name: Configure AWS credentials from main account
       id: aws-login
       # Only run if dry run is explicitly set to 'false'
@@ -389,6 +381,17 @@ runs:
     - name: Set up Docker buildx
       id: buildx
       uses: docker/setup-buildx-action@v4.0.0
+
+    # Must run after the buildx step: it needs the builder name from steps.buildx.outputs.name to find the BuildKit
+    # container, and its post step (which saves the state) must run before setup-buildx's post step removes the builder.
+    # The actions/cache step above still restores/saves the tarball itself.
+    - name: Load buildkit state from cache
+      uses: dashevo/gh-action-cache-buildkit-state@v1.0.3
+      if: inputs.enable-buildkit-cache == 'true'
+      with:
+        builder: buildx_buildkit_${{ steps.buildx.outputs.name }}0
+        cache-path: /tmp/buildkit-cache
+        cache-max-size: 3g
 
     - name: Prepare Docker image names and tags
       id: meta
@@ -497,6 +500,15 @@ runs:
           images+="${tag}@${DIGEST} "
         done
         cosign sign --yes ${images}
+
+    - name: Attest OpenVEX statements
+      if: inputs.dry-run == 'false' && github.actor != 'dependabot[bot]'
+      continue-on-error: true
+      uses: telicent-oss/shared-workflows/.github/actions/attest-openvex@main
+      with:
+        image: ${{ inputs.registry == 'aws' && steps.login-ecr.outputs.registry || 'quay.io/telicent' }}/${{ inputs.app-name-prefix }}${{ inputs.app-name }}${{ inputs.image-suffix }}@${{ steps.build-images.outputs.digest }}
+        remote-vex: ${{ inputs.remote-vex }}
+        github-token: ${{ inputs.github-token }}
 
     - name: Upload container image tarball artefact
       # Only run if dry run is set to anything other than 'false', indicating that this is a dry run

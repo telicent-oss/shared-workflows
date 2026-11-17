@@ -9,6 +9,8 @@ on:
         default: docker
         description: |
           Specifies the name of the profile that enables/disables Docker based tests.
+          Set to an empty string for projects with no such profile, otherwise Maven warns that the requested
+          profile could not be activated.
       USES_DOCKERHUB_IMAGES:
         required: false
         type: boolean
@@ -378,9 +380,9 @@ jobs:
         # stage of the workflow, they'll get generated later for security scans and/or release publishing
         run: |
           if [ "${{ runner.debug }}" -eq 1 ] 2>/dev/null; then
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ case(steps.java-changes.outputs.changed == 'false', '-DskipTests', '') }} -Dcyclonedx.skip ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode ${{ inputs.DOCKER_PROFILE != '' && format('-P{0}', inputs.DOCKER_PROFILE) || '' }} ${{ case(steps.java-changes.outputs.changed == 'false', '-DskipTests', '') }} -Dcyclonedx.skip ${{ inputs.MAVEN_ARGS }} ${{ inputs.MAVEN_DEBUG_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
           else
-            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode -P${{ inputs.DOCKER_PROFILE }} ${{ case(steps.java-changes.outputs.changed == 'false', '-DskipTests', '') }} -Dcyclonedx.skip ${{ inputs.MAVEN_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
+            mvn ${{ inputs.MAVEN_BUILD_GOALS }} --batch-mode ${{ inputs.DOCKER_PROFILE != '' && format('-P{0}', inputs.DOCKER_PROFILE) || '' }} ${{ case(steps.java-changes.outputs.changed == 'false', '-DskipTests', '') }} -Dcyclonedx.skip ${{ inputs.MAVEN_ARGS }} ${{ steps.extra-maven-args.outputs.args }}
           fi
 
       - name: Trivy Vulnerability Scanning
@@ -405,11 +407,39 @@ jobs:
           path: |
             target/site/jacoco/
             **/target/site/jacoco/
-
+          # Modules without tests have no JaCoCo report
+          if-no-files-found: ignore
+            
       - name: Detect Maven version
         id: project
         run: |
-          echo version=$(mvn -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_OUTPUT
+          echo version=$(mvn -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_OUTPUT        
+
+      # When Surefire/Failsafe has to kill a forked test JVM (e.g. "Surefire is going to kill self fork JVM") it writes a
+      # thread dump to *.dumpstream, which is the only way to see what blocked the JVM from exiting
+      - name: Upload Surefire/Failsafe dump files
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: surefire-dumps
+          path: |
+            **/target/surefire-reports/*.dump*
+            **/target/failsafe-reports/*.dump*
+          if-no-files-found: ignore
+          retention-days: 7
+      
+      - name: Check whether SonarQube is Configured
+        id: sq-check
+        run: |
+          if [ -n "$SONAR_HOST_URL" ] && [ -n "$SONAR_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}        
+
 
   # SonarQube runs as its own job rather than as a step in 'build', so that a code quality
   # verdict can never fail the job that produces the artifacts, sets the version output and
