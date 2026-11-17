@@ -28,17 +28,36 @@ inputs:
     description: |
       The SonarQube organization the project belongs to. Required by SonarQube Cloud
       (`https://sonarcloud.io`) unless declared in `sonar-project.properties`.
+  quality-gate:
+    required: false
+    default: ""
+    description: |
+      How the SonarQube quality gate is applied:
+      - `enforce`: wait for the quality gate and fail the build when it fails
+      - `warn`: wait for the quality gate and report a failure as a warning and a job
+        summary entry, without failing the build
+      - `off`: perform the scan only, without waiting for or reporting a quality gate
+
+      Defaults to `warn` when neither this nor the deprecated
+      `sonar-fail-on-quality-gate` input is set, so that a caller which has not thought
+      about gating gets the signal without having the build blocked by it.
+
+      Only the quality gate verdict is downgraded by `warn`. A failure of the scan
+      itself always fails the build, since the scan runs as its own step.
   sonar-fail-on-quality-gate:
     required: false
-    default: "true"
+    default: ""
     description: |
-      Whether to perform just the scan or to enforce it with a hard failure gate.
+      DEPRECATED - use `quality-gate` instead. `true` maps to `quality-gate: enforce`
+      and `false` maps to `quality-gate: off`. Note that `false` therefore means the
+      quality gate is never evaluated; use `quality-gate: warn` to keep the result
+      visible without failing the build.
   sonar-polling-timeout-seconds:
     required: false
     default: "300"
     description: |
-      The maximum time, in seconds, to wait for the quality gate result. Only used when
-      `sonar-fail-on-quality-gate` is `true`.
+      The maximum time, in seconds, to wait for the quality gate result. Used when
+      `quality-gate` is `enforce` or `warn`.
   project-base-dir:
     required: false
     default: "."
@@ -53,14 +72,16 @@ inputs:
 outputs:
   quality-gate-status:
     description: |
-      The quality gate result, one of `PASSED`, `WARN` or `FAILED`. Only populated when
-      `sonar-fail-on-quality-gate` is `true`.
+      The quality gate result, one of `PASSED`, `WARN` or `FAILED`. Populated in `warn`
+      mode as well as `enforce`, so callers can route a non-blocking failure to a
+      notification, a check run or a tracking issue. Empty when `quality-gate` is `off`.
     value: ${{ steps.quality-gate.outputs.quality-gate-status }}
 
 runs:
   using: composite
   steps:
-    - name: Validate inputs
+    - name: Validate inputs and resolve the quality gate mode
+      id: mode
       shell: bash
       run: |
         # Ensure a SonarQube host URL is provided
@@ -80,10 +101,47 @@ runs:
           echo "::error::The 'sonar-polling-timeout-seconds' input must be a positive whole number, got '$POLLING_TIMEOUT'."
           exit 1
         fi
+
+        # Resolve the quality gate mode. 'quality-gate' wins; the deprecated boolean is
+        # honoured for callers that have not migrated yet; absent both, default to 'warn'
+        # so gating is opt-in but the result is still reported.
+        GATE_MODE="$(echo "$GATE_MODE" | tr '[:upper:]' '[:lower:]')"
+        FAIL_ON_GATE="$(echo "$FAIL_ON_GATE" | tr '[:upper:]' '[:lower:]')"
+
+        if [ -n "$GATE_MODE" ]; then
+          if [ -n "$FAIL_ON_GATE" ]; then
+            echo "::warning::Both 'quality-gate' and the deprecated 'sonar-fail-on-quality-gate' were supplied; 'quality-gate=$GATE_MODE' takes precedence."
+          fi
+        elif [ -n "$FAIL_ON_GATE" ]; then
+          case "$FAIL_ON_GATE" in
+            true)  GATE_MODE=enforce ;;
+            false) GATE_MODE=off ;;
+            *)
+              echo "::error::The 'sonar-fail-on-quality-gate' input must be 'true' or 'false', got '$FAIL_ON_GATE'."
+              exit 1
+              ;;
+          esac
+          echo "::warning::'sonar-fail-on-quality-gate' is deprecated; use 'quality-gate: $GATE_MODE' instead. Note that 'quality-gate: warn' reports a failing gate without blocking the build."
+        else
+          GATE_MODE=warn
+        fi
+
+        case "$GATE_MODE" in
+          enforce|warn|off) ;;
+          *)
+            echo "::error::The 'quality-gate' input must be one of 'enforce', 'warn' or 'off', got '$GATE_MODE'."
+            exit 1
+            ;;
+        esac
+
+        echo "Quality gate mode: $GATE_MODE"
+        echo "mode=$GATE_MODE" >> "$GITHUB_OUTPUT"
       env:
         SONAR_HOST_URL: ${{ inputs.sonar-host-url }}
         SONAR_TOKEN: ${{ inputs.sonar-token }}
         POLLING_TIMEOUT: ${{ inputs.sonar-polling-timeout-seconds }}
+        GATE_MODE: ${{ inputs.quality-gate }}
+        FAIL_ON_GATE: ${{ inputs.sonar-fail-on-quality-gate }}
 
     - name: Resolve scanner arguments
       id: scanner-args
@@ -130,7 +188,12 @@ runs:
 
     - name: Quality gate
       id: quality-gate
-      if: inputs.sonar-fail-on-quality-gate == 'true'
+      if: steps.mode.outputs.mode != 'off'
+      # Deliberately a literal rather than an expression: 'continue-on-error' referencing
+      # 'inputs' is evaluated in the wrong context inside a composite action and fails
+      # template validation (actions/runner#2418). The following step decides whether a
+      # failure here is fatal, based on steps.quality-gate.outcome.
+      continue-on-error: true
       uses: SonarSource/sonarqube-quality-gate-action@cf038b0e0cdecfa9e56c198bbb7d21d751d62c3b # v1.2.0
       with:
         scanMetadataReportFile: ${{ steps.scanner-args.outputs.report-task-file }}
@@ -138,3 +201,22 @@ runs:
       env:
         SONAR_TOKEN: ${{ inputs.sonar-token }}
         SONAR_HOST_URL: ${{ inputs.sonar-host-url }}
+
+    - name: Interpret the quality gate result
+      if: steps.mode.outputs.mode != 'off' && steps.quality-gate.outcome == 'failure'
+      shell: bash
+      env:
+        GATE_MODE: ${{ steps.mode.outputs.mode }}
+        GATE_STATUS: ${{ steps.quality-gate.outputs.quality-gate-status }}
+      run: |
+        if [ "$GATE_MODE" = "warn" ]; then
+          echo "::warning::The SonarQube quality gate failed (${GATE_STATUS:-FAILED}). It is not enforced on '${GITHUB_REF_NAME}', so the build has not been failed."
+          {
+            echo "### :warning: SonarQube quality gate failed"
+            echo
+            echo "Status: \`${GATE_STATUS:-FAILED}\`. The quality gate is reported but not enforced on \`${GITHUB_REF_NAME}\`, so this has not failed the build."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+        echo "::error::The SonarQube quality gate failed (${GATE_STATUS:-FAILED})."
+        exit 1
