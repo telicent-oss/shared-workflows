@@ -164,7 +164,6 @@ jobs:
           path: ${{ matrix.path || '.' }}
           allow-development-tag: true
           allow-mutable-tags: false
-          grype-scan-image: false
           registry: aws
           sha-tag-format: short
           # Secrets
