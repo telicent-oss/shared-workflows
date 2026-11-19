@@ -565,7 +565,7 @@ runs:
     - name: Grype image scan
       # Only run if Grype image scan is explicitly set to 'true' AND (is a dry run OR (is not a dry run AND user is not dependabot))
       if: inputs.grype-scan-image == 'true' && (inputs.dry-run != 'false' || (inputs.dry-run == 'false' && github.actor != 'dependabot[bot]'))
-      uses: telicent-oss/shared-workflows/.github/actions/grype-image-scan@main
+      uses: telicent-oss/shared-workflows/.github/actions/grype-image-scan@chore/grype-scan
       with:
         github-token: ${{ inputs.github-token }}
         # Indicates that the image should be imported from a tarball artefact and scanned locally
