@@ -109,7 +109,7 @@ runs:
 
     - name: Grype Vulnerability Scanning
       id: grype-scan
-      uses: telicent-oss/grype-action@v1
+      uses: telicent-oss/grype-action@chore/remove-stale-db
       with:
         gh-token: ${{ inputs.github-token }}
         scan-type: image
