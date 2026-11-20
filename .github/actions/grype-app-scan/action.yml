@@ -35,8 +35,8 @@ inputs:
       Only allowed for BUILD image, MUST NOT be used with DEPLOY image. Full relative path to a custom
       grype config file used to suppress CVEs. NEVER use .grype.yaml, must be a non-default filename.
   fail-on-unfixed:
-    required: false
-    default: 'false'
+    required: true
+    default: 'true'
     description: Whether unfixed HIGH/CRITICAL vulnerabilities must fail the scan.
   remote-vex:
     required: false
