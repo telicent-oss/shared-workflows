@@ -124,6 +124,8 @@ runs:
     - name: Grype vulnerability scan
       id: grype-scan
       uses: telicent-oss/grype-action@v1
+      env:
+        GRYPE_SHOW_SUPPRESSED: true
       with:
         gh-token: ${{ inputs.github-token }}
         scan-type: sbom
