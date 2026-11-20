@@ -85,7 +85,9 @@ runs:
         fi
         : > "$OUT_DIR/purls.txt"
         for digest in ${PLATFORMS:-$INDEX}; do
-          syft scan "registry:$REPOSITORY@$digest" -q -o json | jq -r '.artifacts[].purl // empty' >> "$OUT_DIR/purls.txt"
+          # Trivy also reports packages from SBOMs shipped inside the image (e.g. pip/_vendor/bom.cdx.json).
+          syft scan "registry:$REPOSITORY@$digest" -q -o json --select-catalogers +sbom-cataloger \
+            | jq -r '.artifacts[].purl // empty' >> "$OUT_DIR/purls.txt"
         done
         sort -u -o "$OUT_DIR/purls.txt" "$OUT_DIR/purls.txt"
         node "$SCRIPT" "$VEX_FILE" "$OUT_DIR/purls.txt" "$REPOSITORY" $INDEX $PLATFORMS > "$OUT_DIR/openvex.json"
