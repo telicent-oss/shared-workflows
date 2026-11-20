@@ -61,7 +61,7 @@ runs:
       shell: bash
       env:
         BOM_FILE_NAME: "${{ inputs.app-name }}${{ inputs.package-directory != '.' && format('-{0}', inputs.package-directory) || '' }}.sbom.json"
-        BOM_ARTIFACT_NAME: "grype-${{ github.run_number }}${{ inputs.package-directory != '.' && format('-{0}', inputs.package-directory) || '' }}.sbom.json"
+        BOM_ARTIFACT_NAME: "grype-${{ inputs.app-name }}-${{ github.run_number }}${{ inputs.package-directory != '.' && format('-{0}', inputs.package-directory) || '' }}.sbom.json"      
       run: |
         echo "bom-file-name=$BOM_FILE_NAME" >> "$GITHUB_OUTPUT"
         echo "bom-artifact-name=$BOM_ARTIFACT_NAME" >> "$GITHUB_OUTPUT"
