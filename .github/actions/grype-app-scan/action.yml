@@ -34,10 +34,6 @@ inputs:
     description: |
       Only allowed for BUILD image, MUST NOT be used with DEPLOY image. Full relative path to a custom
       grype config file used to suppress CVEs. NEVER use .grype.yaml, must be a non-default filename.
-  fail-on-unfixed:
-    required: true
-    default: 'true'
-    description: Whether unfixed HIGH/CRITICAL vulnerabilities must fail the scan.
   remote-vex:
     required: false
     description: |
@@ -131,7 +127,6 @@ runs:
         scan-type: sbom
         scan-name: app-scan
         scan-ref: ${{ steps.globals.outputs.bom-file-name }}
-        allow-unfixed: ${{ inputs.fail-on-unfixed == 'false' }}
         remote-vex: |
           telicent-oss/telicent-base-images
           ${{ inputs.remote-vex }}
