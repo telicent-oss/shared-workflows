@@ -50,37 +50,10 @@ inputs:
     required: false
     default: "false"
     description: Whether the `version`` and `appVersion` values should be used to update Chart.yaml when packaging the Helm chart.
-  use-build-number:
-    required: false
-    default: "false"
-    description: |
-      Set to `true` to version the chart <next-version>-<build-number> via the resolve-dev-version action, so Kargo
-      can order dev builds by semver. `version` becomes the fallback when no release-please PR is open, and the
-      chart versions are replaced as if `replace-chart-versions` were `true`. Only allowed with `registry: aws`.
-      Needs `contents: read` and `pull-requests: read`.
-  release-please-component:
-    required: false
-    default: ""
-    description: With `use-build-number`, the release-please component whose release PR gives the next version.
-  release-tag-pattern:
-    required: false
-    default: "v*"
-    description: With `use-build-number`, the glob matching release tags, from which build numbers are counted.
-
-outputs:
-  version:
-    description: The version the chart was packaged with.
-    value: ${{ steps.chart-version.outputs.version }}
 
 runs:
   using: composite
   steps:
-    - name: Refuse build numbers outside ECR
-      if: inputs.use-build-number == 'true' && inputs.registry != 'aws'
-      shell: bash
-      run: |
-        echo "::error::use-build-number is for dev charts on ECR; release charts keep their release version"
-        exit 1
     - name: Validate registry inputs
       uses: telicent-oss/shared-workflows/.github/actions/validate-registry-inputs@main
       with:
@@ -96,34 +69,18 @@ runs:
       with:
         sparse-checkout: ${{ inputs.sparse-checkout != '' && inputs.sparse-checkout || inputs.chart }}
         sparse-checkout-cone-mode: false
-    - name: Resolve build-numbered version
-      if: inputs.use-build-number == 'true'
-      id: dev-version
-      uses: telicent-oss/shared-workflows/.github/actions/resolve-dev-version@main
-      with:
-        current-version: ${{ inputs.version }}
-        component: ${{ inputs.release-please-component }}
-        tag-pattern: ${{ inputs.release-tag-pattern }}
-    - name: Set chart version
-      id: chart-version
-      shell: bash
-      run: echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-      env:
-        VERSION: ${{ steps.dev-version.outputs.version || inputs.version }}
     - name: Package Helm chart
       shell: bash
       run: |
         echo "Packaging ${{ inputs.chart }}"
-        if [[ "${{ inputs.replace-chart-versions == 'true' || inputs.use-build-number == 'true' }}" == 'true' ]]; then
-          echo "  🔄 Updating chart version and app version to $VERSION"
+        if [[ "${{ inputs.replace-chart-versions }}" == 'true' ]]; then
+          echo "  🔄 Updating chart version and app version to ${{ inputs.version }}"
           helm package "${{ inputs.chart }}" --destination "${{ runner.temp }}/packaged-chart/" \
-            --version "$VERSION" \
-            --app-version "${{ inputs.appVersion != '' && inputs.appVersion || steps.chart-version.outputs.version }}"
+            --version "${{ inputs.version }}" \
+            --app-version "${{ inputs.appVersion != '' && inputs.appVersion || inputs.version }}"
         else
           helm package "${{ inputs.chart }}" --destination "${{ runner.temp }}/packaged-chart/"
         fi
-      env:
-        VERSION: ${{ steps.chart-version.outputs.version }}
 
     ###
     # Steps if action is a dry run, i.e. the Helm chart should not be pushed
@@ -203,7 +160,7 @@ runs:
         :> "${{ env.REFS_FILE }}"
         printf "%s@%s\n" "$PUSHED" "$DIGEST" >> "${{ env.REFS_FILE }}"
       env:
-        PACKAGED_CHART: "${{ runner.temp }}/packaged-chart/${{ inputs.app-name-prefix }}${{ inputs.app-name }}-${{ steps.chart-version.outputs.version }}.tgz"
+        PACKAGED_CHART: "${{ runner.temp }}/packaged-chart/${{ inputs.app-name-prefix }}${{ inputs.app-name }}-${{ inputs.version }}.tgz"
         AWS_REGISTRY: ${{ inputs.registry == 'aws' && format('oci://{0}/charts' ,steps.login-ecr.outputs.registry) || '' }}
         QUAY_REGISTRY: ${{ inputs.registry == 'quay' && 'oci://quay.io/telicent/charts' || '' }}
         REFS_FILE: "${{ runner.temp }}/quay-chart-refs.txt"
