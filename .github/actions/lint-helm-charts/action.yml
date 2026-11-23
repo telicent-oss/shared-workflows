@@ -9,6 +9,19 @@ inputs:
   chart:
     required: true
     description: Path to the Helm chart to lint, relative to the repository root.
+  build-dependencies:
+    required: false
+    default: 'false'
+    description: Build Helm chart dependencies before linting.
+  registry:
+    required: false
+    default: ''
+    description: Container registry type.
+
+  role-to-assume:
+    required: false
+    default: ''
+    description: AWS IAM role to assume.
 
 runs:
   using: composite
@@ -22,6 +35,22 @@ runs:
       uses: azure/setup-helm@v4
       with:
         version: "latest"
+    - name: Configure AWS credentials from main account
+      if: ${{ inputs.build-dependencies == 'true' && inputs.registry == 'aws' }}
+      uses: aws-actions/configure-aws-credentials@v6
+      with:
+        role-to-assume: ${{ inputs.role-to-assume != '' && inputs.role-to-assume || 'arn:aws:iam::098669589541:role/GitHubDeploymentRole' }}
+        aws-region: eu-west-2
+        mask-aws-account-id: true
+    - name: Login to Amazon ECR
+      if: ${{ inputs.build-dependencies == 'true' && inputs.registry == 'aws' }}
+      uses: aws-actions/amazon-ecr-login@v2
+      with:
+        mask-password: true
+    - name: Build Helm dependencies
+      if: inputs.build-dependencies == 'true'
+      shell: bash
+      run: helm dependency build ${{ inputs.chart }}
     - name: Lint Helm charts
       shell: bash
       run: helm lint ${{ inputs.chart }}
