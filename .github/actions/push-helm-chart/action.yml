@@ -50,6 +50,10 @@ inputs:
     required: false
     default: "false"
     description: Whether the `version`` and `appVersion` values should be used to update Chart.yaml when packaging the Helm chart.
+  dependency-update:
+    required: false
+    default: "false"
+    description: Whether to update chart dependencies before packaging.
 
 runs:
   using: composite
@@ -73,13 +77,21 @@ runs:
       shell: bash
       run: |
         echo "Packaging ${{ inputs.chart }}"
+
+        DEPENDENCY_UPDATE=""
+        if [[ "${{ inputs.dependency-update }}" == 'true' ]]; then
+          DEPENDENCY_UPDATE="--dependency-update"
+        fi
+
         if [[ "${{ inputs.replace-chart-versions }}" == 'true' ]]; then
           echo "  🔄 Updating chart version and app version to ${{ inputs.version }}"
           helm package "${{ inputs.chart }}" --destination "${{ runner.temp }}/packaged-chart/" \
             --version "${{ inputs.version }}" \
-            --app-version "${{ inputs.appVersion != '' && inputs.appVersion || inputs.version }}"
+            --app-version "${{ inputs.appVersion != '' && inputs.appVersion || inputs.version }}" \
+            $DEPENDENCY_UPDATE
         else
-          helm package "${{ inputs.chart }}" --destination "${{ runner.temp }}/packaged-chart/"
+          helm package "${{ inputs.chart }}" --destination "${{ runner.temp }}/packaged-chart/" \
+            $DEPENDENCY_UPDATE
         fi
 
     ###
