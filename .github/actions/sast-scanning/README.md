@@ -1,7 +1,7 @@
 # Static Application Security Testing Action
 
-This GitHub action runs a SonarQube analysis over a repo and, by default,
-enforces the project's quality gate as a hard failure.
+This GitHub action runs a SonarQube analysis over a repo and reports, and
+optionally enforces, the project's quality gate.
 
 As of ODY go live to prod, passing this action is a requirement for release.
 
@@ -13,8 +13,10 @@ When invoked, the action will carry out the following steps.
   early with a clear message rather than leaving the scanner to fail opaquely.
 * Run the [SonarQube scanner][1] over `project-base-dir`, passing through
   `sonar-project-key`, `sonar-organization` and any additional `args`.
-* Wait for the analysis to be processed and fail the job when the quality gate
-  is not passing, unless `sonar-fail-on-quality-gate` is `false`.
+* Unless `quality-gate` is `off`, wait for the analysis to be processed and
+  read the quality gate result. Whether a failing gate fails the job depends on
+  `quality-gate` — see [The quality gate](#the-quality-gate). A failure of the
+  scan itself always fails the job, since the scan runs as its own step.
 
 Both upstream actions are pinned by commit SHA.
 
@@ -62,7 +64,8 @@ not needed for a self-hosted SonarQube Server.
 | `sonar-token` | | Yes | A SonarQube token with permission to analyse the project. |
 | `sonar-project-key` | | No | The key of the project to analyse. Only required when the repo has no `sonar-project.properties` declaring `sonar.projectKey`. |
 | `sonar-organization` | | No | The organization the project belongs to. Required by SonarQube Cloud unless declared in `sonar-project.properties`. |
-| `sonar-fail-on-quality-gate` | `'true'` | No | Whether to perform just the scan or to enforce it with a hard failure gate. |
+| `quality-gate` | `warn` | No | `enforce`, `warn` or `off`. See [The quality gate](#the-quality-gate). |
+| `sonar-fail-on-quality-gate` | | No | **Deprecated** — use `quality-gate`. `true` maps to `enforce`, `false` maps to `off`. |
 | `sonar-polling-timeout-seconds` | `'300'` | No | Maximum time to wait for the quality gate result. |
 | `project-base-dir` | `.` | No | Base directory of the code to scan. Usually `.`, except in a monorepo where it could be `apps/<application-name>`. |
 | `args` | | No | Additional arguments for the Sonar Scanner CLI, for example `-Dsonar.sources=src`. |
@@ -71,7 +74,22 @@ not needed for a self-hosted SonarQube Server.
 
 | Output | Description |
 | :--- | :--- |
-| `quality-gate-status` | The quality gate result, one of `PASSED`, `WARN` or `FAILED`. Only populated when `sonar-fail-on-quality-gate` is `true`. |
+| `quality-gate-status` | The quality gate result, one of `PASSED`, `WARN` or `FAILED`. Populated in `warn` mode too, so a caller can route a non-blocking failure to a notification or check run. Empty when `quality-gate` is `off`. |
+
+## The Quality Gate
+
+`quality-gate` controls two separate decisions — whether the verdict is
+*observed*, and whether it is *enforced*.
+
+| Mode | Waits for the verdict | Fails the build | Reports the result |
+| :--- | :--- | :--- | :--- |
+| `enforce` | yes | yes | yes |
+| `warn` | yes | no | yes — warning annotation and job summary |
+| `off` | no | no | no — the gate is never evaluated |
+
+To unblock a project's build while it is brought up to standard, use `warn`,
+not `off` — `off` leaves you with no signal at all.
+
 
 ## Usage
 
@@ -124,7 +142,7 @@ still published but a failing gate does not block the build.
           sonar-token: ${{ secrets.SONAR_TOKEN }}
           sonar-project-key: telicent-access-platform
           sonar-organization: telicent-oss
-          sonar-fail-on-quality-gate: 'false'
+          quality-gate: warn
 ```
 
 ### Self-Hosted SonarQube With Extra Scanner Properties
