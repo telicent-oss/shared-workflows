@@ -250,6 +250,9 @@ jobs:
 
       - name: Check whether SonarQube is Configured
         id: sq-check
+        # Don't run SonarQube for Dependabot PRs, these PRs only bump dependencies which inherently cannot change code
+        # quality in any way
+        if: ${{ github.actor != 'dependabot[bot]' }}
         run: |
           if [ -n "$SONAR_HOST_URL" ] && [ -n "$SONAR_TOKEN" ]; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
