@@ -29,7 +29,7 @@ jobs:
         uses: actions/checkout@v6.0.2
 
       - name: Install Java and Maven
-        uses: actions/setup-java@v5.4.0
+        uses: actions/setup-java@v6.3.0
         with:
           java-version: ${{ inputs.JAVA_VERSION }}
           distribution: ${{ inputs.JDK }}
@@ -37,6 +37,11 @@ jobs:
           # We intentionally don't configure credentials for the cache dependencies step.  Any dependencies MUST
           # be in the public artifact repository so fail fast if a project is still relying on private dependencies
           # that have not been published.
+          # This fixes a bug seen where some builds go very slow because a JBoss dependency declares the public
+          # JBoss repository which causes Maven to try and resolve dependencies there which don't exist leading to
+          # 5xx errors and backoff retry slowing the build
+          mvn-mirrors: |
+            central:https://repo.maven.apache.org/maven2:jboss-public-repository-group
 
       - name: Cache Maven Dependencies
         run: |

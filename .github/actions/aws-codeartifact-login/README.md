@@ -77,14 +77,17 @@ For example a Maven user might then use a subsequent step to configure Maven wit
 
 ```yaml
       - name: Install Java and Maven
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v6.3.0
+        env:
+          MAVEN_USERNAME: ${{ steps.code-artifact-login.outputs.user }}
+          MAVEN_PASSWORD: ${{ steps.code-artifact-login.outputs.token }}
         with:
           java-version: 17
           distribution: temurin
           cache: maven
           server-id: codeartifact
-          server-username: ${{ steps.code-artifact-login.outputs.user }}
-          server-password: ${{ steps.code-artifact-login.outputs.token }}
+          server-username-env-var: MAVEN_USERNAME
+          server-password-env-var: MAVEN_PASSWORD
 ```
 
 Or a Python user might do the following:
