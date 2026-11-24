@@ -63,10 +63,15 @@ jobs:
         uses: actions/checkout@v6.0.2
 
       - name: Install Java 17
-        uses: actions/setup-java@v5.4.0
+        uses: actions/setup-java@v6.3.0
         with:
           java-version: 17
           distribution: temurin
+          # This fixes a bug seen where some builds go very slow because a JBoss dependency declares the public
+          # JBoss repository which causes Maven to try and resolve dependencies there which don't exist leading to
+          # 5xx errors and backoff retry slowing the build
+          mvn-mirrors: |
+            central:https://repo.maven.apache.org/maven2:jboss-public-repository-group
 
       - name: Install jira-sync
         uses: jaxxstorm/action-install-gh-release@v3.0.0

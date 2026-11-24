@@ -191,11 +191,16 @@ jobs:
         uses: actions/checkout@v6.0.2
 
       - name: Install Java and Maven
-        uses: actions/setup-java@v5.4.0
+        uses: actions/setup-java@v6.3.0
         with:
           java-version: ${{ inputs.JAVA_VERSION }}
           distribution: ${{ inputs.JDK }}
           cache: maven
+          # This fixes a bug seen where some builds go very slow because a JBoss dependency declares the public
+          # JBoss repository which causes Maven to try and resolve dependencies there which don't exist leading to
+          # 5xx errors and backoff retry slowing the build
+          mvn-mirrors: |
+            central:https://repo.maven.apache.org/maven2:jboss-public-repository-group
 
       # NB - This is needed because sometimes Maven won't resolve internal project dependencies
       #      if this is the very first build for that version e.g. just after a version bump
@@ -284,11 +289,16 @@ jobs:
         uses: actions/checkout@v6.0.2
       
       - name: Install Java and Maven
-        uses: actions/setup-java@v5.4.0
+        uses: actions/setup-java@v6.3.0
         with:
           java-version: ${{ inputs.JAVA_VERSION }}
           distribution: ${{ inputs.JDK }}
           cache: maven
+          # This fixes a bug seen where some builds go very slow because a JBoss dependency declares the public
+          # JBoss repository which causes Maven to try and resolve dependencies there which don't exist leading to
+          # 5xx errors and backoff retry slowing the build
+          mvn-mirrors: |
+            central:https://repo.maven.apache.org/maven2:jboss-public-repository-group
 
       - name: Build Required Modules without Tests
         run: |
@@ -392,11 +402,16 @@ jobs:
           fetch-depth: 0
 
       - name: Install Java and Maven
-        uses: actions/setup-java@v5.4.0
+        uses: actions/setup-java@v6.3.0
         with:
           java-version: ${{ inputs.JAVA_VERSION }}
           distribution: ${{ inputs.JDK }}
           cache: maven
+          # This fixes a bug seen where some builds go very slow because a JBoss dependency declares the public
+          # JBoss repository which causes Maven to try and resolve dependencies there which don't exist leading to
+          # 5xx errors and backoff retry slowing the build
+          mvn-mirrors: |
+            central:https://repo.maven.apache.org/maven2:jboss-public-repository-group
       
       - name: Check whether any Java code changed
         id: java-changes
@@ -452,7 +467,7 @@ jobs:
         uses: actions/checkout@v6.0.2
 
       - name: Install Java and Maven
-        uses: actions/setup-java@v5.4.0
+        uses: actions/setup-java@v6.3.0
         with:
           java-version: ${{ inputs.JAVA_VERSION }}
           distribution: ${{ inputs.JDK }}
@@ -460,8 +475,13 @@ jobs:
           server-id: ${{ inputs.MAVEN_REPOSITORY_ID }}
           # Forced to use indirection here, the setup-java action configures the Maven settings.xml to reference
           # the credentials via environment variables
-          server-username: MAVEN_USERNAME
-          server-password: MAVEN_PASSWORD
+          server-username-env-var: MAVEN_USERNAME
+          server-password-env-var: MAVEN_PASSWORD
+          # This fixes a bug seen where some builds go very slow because a JBoss dependency declares the public
+          # JBoss repository which causes Maven to try and resolve dependencies there which don't exist leading to
+          # 5xx errors and backoff retry slowing the build
+          mvn-mirrors: |
+            central:https://repo.maven.apache.org/maven2:jboss-public-repository-group
 
       - name: Check whether GPG Signing is Enabled
         id: gpg-check

@@ -46,7 +46,7 @@ The caller is responsible for installing Java and Maven before invoking the
 action, typically:
 
 ```yaml
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6.3.0
         with:
           distribution: temurin
           java-version: '21'
@@ -151,7 +151,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6.3.0
         with:
           distribution: temurin
           java-version: '21'
@@ -183,7 +183,7 @@ explicitly.
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6.3.0
         with:
           distribution: temurin
           java-version: '21'
