@@ -27,6 +27,25 @@ subscription.
 3. The build number is the number of commits between the last release's tag
    and the commit being built.
 
+### Before the first release
+
+When no release can be found, the version is `0.0.0-RC.<commits>`, numbered by
+every commit behind the one being built. It ranks below any release, so the
+builds are outranked as soon as the repository has one. No release can be
+found when:
+
+- there is no manifest file;
+- the manifest has no version for the package; or
+- the manifest's version has no tag.
+
+The step then adds a warning to the job summary, and a warning annotation to
+the run, naming the manifest, version and tag prefix it looked for. A wrong
+`manifest-file`, `package-path` or `tag-prefix` in a repository that has
+released looks the same, and the warning is how to tell.
+
+Only a "not found" answer from GitHub is treated this way. Any other API
+error fails the step, and no version is written.
+
 Everything is read through the GitHub API, so the action needs no checkout
 and no language tooling. It is the same for a Node.js, Python or any other
 repository that release-please manages with a manifest.
@@ -34,7 +53,7 @@ repository that release-please manages with a manifest.
 ## Requirements
 
 - The repository is released with release-please, using a manifest file.
-- The last released version has a tag, named `<tag-prefix><version>`.
+- Each released version has a tag, named `<tag-prefix><version>`.
 - The job has these permissions:
 
   ```yaml
@@ -61,7 +80,7 @@ repository that release-please manages with a manifest.
 | Output       | Description                                                       |
 | ------------ | ----------------------------------------------------------------- |
 | version      | The release candidate version, for example `1.8.0-RC.12`.         |
-| next-version | The version the build is a candidate of, for example `1.8.0`.     |
+| next-version | The version the build is a candidate of, for example `1.8.0`. `0.0.0` before the first release. |
 
 ## Usage
 

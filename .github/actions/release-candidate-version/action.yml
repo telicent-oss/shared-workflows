@@ -1,8 +1,9 @@
 name: Release Candidate Version
 description: |
   Works out the version for a development build of a repository released with release-please:
-  <next version>-RC.<commits since the last release>. Reads the release-please manifest through
-  the GitHub API, so it needs no checkout and is the same for any language.
+  <next version>-RC.<commits since the last release>, or 0.0.0-RC.<commits> before the first
+  release. Reads the release-please manifest through the GitHub API, so it needs no checkout
+  and is the same for any language.
 author: Telicent
 
 inputs:
@@ -47,45 +48,74 @@ runs:
       run: |
         set -euo pipefail
 
-        # The package's version in the manifest as it is at a commit or on a branch.
-        manifest_version() {
-          gh api -X GET "repos/$GITHUB_REPOSITORY/contents/$MANIFEST_FILE" -f ref="$1" \
-              -H "Accept: application/vnd.github.raw+json" | jq -r --arg package "$PACKAGE_PATH" '.[$package] // empty'
+        # A GitHub API read that prints nothing when the thing asked for does not exist (404),
+        # and fails on any other error.
+        api() {
+          local RESPONSE
+          if RESPONSE=$(gh api "$@" 2>&1); then
+            echo "$RESPONSE"
+          elif [[ "$RESPONSE" != *"HTTP 404"* ]]; then
+            echo "$RESPONSE" >&2
+            return 1
+          fi
         }
 
-        # The last released version: release-please only changes the manifest in a release.
-        CURRENT_VERSION=$(manifest_version "$GITHUB_SHA")
-        if [[ ! "$CURRENT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-          echo "::error::No released version for package '$PACKAGE_PATH' in $MANIFEST_FILE (found '$CURRENT_VERSION')."
-          exit 1
-        fi
-
-        # The next version is the one an open release-please pull request into this branch
-        # proposes for the package, read from the manifest on the pull request's branch.
-        NEXT_VERSION=""
-        RELEASE_BRANCHES=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --base "$GITHUB_REF_NAME" \
-            --label "autorelease: pending" --json headRefName,labels \
-            --jq '.[] | select(any(.labels[]; .name == "autorelease: pending")) | .headRefName | select(startswith("release-please--"))')
-        for RELEASE_BRANCH in $RELEASE_BRANCHES; do
-          PROPOSED_VERSION=$(manifest_version "$RELEASE_BRANCH")
-          if [[ -n "$PROPOSED_VERSION" && "$PROPOSED_VERSION" != "$CURRENT_VERSION" ]]; then
-            NEXT_VERSION="$PROPOSED_VERSION"
-            echo "Release pull request branch $RELEASE_BRANCH proposes $NEXT_VERSION."
-            break
+        # The package's version in the manifest as it is at a commit or on a branch.
+        manifest_version() {
+          local MANIFEST
+          MANIFEST=$(api -X GET "repos/$GITHUB_REPOSITORY/contents/$MANIFEST_FILE" -f ref="$1" \
+              -H "Accept: application/vnd.github.raw+json") || return 1
+          if [[ -n "$MANIFEST" ]]; then
+            jq -r --arg package "$PACKAGE_PATH" '.[$package] // empty' <<< "$MANIFEST"
           fi
-        done
+        }
 
-        # With no such pull request, it is the next patch of the released version.
-        if [[ -z "$NEXT_VERSION" ]]; then
-          IFS=. read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
-          NEXT_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
-          echo "No release pull request proposes a version. Using the next patch of $CURRENT_VERSION."
+        # The last released version (release-please only changes the manifest in a release), and
+        # the number of commits since its tag.
+        BUILD=""
+        CURRENT_VERSION=$(manifest_version "$GITHUB_SHA")
+        if [[ "$CURRENT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          BUILD=$(api "repos/$GITHUB_REPOSITORY/compare/$TAG_PREFIX$CURRENT_VERSION...$GITHUB_SHA" --jq .ahead_by)
         fi
 
-        # Numbered by the commits since the last release's tag, so each build of a version
-        # outranks the one before it (semver orders RC.9 below RC.10).
-        BUILD=$(gh api "repos/$GITHUB_REPOSITORY/compare/$TAG_PREFIX$CURRENT_VERSION...$GITHUB_SHA" --jq .ahead_by)
+        if [[ -z "$BUILD" ]]; then
+          # Nothing has been released: there is no manifest, no version in it for the package, or
+          # no tag for that version. The build is a candidate of 0.0.0, which ranks below every
+          # release, numbered by all the commits behind it.
+          NEXT_VERSION="0.0.0"
+          # shellcheck disable=SC2016
+          BUILD=$(gh api graphql -F owner="${GITHUB_REPOSITORY%/*}" -F name="${GITHUB_REPOSITORY#*/}" -F sha="$GITHUB_SHA" \
+              -f query='query($owner: String!, $name: String!, $sha: GitObjectID!) {
+                repository(owner: $owner, name: $name) { object(oid: $sha) { ... on Commit { history { totalCount } } } }
+              }' --jq .data.repository.object.history.totalCount)
+          WARNING="No release found for package '$PACKAGE_PATH' (version '$CURRENT_VERSION' in $MANIFEST_FILE, tag prefix '$TAG_PREFIX'). The build is versioned as a candidate of 0.0.0."
+          echo "::warning title=Release candidate of 0.0.0::$WARNING"
+          printf '> [!WARNING]\n> **Release candidate of 0.0.0.** %s\n' "$WARNING" >> "$GITHUB_STEP_SUMMARY"
+        else
+          # The next version is the one an open release-please pull request into this branch
+          # proposes for the package, read from the manifest on the pull request's branch.
+          NEXT_VERSION=""
+          RELEASE_BRANCHES=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --base "$GITHUB_REF_NAME" \
+              --label "autorelease: pending" --json headRefName,labels \
+              --jq '.[] | select(any(.labels[]; .name == "autorelease: pending")) | .headRefName | select(startswith("release-please--"))')
+          for RELEASE_BRANCH in $RELEASE_BRANCHES; do
+            PROPOSED_VERSION=$(manifest_version "$RELEASE_BRANCH")
+            if [[ -n "$PROPOSED_VERSION" && "$PROPOSED_VERSION" != "$CURRENT_VERSION" ]]; then
+              NEXT_VERSION="$PROPOSED_VERSION"
+              echo "Release pull request branch $RELEASE_BRANCH proposes $NEXT_VERSION."
+              break
+            fi
+          done
 
+          # With no such pull request, it is the next patch of the released version.
+          if [[ -z "$NEXT_VERSION" ]]; then
+            IFS=. read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+            NEXT_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+            echo "No release pull request proposes a version. Using the next patch of $CURRENT_VERSION."
+          fi
+        fi
+
+        # Each build of a version outranks the one before it (semver orders RC.9 below RC.10).
         VERSION="$NEXT_VERSION-RC.$BUILD"
         echo "next-version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
         echo "version=$VERSION" >> "$GITHUB_OUTPUT"
