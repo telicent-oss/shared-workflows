@@ -1,0 +1,92 @@
+name: Release Candidate Version
+description: |
+  Works out the version for a development build of a repository released with release-please:
+  <next version>-RC.<commits since the last release>. Reads the release-please manifest through
+  the GitHub API, so it needs no checkout and is the same for any language.
+author: Telicent
+
+inputs:
+  manifest-file:
+    required: false
+    default: .github/release-please-manifest.json
+    description: Path to the release-please manifest file, relative to the repository root.
+  package-path:
+    required: false
+    default: "."
+    description: The package's key in the release-please manifest. Defaults to `.`, the repository root.
+  tag-prefix:
+    required: false
+    default: v
+    description: |
+      What precedes the version in the package's release tags. Defaults to `v` (tags such as `v1.2.3`).
+      A package released with its component in the tag needs it here, for example `my-component-v`.
+  github-token:
+    required: false
+    default: ${{ github.token }}
+    description: Token used to read the repository's contents and pull requests.
+
+outputs:
+  version:
+    description: The release candidate version, for example `1.8.0-RC.12`.
+    value: ${{ steps.version.outputs.version }}
+  next-version:
+    description: The version the build is a candidate of, for example `1.8.0`.
+    value: ${{ steps.version.outputs.next-version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Work out the release candidate version
+      id: version
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        MANIFEST_FILE: ${{ inputs.manifest-file }}
+        PACKAGE_PATH: ${{ inputs.package-path }}
+        TAG_PREFIX: ${{ inputs.tag-prefix }}
+      run: |
+        set -euo pipefail
+
+        # The package's version in the manifest as it is at a commit or on a branch.
+        manifest_version() {
+          gh api -X GET "repos/$GITHUB_REPOSITORY/contents/$MANIFEST_FILE" -f ref="$1" \
+              -H "Accept: application/vnd.github.raw+json" | jq -r --arg package "$PACKAGE_PATH" '.[$package] // empty'
+        }
+
+        # The last released version: release-please only changes the manifest in a release.
+        CURRENT_VERSION=$(manifest_version "$GITHUB_SHA")
+        if [[ ! "$CURRENT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "::error::No released version for package '$PACKAGE_PATH' in $MANIFEST_FILE (found '$CURRENT_VERSION')."
+          exit 1
+        fi
+
+        # The next version is the one an open release-please pull request into this branch
+        # proposes for the package, read from the manifest on the pull request's branch.
+        NEXT_VERSION=""
+        RELEASE_BRANCHES=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open --base "$GITHUB_REF_NAME" \
+            --label "autorelease: pending" --json headRefName,labels \
+            --jq '.[] | select(any(.labels[]; .name == "autorelease: pending")) | .headRefName | select(startswith("release-please--"))')
+        for RELEASE_BRANCH in $RELEASE_BRANCHES; do
+          PROPOSED_VERSION=$(manifest_version "$RELEASE_BRANCH")
+          if [[ -n "$PROPOSED_VERSION" && "$PROPOSED_VERSION" != "$CURRENT_VERSION" ]]; then
+            NEXT_VERSION="$PROPOSED_VERSION"
+            echo "Release pull request branch $RELEASE_BRANCH proposes $NEXT_VERSION."
+            break
+          fi
+        done
+
+        # With no such pull request, it is the next patch of the released version.
+        if [[ -z "$NEXT_VERSION" ]]; then
+          IFS=. read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+          NEXT_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+          echo "No release pull request proposes a version. Using the next patch of $CURRENT_VERSION."
+        fi
+
+        # Numbered by the commits since the last release's tag, so each build of a version
+        # outranks the one before it (semver orders RC.9 below RC.10).
+        BUILD=$(gh api "repos/$GITHUB_REPOSITORY/compare/$TAG_PREFIX$CURRENT_VERSION...$GITHUB_SHA" --jq .ahead_by)
+
+        VERSION="$NEXT_VERSION-RC.$BUILD"
+        echo "next-version=$NEXT_VERSION" >> "$GITHUB_OUTPUT"
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+        echo "version = $VERSION"
